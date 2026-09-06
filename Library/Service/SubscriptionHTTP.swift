@@ -1,36 +1,29 @@
 import Foundation
+import Security
 #if canImport(UIKit)
     import UIKit
 #endif
 
-enum SubscriptionHTTP {
-    struct Response {
-        let body: String
-        let headers: [String: String]
-    }
+/// Happ / Remnawave subscription identity — separate from app `HTTPClient` UA.
+///
+/// Rule: remote subscription fetch always starts as Happ. Brand UAs are fallback only
+/// when the Happ response cannot be used (rejected stub, empty, unparsable).
+public enum SubscriptionClientIdentity {
+    /// Primary panel-compatible UA. Must stay first in `userAgents`.
+    public static let primaryUserAgent = "Happ/3.13.0"
 
-    /// Remnawave / Happ-compatible clients require X-HWID. Without it this panel
-    /// returns a stub: vless://…@127.0.0.1:1#Приложение не поддерживается
-    /// Prefer Happ UA so Remnawave returns native XRAY_JSON (same as Direct / Happ clients).
-    /// Fallback UAs may return base64 share-link lists instead.
-    static let userAgents: [String] = [
-        "Happ/3.13.0",
+    /// Ordered agents for subscription fetch only. Index 0 is always Happ.
+    public static let userAgents: [String] = [
+        primaryUserAgent,
         "vpndirect",
         "VPN Direct/1.0.0",
         "sfi/1.0.0 vpndirect",
     ]
 
-    static func fetch(url: String, userAgent: String) async throws -> Response {
-        guard let requestURL = URL(string: url) else {
-            throw URLError(.badURL)
-        }
-        var request = URLRequest(url: requestURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 45)
-        request.httpMethod = "GET"
-        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        request.setValue("text/plain, application/json, */*", forHTTPHeaderField: "Accept")
-        request.setValue("gzip, deflate, br", forHTTPHeaderField: "Accept-Encoding")
+    public static var device: DeviceIdentity.Info { DeviceIdentity.current }
 
-        // Same device headers Happ sends (Remnawave HWID Device Limit / panel filters).
+    /// Applies Remnawave / Happ device headers (case variants for panel compatibility).
+    public static func applyDeviceHeaders(to request: inout URLRequest) {
         let device = DeviceIdentity.current
         request.setValue(device.hwid, forHTTPHeaderField: "X-HWID")
         request.setValue(device.hwid, forHTTPHeaderField: "x-hwid")
@@ -41,6 +34,29 @@ enum SubscriptionHTTP {
         request.setValue(device.model, forHTTPHeaderField: "X-Device-Model")
         request.setValue(device.model, forHTTPHeaderField: "x-device-model")
         request.setValue(device.locale, forHTTPHeaderField: "X-Device-Locale")
+    }
+}
+
+enum SubscriptionHTTP {
+    struct Response {
+        let body: String
+        let headers: [String: String]
+        let userAgent: String
+    }
+
+    /// Compatibility alias — always Happ-first via `SubscriptionClientIdentity`.
+    static var userAgents: [String] { SubscriptionClientIdentity.userAgents }
+
+    static func fetch(url: String, userAgent: String) async throws -> Response {
+        guard let requestURL = URL(string: url) else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: requestURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 45)
+        request.httpMethod = "GET"
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("text/plain, application/json, */*", forHTTPHeaderField: "Accept")
+        request.setValue("gzip, deflate, br", forHTTPHeaderField: "Accept-Encoding")
+        SubscriptionClientIdentity.applyDeviceHeaders(to: &request)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, !(200 ... 299).contains(http.statusCode) {
@@ -66,7 +82,7 @@ enum SubscriptionHTTP {
                 }
             }
         }
-        return Response(body: text, headers: headers)
+        return Response(body: text, headers: headers, userAgent: userAgent)
     }
 
     static func getString(url: String, userAgent: String) async throws -> String {
@@ -74,18 +90,23 @@ enum SubscriptionHTTP {
     }
 }
 
-enum DeviceIdentity {
-    struct Info {
-        let hwid: String
-        let osName: String
-        let osVersion: String
-        let model: String
-        let locale: String
+/// Stable Remnawave-compatible HWID (vendor UUID without dashes).
+/// Prefer Keychain so reinstall / data reset does not burn a new device slot when possible.
+public enum DeviceIdentity {
+    public struct Info {
+        public let hwid: String
+        public let osName: String
+        public let osVersion: String
+        public let model: String
+        public let locale: String
     }
 
-    private static let hwidKey = "vpndirect.subscription.hwid.v2"
+    private static let defaultsKeyV2 = "vpndirect.subscription.hwid.v2"
+    private static let defaultsKeyLegacy = "vpndirect.subscription.hwid"
+    private static let keychainService = "com.vpndirect.vpndirectapp.subscription"
+    private static let keychainAccount = "hwid.v2"
 
-    static var current: Info {
+    public static var current: Info {
         #if os(iOS) || os(tvOS)
             let osName = "iOS"
             let osVersion = UIDevice.current.systemVersion
@@ -109,13 +130,22 @@ enum DeviceIdentity {
         )
     }
 
-    /// Real per-install device id, same style as Happ: vendor UUID without dashes.
     /// Remnawave accepts `/^[a-zA-Z0-9=-]{10,64}$/`.
     private static func stableHWID() -> String {
-        if let existing = UserDefaults.standard.string(forKey: hwidKey),
-           existing.range(of: #"^[a-zA-Z0-9=-]{10,64}$"#, options: .regularExpression) != nil
-        {
+        if let keychain = readKeychain(), isValidHWID(keychain) {
+            return keychain
+        }
+
+        if let existing = UserDefaults.standard.string(forKey: defaultsKeyV2), isValidHWID(existing) {
+            writeKeychain(existing)
             return existing
+        }
+
+        if let legacy = UserDefaults.standard.string(forKey: defaultsKeyLegacy), isValidHWID(legacy) {
+            writeKeychain(legacy)
+            UserDefaults.standard.set(legacy, forKey: defaultsKeyV2)
+            UserDefaults.standard.removeObject(forKey: defaultsKeyLegacy)
+            return legacy
         }
 
         #if os(iOS) || os(tvOS)
@@ -124,12 +154,46 @@ enum DeviceIdentity {
             let seed = UUID().uuidString
         #endif
 
-        // 32 hex chars from identifierForVendor — stable for this app on this device.
         let hwid = String(seed.replacingOccurrences(of: "-", with: "").prefix(32))
-        UserDefaults.standard.set(hwid, forKey: hwidKey)
-        // Drop legacy synthetic ids from earlier builds.
-        UserDefaults.standard.removeObject(forKey: "vpndirect.subscription.hwid")
+        writeKeychain(hwid)
+        UserDefaults.standard.set(hwid, forKey: defaultsKeyV2)
+        UserDefaults.standard.removeObject(forKey: defaultsKeyLegacy)
         return hwid
+    }
+
+    private static func isValidHWID(_ value: String) -> Bool {
+        value.range(of: #"^[a-zA-Z0-9=-]{10,64}$"#, options: .regularExpression) != nil
+    }
+
+    private static func readKeychain() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess,
+              let data = item as? Data,
+              let value = String(data: data, encoding: .utf8)
+        else { return nil }
+        return value
+    }
+
+    private static func writeKeychain(_ value: String) {
+        guard let data = value.data(using: .utf8) else { return }
+        let base: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+        ]
+        SecItemDelete(base as CFDictionary)
+        var add = base
+        add[kSecValueData as String] = data
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        SecItemAdd(add as CFDictionary, nil)
     }
 
     private static func machineIdentifier() -> String {

@@ -52,7 +52,7 @@ public struct VPNDirectObfuscationID: RawRepresentable, Hashable, Sendable, Coda
 }
 
 /// Canonical intermediate node produced by VPN Direct parsers.
-public struct NormalizedNode: Equatable, Sendable {
+public struct NormalizedNode: Equatable {
     public var name: String
     public var protocolID: VPNDirectProtocolID
     public var server: String
@@ -67,6 +67,8 @@ public struct NormalizedNode: Equatable, Sendable {
     public var source: String?
     /// Pre-built sing-box outbound when the adapter already constructed one.
     public var outbound: [String: Any]?
+    /// Optional detour / next-hop tag (Xray dialerProxy → sing-box detour).
+    public var detour: String?
 
     public init(
         name: String,
@@ -79,7 +81,8 @@ public struct NormalizedNode: Equatable, Sendable {
         uuid: String? = nil,
         attributes: [String: String] = [:],
         source: String? = nil,
-        outbound: [String: Any]? = nil
+        outbound: [String: Any]? = nil,
+        detour: String? = nil
     ) {
         self.name = name
         self.protocolID = protocolID
@@ -92,6 +95,7 @@ public struct NormalizedNode: Equatable, Sendable {
         self.attributes = attributes
         self.source = source
         self.outbound = outbound
+        self.detour = detour
     }
 
     public static func == (lhs: NormalizedNode, rhs: NormalizedNode) -> Bool {
@@ -105,5 +109,6 @@ public struct NormalizedNode: Equatable, Sendable {
             && lhs.uuid == rhs.uuid
             && lhs.attributes == rhs.attributes
             && lhs.source == rhs.source
+            && lhs.detour == rhs.detour
     }
 }

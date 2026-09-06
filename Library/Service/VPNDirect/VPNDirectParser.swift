@@ -1,7 +1,7 @@
 import Foundation
 
 /// Diagnostics for a parse pass over subscription content or share-link lists.
-public struct VPNDirectParseDiagnostics: Equatable, Sendable {
+public struct VPNDirectParseDiagnostics: Equatable {
     public var total: Int
     public var parsed: Int
     public var unsupported: Int
@@ -23,7 +23,7 @@ public struct VPNDirectParseDiagnostics: Equatable, Sendable {
     }
 }
 
-public struct VPNDirectParseResult: Sendable {
+public struct VPNDirectParseResult {
     public var nodes: [NormalizedNode]
     public var diagnostics: VPNDirectParseDiagnostics
 
@@ -34,7 +34,7 @@ public struct VPNDirectParseResult: Sendable {
 }
 
 /// Universal parser surface. Milestone 2: VLESS adapter; Milestone 3 expands schemes.
-public protocol VPNDirectParser: Sendable {
+public protocol VPNDirectParser {
     /// Schemes this parser accepts (e.g. `vless`).
     var supportedSchemes: [String] { get }
 

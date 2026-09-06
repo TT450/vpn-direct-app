@@ -9,7 +9,9 @@ Public roadmap for VPN Direct (Apple client + VPN Direct Core). Status language 
 - [x] Remove fake Mieru capability / tags until runtime exists
 - [x] Compile-time proofs for MASQUE / VLESS encryption / gecko
 - [x] NormalizedNode + VLESS adapter skeleton
+- [x] Happ-first subscription identity + Keychain HWID
 - [ ] Universal multi-scheme URI parsers (VMess, Trojan, SS, HY2, TUIC, …)
+- [ ] TheTochka harvest: Hysteria/HY2, Remnawave balancers, location urltest, cascades
 - [ ] Clash / Mihomo YAML import
 - [ ] Expanded regression fixtures + `sing-box check` in CI
 

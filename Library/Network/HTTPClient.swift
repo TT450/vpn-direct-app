@@ -3,7 +3,8 @@ import Libbox
 
 public class HTTPClient {
     private static var userAgent: String {
-        // Must contain `vpndirect` for Remnawave ALLOWED_APP_USER_AGENTS filters.
+        // App/ruleset/update identity — NOT subscription Happ masquerade.
+        // Subscription fetch uses SubscriptionClientIdentity (Happ-first) exclusively.
         "vpndirect/1.0.0 (SFI; sing-box \(LibboxVersion()))"
     }
 

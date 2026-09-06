@@ -79,24 +79,33 @@ public enum SubscriptionConfigBuilder {
     public static func fetchAndNormalize(url: String) async throws -> Result {
         let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
         var lastError: Error = SubscriptionError.empty
+        // Always Happ first (SubscriptionClientIdentity.userAgents[0]); brand UAs only as fallback.
+        precondition(SubscriptionClientIdentity.userAgents.first == SubscriptionClientIdentity.primaryUserAgent)
 
-        for agent in SubscriptionHTTP.userAgents {
+        for agent in SubscriptionClientIdentity.userAgents {
             do {
                 let response = try await SubscriptionHTTP.fetch(url: trimmedURL, userAgent: agent)
                 do {
                     return try normalizeRemoteContent(response.body, sourceURL: trimmedURL, headers: response.headers)
                 } catch {
                     lastError = error
+                    // Panel stub / wrong format for this UA → try next identity.
                     if case SubscriptionError.panelRejected = error {
                         continue
                     }
-                    // HTML browser page is not usable as a profile body.
-                    if response.body.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix("<!doctype")
-                        || response.body.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix("<html")
-                    {
+                    if case SubscriptionError.noSupportedLinks = error {
                         continue
                     }
-                    throw error
+                    if case SubscriptionError.empty = error {
+                        continue
+                    }
+                    // HTML browser page is not usable as a profile body.
+                    let lowered = response.body.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                    if lowered.hasPrefix("<!doctype") || lowered.hasPrefix("<html") {
+                        continue
+                    }
+                    // Happ (or current UA) returned something we cannot parse — try fallback UA.
+                    continue
                 }
             } catch {
                 lastError = error

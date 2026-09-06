@@ -101,7 +101,7 @@ public class ExtensionProfile: ObservableObject {
         }
     #endif
 
-    nonisolated deinit {
+    deinit {
         if let observer {
             NotificationCenter.default.removeObserver(observer)
         }

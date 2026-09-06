@@ -16,7 +16,7 @@ import Foundation
 /// 4. Sidecar / build-tag strings are **informational only** (`buildTags`); they never
 ///    enable custom VPN Direct features when ABI is incompatible
 /// 5. Stock / incompatible ABI ⇒ all custom features false
-public struct VPNDirectCoreCapabilities: Equatable, Sendable {
+public struct VPNDirectCoreCapabilities: Equatable {
     public static let expectedMagic = "VPN_DIRECT_CORE"
     public static let expectedAPIVersion = 1
 
