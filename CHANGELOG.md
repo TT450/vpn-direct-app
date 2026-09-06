@@ -2,6 +2,29 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.2] — 2026-09-07
+
+### What's New
+
+See [`WHATS_NEW.md`](WHATS_NEW.md) for the full release write-up (App Store short text + engineering detail).
+
+#### Capability correctness
+- Removed fake `with_mieru` from `vpn_direct_full`; CapabilityJSON / CI assert `mieru=false`
+- Compile-time proofs for MASQUE, VLESS encryption/PQ, Hysteria2 gecko
+- Expanded CapabilityJSON protocol/transport trees; Swift mirrors Core JSON when ABI OK
+
+#### Parser skeleton
+- `NormalizedNode` + `VPNDirectParser` + VLESS adapter
+- Subscription share-link path routes through the parser registry
+
+#### Build / CI
+- Fix `GOMOBILE_SHA` detection for sagernet gomobile; hard-fail AWG submodule init
+- `make check-capability-proofs`; core-baseline workflow extended
+
+#### GitHub / docs
+- Premium Core-first README (EN/RU/UZ/ZH) + hero banner
+- Production audit + production plan docs; ROADMAP, SUPPORT, PR/issue templates
+
 ## [1.0.1] — 2026-09-06
 
 ### What's New

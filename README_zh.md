@@ -1,58 +1,105 @@
-<div align="center">
+<p align="center">
+  <img src="docs/brand/github-hero.svg" alt="VPN Direct" width="100%" />
+</p>
 
-[**English**](README.md) · [**Русский 🇷🇺**](README_ru.md) · [**Oʻzbekcha 🇺🇿**](README_uz.md) · [**简体中文 🇨🇳**](README_zh.md)
+<p align="center">
+  <a href="README.md">English</a> ·
+  <a href="README_ru.md">Русский</a> ·
+  <a href="README_uz.md">Oʻzbekcha</a> ·
+  <a href="README_zh.md"><b>简体中文</b></a>
+</p>
 
-<br/>
+<p align="center">
+  <a href="https://github.com/TT450/vpn-direct-app/actions/workflows/core-baseline.yml"><img src="https://github.com/TT450/vpn-direct-app/actions/workflows/core-baseline.yml/badge.svg" alt="Core baseline" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-2563EB.svg?style=flat-square" alt="GPLv3" /></a>
+  <img src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-111827.svg?style=flat-square" alt="Apple platforms" />
+  <a href="https://github.com/TT450/vpn-direct-app/stargazers"><img src="https://img.shields.io/github/stars/TT450/vpn-direct-app?style=flat-square" alt="GitHub stars" /></a>
+  <a href="https://t.me/vpndirectbot"><img src="https://img.shields.io/badge/Telegram-@vpndirectbot-229ED9?style=flat-square&logo=telegram&logoColor=white" alt="Telegram" /></a>
+</p>
 
-<img src="docs/brand/logo.png" alt="VPN Direct" width="128" />
+<p align="center"><b>面向 Apple 的原生 VPN 客户端，自带可复现、capability-driven 的 sing-box Core。</b></p>
 
-# VPN Direct
+<p align="center">
+  <a href="https://apps.apple.com/app/id6807402257"><b>App Store</b></a> ·
+  <a href="docs/core/ARCHITECTURE.md"><b>架构</b></a> ·
+  <a href="docs/core/PROTOCOL_MATRIX.md"><b>协议矩阵</b></a> ·
+  <a href="docs/core/BUILDING.md"><b>构建</b></a> ·
+  <a href="CONTRIBUTING.md"><b>贡献</b></a>
+</p>
 
-**面向 Apple 的原生 VPN 客户端 — 开源，GPLv3**
+---
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-lightgrey.svg?style=flat-square)](#)
-[![Telegram](https://img.shields.io/badge/Telegram-@vpndirectbot-26A5E4?style=flat-square&logo=telegram)](https://t.me/vpndirectbot)
+## VPN Direct
 
-</div>
+VPN Direct 是面向 **iOS、macOS、tvOS** 的开源 VPN 客户端。
 
-## 什么是 VPN Direct？
+Apple 应用保留成熟的 `NetworkExtension` / `PacketTunnelProvider` 架构；网络层演进为 **VPN Direct Core** —— 基于 sing-box 与兼容扩展的可复现薄 Core。
 
-VPN Direct 是基于 [sing-box](https://github.com/SagerNet/sing-box) 与 Libbox（Network Extension）的 **iOS / macOS / tvOS** 原生 VPN 客户端。可导入标准 `vless://` 链接与订阅，并通过本仓库的 GPLv3 源码核对 App Store 构建。
+四项原则：
 
-<div align="center">
+- **原生 Apple 集成** — 系统 VPN 隧道与 Network Extension 生命周期
+- **Capability-driven Core** — 应用查询已链接 Core 的真实能力，而不是猜测
+- **可复现构建** — Core 版本、sing-box pin、Go、gomobile 与构建配置均被记录
+- **无静默协议替换** — 不支持的能力明确失败，而不是悄悄降级为另一种传输
 
-<a href="https://apps.apple.com/app/id6807402257">
-  <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="App Store" height="54"/>
-</a>
-&nbsp;&nbsp;
-<a href="https://t.me/vpndirectbot">
-  <img src="https://img.shields.io/badge/Telegram-@vpndirectbot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram"/>
-</a>
+## 为什么需要 VPN Direct Core？
 
-</div>
+在保持 Apple 客户端稳定的同时，让网络层可独立维护。
 
-## 🚀 主要特性
+```text
+Subscription / Config → Universal Parser → Normalized Node
+→ Capability Resolver → VPN Direct Core → Libbox / sing-box → NetworkExtension
+```
 
-✈️ 原生 Apple：iOS、macOS、tvOS
+## 当前 Core 状态
 
-🟡 VLESS（TLS / REALITY）、WS、gRPC、HTTPUpgrade、**XHTTP**
+仅有 builder / parser **不等于** production。
 
-🟡 订阅与 sing-box 配置生成
+进入 production 需要：`import → Core 校验 → Packet Tunnel → 握手 → TCP/UDP → DNS → 重连 → iOS 内存`
 
-🛡 开源（GPLv3）+ VPN Direct Core 0.1
+权威状态见 [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md)。
 
-📱 [App Store](https://apps.apple.com/app/id6807402257) · Telegram [@vpndirectbot](https://t.me/vpndirectbot)
+| 领域 | 状态 |
+| --- | --- |
+| 自定义 Libbox 构建流水线 | 已实现 |
+| ABI + CapabilityJSON | 已实现 |
+| VLESS 基线（TCP/TLS/REALITY/…） | Runtime |
+| XHTTP / PQ / AWG / MASQUE | 已集成，互操作 / 真机资格认证进行中 |
+| 通用多格式解析器 | 开发中 |
+| Mieru | 基线资格认证后规划 |
 
-## ⚙️ 从源码构建
+## 构建配置
 
-完整说明见 [README.md](README.md) 与 [`docs/core/BUILDING.md`](docs/core/BUILDING.md)。
+| Profile | 用途 |
+| --- | --- |
+| `vpn_direct_ios_minimal` | 精简 Apple/NE 基线 |
+| `vpn_direct_ios` | 默认 Apple 配置 |
+| `vpn_direct_full` | 开发 / 扩展协议面 |
+
+## 从源码构建
 
 ```bash
 git clone --recurse-submodules https://github.com/TT450/vpn-direct-app.git
-cd vpn-direct-app && ./scripts/bootstrap_core.sh && make libbox
+cd vpn-direct-app
+./scripts/bootstrap_core.sh
+make libbox
+make check-fixtures
+make check-abi
 ```
 
-## 📄 许可
+Scheme：iOS `SFI`，macOS `SFM` / `SFM.System`，tvOS `SFT`。详见 [`docs/core/BUILDING.md`](docs/core/BUILDING.md)。
 
-**GPLv3** — [`LICENSE`](LICENSE)。贡献指南：[`CONTRIBUTING.md`](CONTRIBUTING.md)。
+## 文档
+
+[文档索引](docs/README.md) · [架构](docs/core/ARCHITECTURE.md) · [协议矩阵](docs/core/PROTOCOL_MATRIX.md) · [生产就绪审计](docs/core/PRODUCTION_READINESS_AUDIT.md) · [Roadmap](ROADMAP.md) · [What's New](WHATS_NEW.md) · [Support](SUPPORT.md)
+
+## 许可证
+
+**GPLv3 or later** — 见 [`LICENSE`](LICENSE)、[`NOTICE`](NOTICE)。
+
+---
+
+<p align="center">
+  <b>VPN Direct</b><br/>
+  Native Apple client · reproducible Core · explicit capabilities
+</p>

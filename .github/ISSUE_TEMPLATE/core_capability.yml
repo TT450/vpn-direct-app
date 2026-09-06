@@ -1,0 +1,37 @@
+name: Core / protocol capability
+description: Report or request something about Core capabilities, builders, or protocol status
+labels: ["core"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do **not** include private keys or live subscription URLs. Prefer sanitized fixtures.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Capability lies / fail-closed bug
+        - Parser / import gap
+        - Builder / config generation
+        - Interop / device qualification evidence
+        - Documentation / Protocol Matrix mismatch
+    validations:
+      required: true
+  - type: input
+    id: protocol
+    attributes:
+      label: Protocol / transport
+      placeholder: "e.g. VLESS + xhttp, AmneziaWG 3.1, MASQUE CONNECT-IP"
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Expected vs actual capability or behavior; Core version / CapabilityJSON snippet if relevant (redacted).
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: App / Core / sing-box pin
+      placeholder: "1.0.2 / VPNDirectCore 0.1.0 / 1.14.0-lx.35"

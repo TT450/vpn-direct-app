@@ -1,58 +1,105 @@
-<div align="center">
+<p align="center">
+  <img src="docs/brand/github-hero.svg" alt="VPN Direct" width="100%" />
+</p>
 
-[**English**](README.md) · [**Русский 🇷🇺**](README_ru.md) · [**Oʻzbekcha 🇺🇿**](README_uz.md) · [**简体中文 🇨🇳**](README_zh.md)
+<p align="center">
+  <a href="README.md">English</a> ·
+  <a href="README_ru.md">Русский</a> ·
+  <a href="README_uz.md"><b>Oʻzbekcha</b></a> ·
+  <a href="README_zh.md">简体中文</a>
+</p>
 
-<br/>
+<p align="center">
+  <a href="https://github.com/TT450/vpn-direct-app/actions/workflows/core-baseline.yml"><img src="https://github.com/TT450/vpn-direct-app/actions/workflows/core-baseline.yml/badge.svg" alt="Core baseline" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-2563EB.svg?style=flat-square" alt="GPLv3" /></a>
+  <img src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-111827.svg?style=flat-square" alt="Apple platforms" />
+  <a href="https://github.com/TT450/vpn-direct-app/stargazers"><img src="https://img.shields.io/github/stars/TT450/vpn-direct-app?style=flat-square" alt="GitHub stars" /></a>
+  <a href="https://t.me/vpndirectbot"><img src="https://img.shields.io/badge/Telegram-@vpndirectbot-229ED9?style=flat-square&logo=telegram&logoColor=white" alt="Telegram" /></a>
+</p>
 
-<img src="docs/brand/logo.png" alt="VPN Direct" width="128" />
+<p align="center"><b>Apple uchun native VPN klient — o‘zining qayta ishlab chiqariladigan, capability-driven Core’i sing-box asosida.</b></p>
 
-# VPN Direct
+<p align="center">
+  <a href="https://apps.apple.com/app/id6807402257"><b>App Store</b></a> ·
+  <a href="docs/core/ARCHITECTURE.md"><b>Arxitektura</b></a> ·
+  <a href="docs/core/PROTOCOL_MATRIX.md"><b>Protokollar</b></a> ·
+  <a href="docs/core/BUILDING.md"><b>Build</b></a> ·
+  <a href="CONTRIBUTING.md"><b>Contribute</b></a>
+</p>
 
-**Apple uchun tezkor native VPN — ochiq manba, GPLv3**
+---
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-lightgrey.svg?style=flat-square)](#)
-[![Telegram](https://img.shields.io/badge/Telegram-@vpndirectbot-26A5E4?style=flat-square&logo=telegram)](https://t.me/vpndirectbot)
+## VPN Direct
 
-</div>
+VPN Direct — **iOS, macOS va tvOS** uchun open-source VPN klient.
 
-## VPN Direct nima?
+Apple ilovasi `NetworkExtension` / `PacketTunnelProvider` arxitekturasini saqlaydi; tarmoq qatlami esa **VPN Direct Core** sifatida rivojlanadi — sing-box va mos keluvchi kengaytmalar asosidagi yupqa, qayta ishlab chiqariladigan Core.
 
-VPN Direct — **iOS / macOS / tvOS** uchun [sing-box](https://github.com/SagerNet/sing-box) va Libbox asosidagi native VPN mijoz. `vless://` havolalar va obunalarni import qiling, tizim VPN tunnelidan foydalaning va App Store binaryni ushbu ochiq (GPLv3) manba bilan solishtiring.
+To‘rt tamoyil:
 
-<div align="center">
+- **Apple bilan native integratsiya** — tizim VPN tunnel, Network Extension lifecycle.
+- **Capability-driven Core** — ilova bog‘langan Core’dan real imkoniyatlarni so‘raydi.
+- **Qayta ishlab chiqariladigan buildlar** — Core versiyasi, sing-box pin, Go, gomobile va profil taglari kuzatiladi.
+- **Jim protokol almashtirish yo‘q** — qo‘llab-quvvatlanmagan funksiya aniq xato beradi.
 
-<a href="https://apps.apple.com/app/id6807402257">
-  <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="App Store" height="54"/>
-</a>
-&nbsp;&nbsp;
-<a href="https://t.me/vpndirectbot">
-  <img src="https://img.shields.io/badge/Telegram-@vpndirectbot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram"/>
-</a>
+## Nima uchun VPN Direct Core?
 
-</div>
+VPN Direct Core Apple klientini barqaror saqlab, tarmoq qatlamini mustaqil qo‘llab-quvvatlash imkonini beradi.
 
-## 🚀 Asosiy imkoniyatlar
+```text
+Subscription / Config → Universal Parser → Normalized Node
+→ Capability Resolver → VPN Direct Core → Libbox / sing-box → NetworkExtension
+```
 
-✈️ Apple native — iOS, macOS, tvOS
+## Hozirgi Core holati
 
-🟡 VLESS (TLS / REALITY), WS, gRPC, HTTPUpgrade, **XHTTP**
+Builder yoki parser borligi — bu hali **production** emas.
 
-🟡 Obunalar va sing-box konfiguratsiya
+Production uchun: `import → Core validate → Packet Tunnel → handshake → TCP/UDP → DNS → reconnect → iOS memory`.
 
-🛡 Ochiq manba (GPLv3) + VPN Direct Core 0.1
+Jonli holat: [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md).
 
-📱 [App Store](https://apps.apple.com/app/id6807402257) · Telegram [@vpndirectbot](https://t.me/vpndirectbot)
+| Yo‘nalish | Holat |
+| --- | --- |
+| Libbox build pipeline | Tayyor |
+| ABI + CapabilityJSON | Tayyor |
+| VLESS baseline (TCP/TLS/REALITY/…) | Runtime |
+| XHTTP / PQ / AWG / MASQUE | Integratsiya + kvalifikatsiya |
+| Universal parser | Ishlanmoqda |
+| Mieru | Baseline’dan keyin |
 
-## ⚙️ Manbadan yigʻish
+## Build profillari
 
-Toʻliq qoʻllanma: [README.md](README.md) · [`docs/core/BUILDING.md`](docs/core/BUILDING.md)
+| Profil | Maqsad |
+| --- | --- |
+| `vpn_direct_ios_minimal` | Kichik Apple/NE baseline |
+| `vpn_direct_ios` | Default Apple profil |
+| `vpn_direct_full` | Dev / kengaytirilgan protokol yuzasi |
+
+## Manbadan build
 
 ```bash
 git clone --recurse-submodules https://github.com/TT450/vpn-direct-app.git
-cd vpn-direct-app && ./scripts/bootstrap_core.sh && make libbox
+cd vpn-direct-app
+./scripts/bootstrap_core.sh
+make libbox
+make check-fixtures
+make check-abi
 ```
 
-## 📄 Litsenziya
+Scheme’lar: iOS `SFI`, macOS `SFM` / `SFM.System`, tvOS `SFT`. Batafsil: [`docs/core/BUILDING.md`](docs/core/BUILDING.md).
 
-**GPLv3** — [`LICENSE`](LICENSE). Hissa: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+## Hujjatlar
+
+[Docs index](docs/README.md) · [Architecture](docs/core/ARCHITECTURE.md) · [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) · [Production Audit](docs/core/PRODUCTION_READINESS_AUDIT.md) · [Roadmap](ROADMAP.md) · [What's New](WHATS_NEW.md) · [Support](SUPPORT.md)
+
+## Litsenziya
+
+**GPLv3 or later** — [`LICENSE`](LICENSE), [`NOTICE`](NOTICE).
+
+---
+
+<p align="center">
+  <b>VPN Direct</b><br/>
+  Native Apple client · reproducible Core · explicit capabilities
+</p>

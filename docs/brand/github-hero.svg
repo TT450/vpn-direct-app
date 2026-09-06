@@ -1,0 +1,20 @@
+<svg width="1440" height="480" viewBox="0 0 1440 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="bg" x1="90" y1="40" x2="1340" y2="450" gradientUnits="userSpaceOnUse"><stop stop-color="#07111F"/><stop offset="0.52" stop-color="#0B1A30"/><stop offset="1" stop-color="#101C2A"/></linearGradient>
+<radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1100 120) rotate(140) scale(540 420)"><stop stop-color="#3B82F6" stop-opacity="0.28"/><stop offset="1" stop-color="#3B82F6" stop-opacity="0"/></radialGradient>
+<linearGradient id="line" x1="860" y1="70" x2="1290" y2="390" gradientUnits="userSpaceOnUse"><stop stop-color="#60A5FA" stop-opacity="0.85"/><stop offset="1" stop-color="#93C5FD" stop-opacity="0.18"/></linearGradient>
+</defs>
+<rect width="1440" height="480" rx="28" fill="url(#bg)"/><rect width="1440" height="480" rx="28" fill="url(#glow)"/>
+<g opacity="0.95"><circle cx="1104" cy="238" r="115" stroke="#1E3A5F" stroke-width="1.5"/><circle cx="1104" cy="238" r="176" stroke="#172C46" stroke-width="1.5"/><circle cx="1104" cy="238" r="236" stroke="#13263C" stroke-width="1.5"/></g>
+<g stroke="url(#line)" stroke-width="2"><path d="M887 130L996 201L1104 238L1217 168L1322 221"/><path d="M866 309L986 282L1104 238L1220 317L1338 284"/><path d="M996 201L986 282"/><path d="M1217 168L1220 317"/></g>
+<g fill="#7DD3FC"><circle cx="887" cy="130" r="6"/><circle cx="996" cy="201" r="7"/><circle cx="986" cy="282" r="6"/><circle cx="1104" cy="238" r="11"/><circle cx="1217" cy="168" r="7"/><circle cx="1220" cy="317" r="6"/><circle cx="1322" cy="221" r="6"/><circle cx="1338" cy="284" r="5"/></g>
+<circle cx="1104" cy="238" r="26" fill="#0D203B" stroke="#60A5FA" stroke-width="2"/><path d="M1095 238L1102 245L1115 229" stroke="#BFDBFE" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+<g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif">
+<text x="92" y="152" fill="#F8FAFC" font-size="66" font-weight="700" letter-spacing="-2">VPN Direct</text>
+<text x="94" y="205" fill="#93C5FD" font-size="24" font-weight="600">Apple-native VPN client · VPN Direct Core</text>
+<text x="94" y="264" fill="#AAB8C8" font-size="22">Open source. Reproducible. Multi-protocol.</text>
+<text x="94" y="302" fill="#AAB8C8" font-size="22">Built on sing-box with a thin, capability-driven Core.</text>
+<rect x="94" y="351" width="164" height="42" rx="21" fill="#102A49" stroke="#234A73"/><text x="176" y="378" fill="#BFDBFE" font-size="17" text-anchor="middle" font-weight="600">iOS · macOS · tvOS</text>
+<rect x="274" y="351" width="147" height="42" rx="21" fill="#102A49" stroke="#234A73"/><text x="347.5" y="378" fill="#BFDBFE" font-size="17" text-anchor="middle" font-weight="600">VPN Direct Core</text>
+<rect x="437" y="351" width="117" height="42" rx="21" fill="#102A49" stroke="#234A73"/><text x="495.5" y="378" fill="#BFDBFE" font-size="17" text-anchor="middle" font-weight="600">GPLv3</text>
+</g></svg>

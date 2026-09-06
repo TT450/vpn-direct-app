@@ -23,7 +23,7 @@ body:
     id: version
     attributes:
       label: App / Core version
-      placeholder: "1.0.0 / VPNDirectCore 0.1.0"
+      placeholder: "1.0.2 / VPNDirectCore 0.1.0"
   - type: dropdown
     id: platform
     attributes:
@@ -33,3 +33,8 @@ body:
         - macOS
         - tvOS
         - Other / build scripts only
+  - type: textarea
+    id: caps
+    attributes:
+      label: Capability / Core notes (optional)
+      description: Redacted CapabilityJSON snippet or Protocol Matrix row if relevant.

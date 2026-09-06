@@ -1,157 +1,244 @@
-<div align="center">
+<p align="center">
+  <img src="docs/brand/github-hero.svg" alt="VPN Direct" width="100%" />
+</p>
 
-[**English**](README.md) · [**Русский 🇷🇺**](README_ru.md) · [**Oʻzbekcha 🇺🇿**](README_uz.md) · [**简体中文 🇨🇳**](README_zh.md)
+<p align="center">
+  <a href="README.md"><b>English</b></a> ·
+  <a href="README_ru.md">Русский</a> ·
+  <a href="README_uz.md">Oʻzbekcha</a> ·
+  <a href="README_zh.md">简体中文</a>
+</p>
 
-<br/>
+<p align="center">
+  <a href="https://github.com/TT450/vpn-direct-app/actions/workflows/core-baseline.yml"><img src="https://github.com/TT450/vpn-direct-app/actions/workflows/core-baseline.yml/badge.svg" alt="Core baseline" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-2563EB.svg?style=flat-square" alt="GPLv3" /></a>
+  <img src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-111827.svg?style=flat-square" alt="Apple platforms" />
+  <a href="https://github.com/TT450/vpn-direct-app/stargazers"><img src="https://img.shields.io/github/stars/TT450/vpn-direct-app?style=flat-square" alt="GitHub stars" /></a>
+  <a href="https://t.me/vpndirectbot"><img src="https://img.shields.io/badge/Telegram-@vpndirectbot-229ED9?style=flat-square&logo=telegram&logoColor=white" alt="Telegram" /></a>
+</p>
 
-<img src="docs/brand/logo.png" alt="VPN Direct" width="128" />
+<p align="center"><b>A native Apple VPN client with its own reproducible, capability-driven Core built on sing-box.</b></p>
 
-# VPN Direct
+<p align="center">
+  <a href="https://apps.apple.com/app/id6807402257"><b>App Store</b></a> ·
+  <a href="docs/core/ARCHITECTURE.md"><b>Architecture</b></a> ·
+  <a href="docs/core/PROTOCOL_MATRIX.md"><b>Protocol Matrix</b></a> ·
+  <a href="docs/core/BUILDING.md"><b>Build</b></a> ·
+  <a href="CONTRIBUTING.md"><b>Contribute</b></a>
+</p>
 
-**Fast native VPN client for Apple — open source, GPLv3**
+---
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-lightgrey.svg?style=flat-square)](#)
-[![Version](https://img.shields.io/badge/version-1.0.0-informational.svg?style=flat-square)](#)
-[![Stars](https://img.shields.io/github/stars/TT450/vpn-direct-app?style=flat-square)](https://github.com/TT450/vpn-direct-app/stargazers)
-[![Telegram](https://img.shields.io/badge/Telegram-@vpndirectbot-26A5E4?style=flat-square&logo=telegram)](https://t.me/vpndirectbot)
+## VPN Direct
 
-</div>
+VPN Direct is an open-source VPN client for **iOS, macOS and tvOS**.
 
-## What is VPN Direct?
+The Apple application keeps the proven `NetworkExtension` / `PacketTunnelProvider` architecture, while the networking layer is moving to **VPN Direct Core** — a thin, reproducible Core based on sing-box and selected upstream-compatible extensions.
 
-VPN Direct is a **native Apple VPN client** for **iOS / macOS / tvOS**, built on [sing-box](https://github.com/SagerNet/sing-box) and Libbox (Network Extension). Import standard `vless://` links and subscriptions, connect through a system VPN tunnel, and verify the binary against this public GPLv3 source tree.
+The project is designed around four principles:
 
-This repository is the **source offer** for the App Store / TestFlight builds — so the community can review, build, and compare.
+- **Native Apple integration** — system VPN tunnel, Network Extension lifecycle and Apple platform support.
+- **Capability-driven Core** — the application asks the linked Core what it actually supports instead of guessing.
+- **Reproducible builds** — Core version, sing-box pin, Go toolchain, gomobile and build profiles are tracked.
+- **No silent protocol substitution** — unsupported features fail explicitly instead of being converted into another transport.
 
-<div align="center">
+## Why VPN Direct Core?
 
-<a href="https://apps.apple.com/app/id6807402257">
-  <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" height="54"/>
-</a>
-&nbsp;&nbsp;
-<a href="https://t.me/vpndirectbot">
-  <img src="https://img.shields.io/badge/Open-Telegram%20bot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram bot"/>
-</a>
+VPN Direct Core keeps the Apple application stable while making the networking layer independently maintainable.
 
-</div>
+```text
+Subscription / Config
+        │
+        ▼
+Universal Parser
+        │
+        ▼
+Normalized Node
+        │
+        ▼
+Capability Resolver
+        │
+        ▼
+VPN Direct Core
+        │
+        ▼
+Libbox / sing-box
+        │
+        ▼
+NetworkExtension
+```
 
-## 🚀 Main features
+The Core remains intentionally close to upstream sing-box. Custom functionality should stay isolated behind build tags, overlays or small patches so upstream updates remain realistic.
 
-✈️ **Apple-native** — iOS, macOS, and tvOS (SFI / SFM / SFT)
+## Current Core status
 
-⭐ Clean Direct UI with favorites, recent servers, and access flows
+VPN Direct Core is under active hardening. A feature is not considered production-ready merely because a builder exists or a config parses.
 
-🟡 **Protocols & transports:** VLESS (TLS / REALITY), WS, gRPC, HTTPUpgrade, **XHTTP**
+A protocol reaches **production** only after:
 
-🟡 Subscriptions and sing-box config generation
+`import → Core validation → Packet Tunnel start → server handshake → TCP/UDP → DNS → reconnect → iOS memory check`
 
-🔄 Auto / one-tap subscription import (`vpndirect://`, Happ / Streisand-style links)
+For the authoritative status, see the live [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md).
 
-🛡 **Open source (GPLv3)** — reproducible Libbox via VPN Direct Core 0.1
-
-⚙ **VPN Direct Core** — thin fork of [sing-box-lx](https://github.com/Leadaxe/sing-box-lx): XHTTP, AmneziaWG, MASQUE CONNECT-IP, VLESS encryption + Capability Registry
-
-📱 Available on the **App Store**
-
-## 🛍️ Get it
-
-| Platform | Download |
+| Area | State |
 | --- | --- |
-| **iOS / macOS / tvOS** | [App Store](https://apps.apple.com/app/id6807402257) |
-| **Telegram** | [@vpndirectbot](https://t.me/vpndirectbot) |
-| **Source** | [Clone this repo](https://github.com/TT450/vpn-direct-app) |
+| Custom Libbox build pipeline | Implemented |
+| Core ABI + capability document | Implemented |
+| VLESS TCP / TLS / REALITY / WS / gRPC / HTTPUpgrade | Runtime baseline |
+| VLESS XHTTP | Integrated, interop qualification ongoing |
+| VLESS encryption / PQ | Integrated, interop qualification ongoing |
+| AmneziaWG 2 / 3.0 / 3.1 | Parser + Core integration, device qualification ongoing |
+| MASQUE CONNECT-IP / WARP profile | Integrated, qualification ongoing |
+| Universal multi-format parser | In development |
+| Mieru | Planned after baseline qualification |
+| Real interop lab | In development |
 
-## 🆔 Public identifiers
+## Architecture
+
+```text
+┌───────────────────────────────────────────────┐
+│                 VPN Direct App                │
+│          SwiftUI · iOS · macOS · tvOS         │
+└──────────────────────┬────────────────────────┘
+                       │
+                       ▼
+┌───────────────────────────────────────────────┐
+│              Network Extension                │
+│     PacketTunnelProvider · tunnel lifecycle   │
+└──────────────────────┬────────────────────────┘
+                       │
+                       ▼
+┌───────────────────────────────────────────────┐
+│              VPN Direct Core API              │
+│     ABI · capabilities · builders · errors    │
+└──────────────────────┬────────────────────────┘
+                       │
+                       ▼
+┌───────────────────────────────────────────────┐
+│                    Libbox                     │
+│      sing-box-lx pin + isolated overlays      │
+└──────────────────────┬────────────────────────┘
+                       │
+                       ▼
+┌───────────────────────────────────────────────┐
+│                 sing-box stack                │
+└───────────────────────────────────────────────┘
+```
+
+More detail: [`docs/core/ARCHITECTURE.md`](docs/core/ARCHITECTURE.md)
+
+## Build profiles
+
+| Profile | Purpose |
+| --- | --- |
+| `vpn_direct_ios_minimal` | Small Apple/NE-oriented baseline |
+| `vpn_direct_ios` | Default production Apple profile |
+| `vpn_direct_full` | Development / extended protocol surface |
+
+Profiles live in [`scripts/tags/`](scripts/tags/).
+
+## Build from source
+
+**Requirements:** macOS, Xcode, the Go version pinned in [`core/VERSION`](core/VERSION), and an Apple Developer Team with Network Extension/App Group entitlements.
+
+```bash
+git clone --recurse-submodules https://github.com/TT450/vpn-direct-app.git
+cd vpn-direct-app
+
+./scripts/bootstrap_core.sh
+make libbox
+make check-fixtures
+make check-abi
+```
+
+Open `sing-box.xcodeproj` and use:
+
+| Platform | Scheme |
+| --- | --- |
+| iOS | `SFI` |
+| macOS | `SFM` / `SFM.System` |
+| tvOS | `SFT` |
+
+Detailed instructions: [`docs/core/BUILDING.md`](docs/core/BUILDING.md)
+
+## Repository map
+
+```text
+vpn-direct-app/
+├── ApplicationLibrary/      Apple UI and app-specific components
+├── Extension/               Packet Tunnel / Network Extension
+├── Library/                 Core bridge, subscriptions, builders, shared logic
+├── core/
+│   ├── VERSION              Core/toolchain pins
+│   ├── overlays/            VPN Direct Libbox capability layer
+│   └── sing-box/            pinned Core source submodule
+├── scripts/
+│   ├── build_libbox.sh
+│   ├── check_abi.sh
+│   ├── check_fixtures.sh
+│   └── tags/                Core build profiles
+├── tests/fixtures/          regression fixtures
+├── interop/                 interoperability test area
+└── docs/core/               Core architecture and engineering docs
+```
+
+## Documentation
+
+| Document | Purpose |
+| --- | --- |
+| [Architecture](docs/core/ARCHITECTURE.md) | Core design and Apple integration |
+| [Current Architecture](docs/core/CURRENT_ARCHITECTURE.md) | Current repository architecture |
+| [Build Guide](docs/core/BUILDING.md) | Reproduce Libbox and Apple builds |
+| [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) | What is parsed, compiled, tested and production-ready |
+| [Core Plan](docs/core/VPN_DIRECT_CORE_PLAN.md) | VPN Direct Core roadmap |
+| [Donors](docs/core/DONORS.md) | Upstream and donor source tracking |
+| [License Audit](docs/core/LICENSE_AUDIT.md) | Dependency/license engineering notes |
+| [Mieru Status](docs/core/MIERU_DEFERRED.md) | Mieru integration status |
+
+## Public identifiers
 
 | | |
 | --- | --- |
-| App name | VPN Direct |
+| App | VPN Direct |
 | Bundle ID | `com.vpndirect.vpndirectapp` |
 | Packet Tunnel | `com.vpndirect.vpndirectapp.SingBoxPacketTunnel` |
 | App Group | `group.com.vpndirect.vpndirectapp` |
 | URL scheme | `vpndirect://` |
 | App Store ID | `6807402257` |
 
-Signing Team ID and App Store Connect API keys are **not** stored here — set them locally (`DEVELOPMENT_TEAM`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_PATH`, `FASTLANE_TEAM_ID`). See [`fastlane/SECRETS.example.md`](fastlane/SECRETS.example.md).
+Secrets and signing credentials are not stored in this repository.
 
-## 🧱 Architecture
+## Contributing
 
-| Component | Source |
-| --- | --- |
-| Apple UI / Network Extension | this repository (fork of [sing-box for Apple](https://github.com/SagerNet/sing-box-for-apple)) |
-| Proxy engine | Libbox from `core/sing-box` → [sing-box-lx](https://github.com/Leadaxe/sing-box-lx) |
-| Upstream core | [SagerNet/sing-box](https://github.com/SagerNet/sing-box) |
+Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a PR.
 
-Also: [`NOTICE`](NOTICE) · [`docs/core/DONORS.md`](docs/core/DONORS.md) · [`docs/core/LICENSE_AUDIT.md`](docs/core/LICENSE_AUDIT.md) · [`docs/core/ARCHITECTURE.md`](docs/core/ARCHITECTURE.md)
+For protocol changes:
+- add/update regression fixtures;
+- update the Protocol Matrix;
+- do not commit real subscription URLs, private keys, credentials or signing secrets.
 
-## ⚙️ Build from source
+Security issues should follow [`SECURITY.md`](SECURITY.md), not public bug reports.
 
-**Requirements:** macOS + Xcode, Go (see pin in `core/VERSION`), Apple Developer Team with Network Extension + App Group.
+## Upstream & acknowledgements
 
-```bash
-git clone --recurse-submodules https://github.com/TT450/vpn-direct-app.git
-cd vpn-direct-app
-./scripts/bootstrap_core.sh   # if core/sing-box is empty
-make libbox-backup-stock      # optional, if you already have stock Libbox
-make libbox                   # → Libbox.xcframework
-```
+VPN Direct builds on the work of:
 
-Open `sing-box.xcodeproj` → scheme **SFI** (iOS), **SFM** / **SFM.System** (macOS), or **SFT** (tvOS). Sign with your Team ID.
+- [SagerNet/sing-box](https://github.com/SagerNet/sing-box)
+- [SagerNet/sing-box-for-apple](https://github.com/SagerNet/sing-box-for-apple)
+- [Leadaxe/sing-box-lx](https://github.com/Leadaxe/sing-box-lx)
+- the wider sing-box / Libbox ecosystem
 
-```bash
-make check-fixtures
-```
+See [`docs/core/DONORS.md`](docs/core/DONORS.md) for source strategy.
 
-Full Core docs: [`docs/core/BUILDING.md`](docs/core/BUILDING.md) · [`docs/core/PROTOCOL_MATRIX.md`](docs/core/PROTOCOL_MATRIX.md)
+## License
 
-`Libbox.xcframework` is **not** committed — build it from Core sources.
+VPN Direct is distributed under the **GNU General Public License v3 or later**.
 
-## 📁 Repository layout
+See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE) and [`docs/core/LICENSE_AUDIT.md`](docs/core/LICENSE_AUDIT.md).
 
-```text
-├── SFI / SFM / SFT       # Apple apps
-├── Extension/            # Packet Tunnel
-├── Library/              # Libbox bridge, builders, capabilities
-├── ApplicationLibrary/   # UI (VPN Direct)
-├── scripts/              # bootstrap + build_libbox
-├── core/                 # VERSION pins + overlays; sing-box submodule
-├── docs/                 # brand + core architecture
-└── tests/fixtures/       # regression fixtures (no secrets)
-```
+---
 
-## ✏️ Acknowledgements
-
-Thanks to the authors and contributors of:
-
-- [Sing-box](https://github.com/SagerNet/sing-box)
-- [Sing-box for Apple](https://github.com/SagerNet/sing-box-for-apple)
-- [sing-box-lx](https://github.com/Leadaxe/sing-box-lx)
-- nekohasekai / SagerNet and everyone behind Libbox
-
-## 👩‍🏫 Collaboration
-
-Community contributions welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md). Security reports: [`SECURITY.md`](SECURITY.md).
-
-<div align="center">
-
-[![Telegram](https://img.shields.io/badge/Telegram-@vpndirectbot-26A5E4?style=flat-square&logo=telegram)](https://t.me/vpndirectbot)
-[![GitHub](https://img.shields.io/badge/GitHub-TT450%2Fvpn--direct--app-181717?style=flat-square&logo=github)](https://github.com/TT450/vpn-direct-app)
-[![License](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
-
-</div>
-
-## 📄 License
-
-**GNU General Public License v3** (or later) — see [`LICENSE`](LICENSE).
-
-```
-Copyright (C) 2022 by nekohasekai <contact-sagernet@sekai.icu>
-Copyright (C) 2026 VPN Direct contributors
-```
-
-When distributing binaries (App Store, TestFlight, sideload), GPLv3 requires that recipients can obtain the **corresponding source** for this modified client, including Libbox build scripts. This public repository is that offer.
-
-## ⚠️ Disclaimer
-
-VPN Direct is a client for **your** configs. Authors do not ship VPN servers “out of the box” and are not responsible for unlawful use of the tunnel under local law.
+<p align="center">
+  <b>VPN Direct</b><br/>
+  Native Apple client · reproducible Core · explicit capabilities
+</p>
