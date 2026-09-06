@@ -75,21 +75,26 @@ else
   echo "note: Libbox.xcframework not present — overlay-only ABI check"
 fi
 
-# Compile-check Go overlays against donor package when submodule present
+# Compile-check Go overlays against donor package when submodule present.
+# Compile failure must fail this script (not WARN-and-continue).
 if [[ -d "${CORE}/experimental/libbox" ]]; then
   cp -f "${OVERLAY}"/*.go "${CORE}/experimental/libbox/"
+  set +e
   (
     cd "${CORE}"
-    # tags matching default iOS profile so tag files resolve
     go test -c -o /dev/null ./experimental/libbox \
       -tags 'with_gvisor,with_quic,with_wireguard,with_utls,with_xhttp,with_awg' \
-      >/tmp/vpndirect-libbox-abi-test.log 2>&1 \
-      && echo "OK go test -c experimental/libbox" \
-      || {
-        echo "WARN go test -c experimental/libbox failed (see /tmp/vpndirect-libbox-abi-test.log)"
-        tail -40 /tmp/vpndirect-libbox-abi-test.log || true
-      }
+      >/tmp/vpndirect-libbox-abi-test.log 2>&1
   )
+  go_status=$?
+  set -e
+  if [[ "${go_status}" -eq 0 ]]; then
+    echo "OK go test -c experimental/libbox"
+  else
+    echo "ERROR go test -c experimental/libbox failed (exit ${go_status})" >&2
+    tail -40 /tmp/vpndirect-libbox-abi-test.log || true
+    fail=1
+  fi
 fi
 
 if [[ "${fail}" -ne 0 ]]; then

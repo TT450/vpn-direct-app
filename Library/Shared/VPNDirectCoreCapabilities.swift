@@ -13,8 +13,9 @@ import Foundation
 /// 1. Env `VPN_DIRECT_CAPABILITY_JSON` — tests/CI
 /// 2. Linked Libbox CapabilityJSON when ABI magic + API version match
 /// 3. Linked per-feature exports (fallback when JSON missing but ABI ok)
-/// 4. Sidecar stamp / `VPN_DIRECT_BUILD_TAGS` only for named tags (`with_xhttp`, `with_awg`, `with_mieru`)
-/// 5. Stock defaults (custom features off; MASQUE / PQ / gecko never inferred from core name)
+/// 4. Sidecar / build-tag strings are **informational only** (`buildTags`); they never
+///    enable custom VPN Direct features when ABI is incompatible
+/// 5. Stock / incompatible ABI ⇒ all custom features false
 public struct VPNDirectCoreCapabilities: Equatable, Sendable {
     public static let expectedMagic = "VPN_DIRECT_CORE"
     public static let expectedAPIVersion = 1
@@ -75,8 +76,9 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
         }
 
         if abiOK {
-            let hasXHTTP = linked.xhttp ?? tags.contains("with_xhttp")
-            let hasAWG = linked.awg ?? tags.contains("with_awg")
+            // Prefer explicit linked exports; tags from the linked binary may fill gaps only while ABI is OK.
+            let hasXHTTP = linked.xhttp ?? false
+            let hasAWG = linked.awg ?? false
             let versions = linked.awgVersions
             let hysteriaObfs = linked.hysteria2Obfuscations.isEmpty
                 ? ["salamander"]
@@ -97,15 +99,13 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
                 supportsMASQUEConnectIP: linked.masqueConnectIP ?? false,
                 supportsMASQUEConnectUDP: linked.masqueConnectUDP ?? false,
                 supportsVLESSEncryption: linked.vlessEncryption ?? false,
-                supportsMieru: linked.mieru ?? tags.contains("with_mieru"),
+                supportsMieru: linked.mieru ?? false,
                 hysteria2Obfuscations: hysteriaObfs,
                 vlessTransports: Self.vlessTransportList(xhttp: hasXHTTP)
             )
         }
 
-        // Stock / incompatible ABI: only named tags may prove xhttp/awg/mieru.
-        let stockXHTTP = tags.contains("with_xhttp")
-        let stockAWG = tags.contains("with_awg")
+        // Stock / incompatible ABI: sidecar tags are debug info only — never gate features.
         return VPNDirectCoreCapabilities(
             coreName: stamped.coreName ?? "Libbox",
             coreVersion: stamped.coreVersion
@@ -114,15 +114,15 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
             singBoxVersion: singBoxVersion,
             buildTags: tags,
             abiCompatible: false,
-            supportsXHTTP: stockXHTTP,
-            supportsAWG: stockAWG,
+            supportsXHTTP: false,
+            supportsAWG: false,
             amneziaWGVersions: [],
             supportsMASQUEConnectIP: false,
             supportsMASQUEConnectUDP: false,
             supportsVLESSEncryption: false,
-            supportsMieru: tags.contains("with_mieru"),
+            supportsMieru: false,
             hysteria2Obfuscations: ["salamander"],
-            vlessTransports: Self.vlessTransportList(xhttp: stockXHTTP)
+            vlessTransports: Self.vlessTransportList(xhttp: false)
         )
     }
 
