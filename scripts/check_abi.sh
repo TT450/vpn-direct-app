@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # ABI smoke: overlays applied + (optional) linked Libbox exports.
+# Uses POSIX/BSD grep only — no ripgrep dependency (CI macOS runners).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -22,24 +23,31 @@ require_overlay() {
 require_overlay "vpndirect_capabilities.go"
 require_overlay "vpndirect_tag_gecko.go"
 
-# Apply overlays into a temp copy check: magic/API present in source
-if ! rg -q 'VPN_DIRECT_CORE' "${OVERLAY}/vpndirect_capabilities.go"; then
+CAPABILITIES_FILE="${OVERLAY}/vpndirect_capabilities.go"
+
+if ! grep -q 'VPN_DIRECT_CORE' "${CAPABILITIES_FILE}"; then
   echo "MISSING magic constant" >&2
   fail=1
+else
+  echo "OK magic constant"
 fi
-if ! rg -q 'VPNDirectCapabilityJSON' "${OVERLAY}/vpndirect_capabilities.go"; then
+if ! grep -q 'VPNDirectCapabilityJSON' "${CAPABILITIES_FILE}"; then
   echo "MISSING CapabilityJSON" >&2
   fail=1
+else
+  echo "OK CapabilityJSON"
 fi
-if ! rg -q 'VPNDirectCoreAPIVersion' "${OVERLAY}/vpndirect_capabilities.go"; then
+if ! grep -q 'VPNDirectCoreAPIVersion' "${CAPABILITIES_FILE}"; then
   echo "MISSING APIVersion" >&2
   fail=1
+else
+  echo "OK APIVersion"
 fi
 
 # If framework exists, prefer header + nm smoke for magic
 if [[ -d "${FRAMEWORK}" ]]; then
   HEADER="$(find "${FRAMEWORK}" -name 'Libbox.objc.h' 2>/dev/null | head -1 || true)"
-  if [[ -n "${HEADER}" ]] && rg -q 'LibboxVPNDirectCoreMagic' "${HEADER}"; then
+  if [[ -n "${HEADER}" ]] && grep -q 'LibboxVPNDirectCoreMagic' "${HEADER}"; then
     echo "OK framework header LibboxVPNDirectCoreMagic"
   else
     echo "WARN framework header missing LibboxVPNDirectCoreMagic"
@@ -49,14 +57,14 @@ if [[ -d "${FRAMEWORK}" ]]; then
     BIN="$(find "${FRAMEWORK}" -type f -name 'Libbox' 2>/dev/null | head -1 || true)"
   fi
   if [[ -n "${BIN}" ]]; then
-    if nm "${BIN}" 2>/dev/null | rg -q 'VPNDirectCoreMagic'; then
+    if nm "${BIN}" 2>/dev/null | grep -q 'VPNDirectCoreMagic'; then
       echo "OK framework nm VPNDirectCoreMagic"
     else
       echo "WARN framework nm missing VPNDirectCoreMagic"
     fi
     if [[ -f "${FRAMEWORK}/VPNDirectCore.version" ]]; then
       echo "OK stamp present"
-      if rg -q '^SING_BOX_SHA=' "${FRAMEWORK}/VPNDirectCore.version"; then
+      if grep -q '^SING_BOX_SHA=' "${FRAMEWORK}/VPNDirectCore.version"; then
         echo "OK stamp SING_BOX_SHA"
       else
         echo "WARN stamp missing SING_BOX_SHA"
