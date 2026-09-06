@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/TT450/vpn-direct-app/security/advisories/new
+    about: Please report security issues privately (see SECURITY.md).
+  - name: Upstream sing-box
+    url: https://github.com/SagerNet/sing-box
+    about: Core proxy engine issues that are not specific to VPN Direct.

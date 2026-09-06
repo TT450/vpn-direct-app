@@ -1,0 +1,11 @@
+{
+  "type": "masque",
+  "tag": "masque-out",
+  "server": "engage.cloudflareclient.com",
+  "server_port": 443,
+  "profile": "cloudflare",
+  "vhttp": "h3",
+  "private_key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEE=",
+  "public_key": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
+  "tls": { "server_name": "consumer-masque.cloudflareclient.com" }
+}

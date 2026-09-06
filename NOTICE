@@ -1,0 +1,37 @@
+# Notice — third-party and upstream attribution
+
+VPN Direct includes and depends on software from other projects. This file is a human-readable summary; license texts govern.
+
+## Primary upstream
+
+### sing-box for Apple
+
+- Project: [SagerNet/sing-box-for-apple](https://github.com/SagerNet/sing-box-for-apple)
+- Copyright: Copyright (C) 2022 by nekohasekai \<contact-sagernet@sekai.icu\>
+- License: GNU GPL v3 or later
+
+VPN Direct is a modified version of that Apple client (SFI / SFM / SFT, Library, Extension).
+
+### sing-box
+
+- Project: [SagerNet/sing-box](https://github.com/SagerNet/sing-box)
+- License: GNU GPL v3 or later (see upstream)
+
+Libbox is built from Go sources of sing-box (and forks) via gomobile.
+
+### sing-box-lx (Core 0.1 donor)
+
+- Project: [Leadaxe/sing-box-lx](https://github.com/Leadaxe/sing-box-lx)
+- Thin fork of sing-box providing XHTTP, AmneziaWG, MASQUE, and related mobile tags
+- See `docs/core/DONORS.md` and `docs/core/LICENSE_AUDIT.md`
+
+## Other dependencies
+
+Apple targets pull Swift packages declared in the Xcode project (for example GRDB, QRCode helpers, editor frameworks). Each package retains its own license — typically MIT / Apache-2.0 / BSD. Inspect `Package.resolved` / Xcode SPM list when redistributing.
+
+Nested Go modules inside `core/sing-box` (gvisor, wireguard-go forks, quic stacks, etc.) carry their own licenses as vendored or module dependencies of upstream sing-box / lx.
+
+## VPN Direct additions
+
+- Copyright (C) 2026 VPN Direct contributors
+- New files under `docs/core/`, `scripts/`, `Library/Shared/VPNDirectCoreCapabilities.swift`, protocol builders, and Core overlays are part of this GPLv3 work unless a file states otherwise.

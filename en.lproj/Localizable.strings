@@ -1,0 +1,33 @@
+"main.disconnected" = "Disconnected";
+"main.connected" = "Connected";
+"main.days_left" = "Days left";
+"settings.title" = "Settings";
+"about.title" = "About";
+"language.select_language" = "Select language";
+"settings.language" = "Language";
+"settings.change_config" = "Change configuration";
+"settings.telegram" = "Telegram channel";
+"settings.about" = "About VPN Direct";
+
+"add_config.title_01" = "Welcome";
+"add_config.text_01" = "To get started, you need to set up a VPN";
+"add_config.text_02" = "Paste any VLESS link (vless://...) to set up the VPN";
+"add_config.title_02" = "Replace configuration";
+"add_config.text_03" = "You can enter it below or paste it from the clipboard.";
+"add_config.text_04" = "Go to telegram bot @vpndirectbot";
+"add_config.paste" = "Paste";
+"add_config.config_add" = "Add config";
+"add_config.config_replace" = "Replace config";
+
+"main.download" = "Download";
+"main.upload" = "Upload";
+
+"main.day1" = "day";
+"main.day2" = "days";
+"main.day5" = "days";
+
+"main.install_extension.text" = "For VPN to work, you need to install an extension";
+"main.install_extension.button" = "Install network extension";
+
+"general.about" = "Back";
+

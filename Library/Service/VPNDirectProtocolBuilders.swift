@@ -1,0 +1,331 @@
+import Foundation
+
+/// AmneziaWG / WireGuard endpoint options for VPN Direct Core.
+/// Versions are strings ("2", "3.0", "3.1") — not a closed enum — so future AWG releases do not require model rewrites.
+public struct AmneziaWGEndpointOptions: Equatable, Sendable {
+    public var privateKey: String
+    public var address: [String]
+    public var peers: [Peer]
+    public var mtu: Int?
+    public var amneziaVersion: String
+
+    // Classic AWG obfuscation
+    public var jc: Int?
+    public var jmin: Int?
+    public var jmax: Int?
+    public var s1: Int?
+    public var s2: Int?
+    public var s3: Int?
+    public var s4: Int?
+    public var h1: String?
+    public var h2: String?
+    public var h3: String?
+    public var h4: String?
+    public var i1: String?
+    public var i2: String?
+    public var i3: String?
+    public var i4: String?
+    public var i5: String?
+
+    // Masquerade sugar (WireSock-style)
+    public var id: String?
+    public var ip: String?
+    public var ib: String?
+
+    // AWG 3.x
+    public var headerProtectionKey: String?
+    public var contentPaddingAddition: Int?
+    public var randomTrailers: Bool?
+    public var disableCookies: Bool?
+    public var rekeyAfterTime: String?
+    public var rekeyTimeout: String?
+    public var rejectAfterTime: String?
+    public var keepaliveTimeout: String?
+    public var maxHandshakeAttempts: String?
+    public var persistentKeepaliveInterval: String?
+
+    public struct Peer: Equatable, Sendable {
+        public var publicKey: String
+        public var preSharedKey: String?
+        public var allowedIPs: [String]
+        public var endpoint: String?
+        public var persistentKeepaliveInterval: Int?
+
+        public init(
+            publicKey: String,
+            preSharedKey: String? = nil,
+            allowedIPs: [String] = ["0.0.0.0/0", "::/0"],
+            endpoint: String? = nil,
+            persistentKeepaliveInterval: Int? = nil
+        ) {
+            self.publicKey = publicKey
+            self.preSharedKey = preSharedKey
+            self.allowedIPs = allowedIPs
+            self.endpoint = endpoint
+            self.persistentKeepaliveInterval = persistentKeepaliveInterval
+        }
+    }
+
+    public init(
+        privateKey: String,
+        address: [String],
+        peers: [Peer],
+        mtu: Int? = nil,
+        amneziaVersion: String = "2"
+    ) {
+        self.privateKey = privateKey
+        self.address = address
+        self.peers = peers
+        self.mtu = mtu
+        self.amneziaVersion = amneziaVersion
+    }
+
+    /// sing-box / lx endpoint JSON object (`type: wireguard` + AWG fields).
+    public func endpointJSON(tag: String = "wg-out") throws -> [String: Any] {
+        guard VPNDirectCoreCapabilities.current.supportsAWG || hasNoObfuscation else {
+            throw VPNDirectCoreError.unsupportedFeature(component: "amneziawg", detail: "Current Libbox build lacks with_awg")
+        }
+
+        var endpoint: [String: Any] = [
+            "type": "wireguard",
+            "tag": tag,
+            "private_key": privateKey,
+            "address": address,
+            "peers": peers.map { peer -> [String: Any] in
+                var p: [String: Any] = [
+                    "public_key": peer.publicKey,
+                    "allowed_ips": peer.allowedIPs,
+                ]
+                if let preSharedKey = peer.preSharedKey { p["pre_shared_key"] = preSharedKey }
+                if let endpoint = peer.endpoint { p["address"] = endpoint }
+                if let keepalive = peer.persistentKeepaliveInterval {
+                    p["persistent_keepalive_interval"] = keepalive
+                }
+                return p
+            },
+        ]
+        if let mtu { endpoint["mtu"] = mtu }
+
+        // Obfuscation / AWG fields (only emit when set)
+        if let jc { endpoint["jc"] = jc }
+        if let jmin { endpoint["jmin"] = jmin }
+        if let jmax { endpoint["jmax"] = jmax }
+        if let s1 { endpoint["s1"] = s1 }
+        if let s2 { endpoint["s2"] = s2 }
+        if let s3 { endpoint["s3"] = s3 }
+        if let s4 { endpoint["s4"] = s4 }
+        if let h1 { endpoint["h1"] = h1 }
+        if let h2 { endpoint["h2"] = h2 }
+        if let h3 { endpoint["h3"] = h3 }
+        if let h4 { endpoint["h4"] = h4 }
+        if let i1 { endpoint["i1"] = i1 }
+        if let i2 { endpoint["i2"] = i2 }
+        if let i3 { endpoint["i3"] = i3 }
+        if let i4 { endpoint["i4"] = i4 }
+        if let i5 { endpoint["i5"] = i5 }
+        if let id { endpoint["id"] = id }
+        if let ip { endpoint["ip"] = ip }
+        if let ib { endpoint["ib"] = ib }
+        if let headerProtectionKey { endpoint["header_protection_key"] = headerProtectionKey }
+        if let contentPaddingAddition { endpoint["content_padding_addition"] = contentPaddingAddition }
+        if let randomTrailers { endpoint["random_trailers"] = randomTrailers }
+        if let disableCookies { endpoint["disable_cookies"] = disableCookies }
+        if let rekeyAfterTime { endpoint["rekey_after_time"] = rekeyAfterTime }
+        if let rekeyTimeout { endpoint["rekey_timeout"] = rekeyTimeout }
+        if let rejectAfterTime { endpoint["reject_after_time"] = rejectAfterTime }
+        if let keepaliveTimeout { endpoint["keepalive_timeout"] = keepaliveTimeout }
+        if let maxHandshakeAttempts { endpoint["max_handshake_attempts"] = maxHandshakeAttempts }
+        if let persistentKeepaliveInterval { endpoint["persistent_keepalive_interval"] = persistentKeepaliveInterval }
+
+        // Non-standard metadata for Capability / UI (ignored by sing-box if unknown — strip before check if needed)
+        endpoint["_vpndirect_amnezia_version"] = amneziaVersion
+        return endpoint
+    }
+
+    private var hasNoObfuscation: Bool {
+        jc == nil && jmin == nil && jmax == nil
+            && s1 == nil && s2 == nil && s3 == nil && s4 == nil
+            && h1 == nil && h2 == nil && h3 == nil && h4 == nil
+            && i1 == nil && headerProtectionKey == nil
+    }
+
+    /// Parse a subset of Amnezia / wg-quick style `.conf` text into options.
+    public static func parseConf(_ text: String, amneziaVersion: String = "2") throws -> AmneziaWGEndpointOptions {
+        var privateKey = ""
+        var address: [String] = []
+        var mtu: Int?
+        var peerPublicKey = ""
+        var peerPSK: String?
+        var allowedIPs: [String] = ["0.0.0.0/0", "::/0"]
+        var endpoint: String?
+        var keepalive: Int?
+        var jc: Int?; var jmin: Int?; var jmax: Int?
+        var s1: Int?; var s2: Int?; var s3: Int?; var s4: Int?
+        var h1: String?; var h2: String?; var h3: String?; var h4: String?
+        var i1: String?; var i2: String?; var i3: String?; var i4: String?; var i5: String?
+        var headerProtectionKey: String?
+        var contentPaddingAddition: Int?
+        var randomTrailers: Bool?
+        var disableCookies: Bool?
+
+        var section = ""
+        for raw in text.split(whereSeparator: \.isNewline) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty || line.hasPrefix("#") || line.hasPrefix(";") { continue }
+            if line.hasPrefix("[") && line.hasSuffix("]") {
+                section = line.lowercased()
+                continue
+            }
+            let parts = line.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            guard parts.count == 2 else { continue }
+            let key = parts[0].lowercased()
+            let value = parts[1]
+            switch (section, key) {
+            case ("[interface]", "privatekey"): privateKey = value
+            case ("[interface]", "address"): address = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            case ("[interface]", "mtu"): mtu = Int(value)
+            case ("[interface]", "jc"): jc = Int(value)
+            case ("[interface]", "jmin"): jmin = Int(value)
+            case ("[interface]", "jmax"): jmax = Int(value)
+            case ("[interface]", "s1"): s1 = Int(value)
+            case ("[interface]", "s2"): s2 = Int(value)
+            case ("[interface]", "s3"): s3 = Int(value)
+            case ("[interface]", "s4"): s4 = Int(value)
+            case ("[interface]", "h1"): h1 = value
+            case ("[interface]", "h2"): h2 = value
+            case ("[interface]", "h3"): h3 = value
+            case ("[interface]", "h4"): h4 = value
+            case ("[interface]", "i1"): i1 = value
+            case ("[interface]", "i2"): i2 = value
+            case ("[interface]", "i3"): i3 = value
+            case ("[interface]", "i4"): i4 = value
+            case ("[interface]", "i5"): i5 = value
+            case ("[interface]", "headerprotectionkey"): headerProtectionKey = value
+            case ("[interface]", "contentpaddingaddition"): contentPaddingAddition = Int(value)
+            case ("[interface]", "randomtrailers"): randomTrailers = (value == "true" || value == "1")
+            case ("[interface]", "disablecookies"), ("[interface]", "disablecookie"): disableCookies = (value == "true" || value == "1")
+            case ("[peer]", "publickey"): peerPublicKey = value
+            case ("[peer]", "presharedkey"): peerPSK = value
+            case ("[peer]", "allowedips"): allowedIPs = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            case ("[peer]", "endpoint"): endpoint = value
+            case ("[peer]", "persistentkeepalive"): keepalive = Int(value)
+            default: break
+            }
+        }
+
+        guard !privateKey.isEmpty, !peerPublicKey.isEmpty, !address.isEmpty else {
+            throw VPNDirectCoreError.malformedConfig(component: "amneziawg", detail: "Missing private key, peer public key, or address")
+        }
+
+        var options = AmneziaWGEndpointOptions(
+            privateKey: privateKey,
+            address: address,
+            peers: [
+                .init(
+                    publicKey: peerPublicKey,
+                    preSharedKey: peerPSK,
+                    allowedIPs: allowedIPs,
+                    endpoint: endpoint,
+                    persistentKeepaliveInterval: keepalive
+                ),
+            ],
+            mtu: mtu,
+            amneziaVersion: amneziaVersion
+        )
+        options.jc = jc; options.jmin = jmin; options.jmax = jmax
+        options.s1 = s1; options.s2 = s2; options.s3 = s3; options.s4 = s4
+        options.h1 = h1; options.h2 = h2; options.h3 = h3; options.h4 = h4
+        options.i1 = i1; options.i2 = i2; options.i3 = i3; options.i4 = i4; options.i5 = i5
+        options.headerProtectionKey = headerProtectionKey
+        options.contentPaddingAddition = contentPaddingAddition
+        options.randomTrailers = randomTrailers
+        options.disableCookies = disableCookies
+        return options
+    }
+}
+
+/// MASQUE CONNECT-IP / Cloudflare WARP outbound (sing-box-lx).
+public struct MasqueOutboundOptions: Equatable, Sendable {
+    public var server: String
+    public var serverPort: Int
+    public var profile: String // cloudflare | standard
+    public var vhttp: String // h3 | h2
+    public var privateKey: String
+    public var publicKey: String
+    public var ip: String?
+    public var ipv6: String?
+    public var tlsServerName: String?
+
+    public init(
+        server: String,
+        serverPort: Int = 443,
+        profile: String = "cloudflare",
+        vhttp: String = "h3",
+        privateKey: String,
+        publicKey: String,
+        ip: String? = nil,
+        ipv6: String? = nil,
+        tlsServerName: String? = nil
+    ) {
+        self.server = server
+        self.serverPort = serverPort
+        self.profile = profile
+        self.vhttp = vhttp
+        self.privateKey = privateKey
+        self.publicKey = publicKey
+        self.ip = ip
+        self.ipv6 = ipv6
+        self.tlsServerName = tlsServerName
+    }
+
+    public func outboundJSON(tag: String = "masque-out") throws -> [String: Any] {
+        guard VPNDirectCoreCapabilities.current.supportsMASQUEConnectIP else {
+            throw VPNDirectCoreError.unsupportedFeature(component: "masque", detail: "CONNECT-IP not available in this Libbox build")
+        }
+        var outbound: [String: Any] = [
+            "type": "masque",
+            "tag": tag,
+            "server": server,
+            "server_port": serverPort,
+            "profile": profile,
+            "vhttp": vhttp,
+            "private_key": privateKey,
+            "public_key": publicKey,
+        ]
+        if let ip { outbound["ip"] = ip }
+        if let ipv6 { outbound["ipv6"] = ipv6 }
+        if let tlsServerName {
+            outbound["tls"] = ["server_name": tlsServerName]
+        }
+        return outbound
+    }
+}
+
+/// Normalized Core-facing errors for UI.
+public enum VPNDirectCoreError: LocalizedError {
+    case unsupportedFeature(component: String, detail: String)
+    case malformedConfig(component: String, detail: String)
+    case coreError(detail: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case let .unsupportedFeature(component, _):
+            return "This VPN Direct build does not support \(component)."
+        case let .malformedConfig(component, _):
+            return "Invalid \(component) configuration."
+        case let .coreError(detail):
+            return detail
+        }
+    }
+
+    public var debugDescription: String {
+        switch self {
+        case let .unsupportedFeature(component, detail):
+            return "unsupportedFeature(\(component)): \(detail)"
+        case let .malformedConfig(component, detail):
+            return "malformedConfig(\(component)): \(detail)"
+        case let .coreError(detail):
+            return "coreError: \(detail)"
+        }
+    }
+}
