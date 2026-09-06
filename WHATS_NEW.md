@@ -1,28 +1,26 @@
-# What's New — VPN Direct 1.0.4
+# What's New — VPN Direct 1.0.5
 
 Release date: 2026-09-07  
-Git tag: `v1.0.4`
+Git tag: `v1.0.5`
 
 ## App Store / short What's New
 
-- Remnawave / Happ subscriptions keep country locations and Auto (no more “one VLESS only”)
-- Hysteria / Hysteria2 share links and XRAY JSON supported
-- Same server in Auto and a country no longer deletes the country row
-- Multi-hop cascades via dialerProxy → detour restored from TheTochka compatibility harvest
+- Broader subscription import: VMess, Trojan, Shadowsocks, TUIC, AnyTLS, WireGuard/AWG, SOCKS, HTTP proxy, SSH
+- Clash / Mihomo YAML proxies and smarter content detection (JSON / YAML / conf / URI)
+- Remnawave/Happ topology from 1.0.4 kept; docs and Protocol Matrix refreshed
+- Production readiness gate: `make check-production-ready`
 
 ## Engineering detail
 
-### Compatibility Harvest P0 (TheTochka `dev`)
-- `NormalizedSubscription` → `NormalizedLocation` → `NormalizedNode`
-- `XrayJSONAdapter`: all VLESS + HY2 leaves, per-profile dedupe, no skip of Автовыбор
-- `SingBoxGraphBuilder`: per-location urltest + global `auto` over leaves
-- `HysteriaShareLinkParser` + Xray Hysteria conversion (ignore uTLS on QUIC)
-- `dialerProxy` → `detour` end-to-end
-- Fixtures + `scripts/check_subscription_graph.sh`
+- `VPNDirectContentDetector` — ordered detect, no YAML line-trim
+- Universal share-link parsers + `UniversalOutboundBuilder`
+- Clash YAML adapter (proxies only); Xray leaves: VLESS / HY / VMess / Trojan / SS
+- `VPNDirectConfigValidator`, error model v2, `VPNDirectRedactor`
+- `core/protocol-matrix.json`, interop scaffolds, iPhone qualification checklist
+- Mieru: Swift parse + fail-closed emit; Core runtime still off (`with_mieru` not in tags)
 
-### Still deferred
-- Full Universal Parser (TUIC/AnyTLS/Clash…)
-- XHTTP Yandex CDN mapping (P1)
-- Interop lab / device qualification / Mieru
+### Still not `tested` / production
 
-See also: `docs/core/THETOCHKA_COMPATIBILITY_HARVEST.md`, `CHANGELOG.md`.
+Interop lab evidence and filled device qualification are required before matrix rows move to `tested`. CONNECT-UDP / Tailscale / OpenVPN remain `out_of_scope`.
+
+See also: `docs/core/PROTOCOL_MATRIX.md`, `ROADMAP.md`, `CHANGELOG.md`.

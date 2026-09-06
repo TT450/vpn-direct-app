@@ -50,19 +50,19 @@ VPN Direct Core keeps the Apple application stable while making the networking l
 Subscription / Config
         │
         ▼
-Universal Parser
+Content Detector
         │
         ▼
-Normalized Node
+Universal Parser / Format Adapters
         │
         ▼
-Capability Resolver
+NormalizedSubscription → Location → Node
         │
         ▼
-VPN Direct Core
+Capability Resolver + Outbound Builder
         │
         ▼
-Libbox / sing-box
+VPN Direct Core (Libbox / sing-box)
         │
         ▼
 NetworkExtension
@@ -72,26 +72,30 @@ The Core remains intentionally close to upstream sing-box. Custom functionality 
 
 ## Current Core status
 
-VPN Direct Core is under active hardening. A feature is not considered production-ready merely because a builder exists or a config parses.
+**Latest release:** [`v1.0.5`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.5) · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
 
-A protocol reaches **production** only after:
+A feature is not **production / `tested`** merely because a builder exists. Production requires:
 
-`import → Core validation → Packet Tunnel start → server handshake → TCP/UDP → DNS → reconnect → iOS memory check`
+`import → Core validation → Packet Tunnel start → handshake → TCP/UDP → DNS → reconnect → iOS memory check`
 
-For the authoritative status, see the live [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md).
+Authoritative row-level status: [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) · machine-readable [`core/protocol-matrix.json`](core/protocol-matrix.json).
 
 | Area | State |
 | --- | --- |
-| Custom Libbox build pipeline | Implemented |
-| Core ABI + capability document | Implemented |
+| Custom Libbox build + Core baseline CI | Implemented (fixtures, ABI, Libbox, SFI) |
+| Core ABI + CapabilityJSON (fail-closed) | Implemented |
+| Remnawave / Happ topology (locations, Auto, detour) | Implemented (harvest P0) |
 | VLESS TCP / TLS / REALITY / WS / gRPC / HTTPUpgrade | Runtime baseline |
-| VLESS XHTTP | Integrated, interop qualification ongoing |
-| VLESS encryption / PQ | Integrated, interop qualification ongoing |
-| AmneziaWG 2 / 3.0 / 3.1 | Parser + Core integration, device qualification ongoing |
-| MASQUE CONNECT-IP / WARP profile | Integrated, qualification ongoing |
-| Universal multi-format parser | In development |
-| Mieru | Planned after baseline qualification |
-| Real interop lab | In development |
+| VLESS XHTTP / encryption (PQ) | Parser + runtime; interop qualification ongoing |
+| Hysteria / Hysteria2 (+ share + Xray) | Parser + runtime; interop ongoing |
+| VMess / Trojan / Shadowsocks / TUIC / AnyTLS / ShadowTLS / Naive | Parser + builder; interop ongoing |
+| WireGuard / AmneziaWG 2–3.1 (URI + `.conf`) | Parser + runtime; device qualification ongoing |
+| MASQUE CONNECT-IP / WARP profile | Parser + runtime; qualification ongoing |
+| Clash / Mihomo YAML (proxies only) | Implemented |
+| Content detector + production gate | Implemented (`make check-production-ready`) |
+| Mieru | Swift parse fail-closed; Core runtime not registered |
+| Interop lab / iPhone `tested` evidence | Scaffolds + checklist; live evidence pending |
+| CONNECT-UDP / Tailscale / OpenVPN | `out_of_scope` for Core 1.x |
 
 ## Architecture
 
@@ -149,6 +153,7 @@ cd vpn-direct-app
 make libbox
 make check-fixtures
 make check-abi
+make check-production-ready
 ```
 
 Open `sing-box.xcodeproj` and use:
@@ -167,19 +172,23 @@ Detailed instructions: [`docs/core/BUILDING.md`](docs/core/BUILDING.md)
 vpn-direct-app/
 ├── ApplicationLibrary/      Apple UI and app-specific components
 ├── Extension/               Packet Tunnel / Network Extension
-├── Library/                 Core bridge, subscriptions, builders, shared logic
+├── Library/                 Core bridge, subscriptions, VPNDirect parsers/builders
 ├── core/
 │   ├── VERSION              Core/toolchain pins
+│   ├── protocol-matrix.json Machine-readable matrix
 │   ├── overlays/            VPN Direct Libbox capability layer
 │   └── sing-box/            pinned Core source submodule
 ├── scripts/
 │   ├── build_libbox.sh
 │   ├── check_abi.sh
 │   ├── check_fixtures.sh
+│   ├── check_universal_parsers.sh
+│   ├── check_production_ready.sh
 │   └── tags/                Core build profiles
 ├── tests/fixtures/          regression fixtures
-├── interop/                 interoperability test area
-└── docs/core/               Core architecture and engineering docs
+├── interop/                 interoperability scaffolds + evidence/
+├── docs/core/               Core architecture and engineering docs
+└── docs/device/             iPhone qualification checklist
 ```
 
 ## Documentation
@@ -190,10 +199,13 @@ vpn-direct-app/
 | [Current Architecture](docs/core/CURRENT_ARCHITECTURE.md) | Current repository architecture |
 | [Build Guide](docs/core/BUILDING.md) | Reproduce Libbox and Apple builds |
 | [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) | What is parsed, compiled, tested and production-ready |
-| [Core Plan](docs/core/VPN_DIRECT_CORE_PLAN.md) | VPN Direct Core roadmap |
+| [Production Audit](docs/core/PRODUCTION_READINESS_AUDIT.md) | Honest readiness vs code |
+| [Roadmap](ROADMAP.md) | Public product roadmap |
+| [What's New](WHATS_NEW.md) | Latest release notes |
 | [Donors](docs/core/DONORS.md) | Upstream and donor source tracking |
 | [License Audit](docs/core/LICENSE_AUDIT.md) | Dependency/license engineering notes |
 | [Mieru Status](docs/core/MIERU_DEFERRED.md) | Mieru integration status |
+| [iPhone Qualification](docs/device/IPHONE_QUALIFICATION.md) | Device evidence checklist |
 
 ## Public identifiers
 

@@ -47,26 +47,29 @@ Apple 应用保留成熟的 `NetworkExtension` / `PacketTunnelProvider` 架构�
 在保持 Apple 客户端稳定的同时，让网络层可独立维护。
 
 ```text
-Subscription / Config → Universal Parser → Normalized Node
-→ Capability Resolver → VPN Direct Core → Libbox / sing-box → NetworkExtension
+Subscription / Config → Content Detector → Universal Parser / Adapters
+→ NormalizedSubscription → Location → Node
+→ Capability Resolver + Builder → VPN Direct Core → Libbox → NetworkExtension
 ```
 
 ## 当前 Core 状态
 
-仅有 builder / parser **不等于** production。
+**最新发布：** [`v1.0.5`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.5)
 
-进入 production 需要：`import → Core 校验 → Packet Tunnel → 握手 → TCP/UDP → DNS → 重连 → iOS 内存`
-
-权威状态见 [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md)。
+仅有 builder / parser **不等于** `tested` / production。权威状态见 [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md)。
 
 | 领域 | 状态 |
 | --- | --- |
-| 自定义 Libbox 构建流水线 | 已实现 |
-| ABI + CapabilityJSON | 已实现 |
-| VLESS 基线（TCP/TLS/REALITY/…） | Runtime |
-| XHTTP / PQ / AWG / MASQUE | 已集成，互操作 / 真机资格认证进行中 |
-| 通用多格式解析器 | 开发中 |
-| Mieru | 基线资格认证后规划 |
+| Libbox 构建 + Core baseline CI | 已实现 |
+| ABI + CapabilityJSON（fail-closed） | 已实现 |
+| Remnawave/Happ 拓扑（locations / Auto / detour） | 已实现 |
+| VLESS 基线 + XHTTP/PQ | Runtime / parser+runtime；互操作进行中 |
+| Hysteria/HY2、VMess、Trojan、SS、TUIC、AnyTLS… | Parser + builder；互操作进行中 |
+| WireGuard / AmneziaWG / MASQUE | Parser + runtime；真机资格认证进行中 |
+| Clash YAML（仅 proxies）+ content detector | 已实现 |
+| `make check-production-ready` | 已实现 |
+| Mieru | Swift 解析 fail-closed；Core runtime 未注册 |
+| CONNECT-UDP / Tailscale / OpenVPN | `out_of_scope` |
 
 ## 构建配置
 

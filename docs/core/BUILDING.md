@@ -70,12 +70,19 @@ xcodebuild -scheme SFI -configuration Debug -destination 'generic/platform=iOS' 
   -derivedDataPath build/DerivedData -allowProvisioningUpdates build
 ```
 
-## Validate fixtures
+## Validate fixtures & honesty gate
 
 ```bash
 make check-fixtures
-# or: ./scripts/check_fixtures.sh
+# runs check_fixtures.sh + check_subscription_graph.sh + check_universal_parsers.sh
+
+make check-abi
+make check-capability-proofs
+make check-production-ready
+# fixtures + ABI + matrix honesty (out_of_scope / no fake tested) + mieru tag off
 ```
+
+Universal / Remnawave fixtures live under `tests/fixtures/regression/`.
 
 ## Validate core configs (optional)
 
@@ -88,4 +95,4 @@ make -f Makefile.lx lx-build   # desktop binary with lx tags
 
 ## Version pins
 
-See `core/VERSION`.
+See [`core/VERSION`](../../core/VERSION) and machine-readable [`core/protocol-matrix.json`](../../core/protocol-matrix.json).

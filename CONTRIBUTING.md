@@ -7,6 +7,7 @@ Thanks for helping improve the open source Apple client.
 1. Read [`docs/core/ARCHITECTURE.md`](docs/core/ARCHITECTURE.md) — keep Network Extension lifecycle thin; prefer Core / builders / docs changes.
 2. Do **not** commit secrets: `.p8`, `api_key.json`, provisioning profiles, real server credentials, or private keys.
 3. Do **not** commit built `Libbox.xcframework` — use `scripts/build_libbox.sh`.
+4. Do **not** claim Protocol Matrix `tested` without interop + device evidence.
 
 ## Development flow
 
@@ -14,6 +15,7 @@ Thanks for helping improve the open source Apple client.
 ./scripts/bootstrap_core.sh
 make libbox          # when Core / Libbox changes
 make check-fixtures
+make check-production-ready
 # Xcode: scheme SFI
 ```
 
@@ -22,13 +24,15 @@ make check-fixtures
 - Prefer small, reviewable PRs
 - Include a short **why** in the description
 - For protocol/builder changes, add or update fixtures under `tests/fixtures/regression/`
-- Update `docs/core/PROTOCOL_MATRIX.md` when protocol status changes
+- Update `docs/core/PROTOCOL_MATRIX.md` **and** `core/protocol-matrix.json` when protocol status changes
+- Keep capability fail-closed: no `with_mieru` / `supportsMieru=true` without a registered outbound
 
 ## Coding notes
 
-- Swift: match existing Library / ApplicationLibrary style
+- Swift parsers/builders live under `Library/Service/VPNDirect/`
 - Go overlays for Libbox live in `core/overlays/libbox/` and are applied at build time
 - Capability checks go through `VPNDirectCoreCapabilities` — avoid hardcoding “stock Libbox” assumptions
+- Prefer `NormalizedNode` attributes + `UniversalOutboundBuilder` over long-lived pre-built `outbound` dicts
 
 ## License
 

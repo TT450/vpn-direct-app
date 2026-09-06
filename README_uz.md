@@ -47,26 +47,26 @@ To‘rt tamoyil:
 VPN Direct Core Apple klientini barqaror saqlab, tarmoq qatlamini mustaqil qo‘llab-quvvatlash imkonini beradi.
 
 ```text
-Subscription / Config → Universal Parser → Normalized Node
-→ Capability Resolver → VPN Direct Core → Libbox / sing-box → NetworkExtension
+Subscription / Config → Content Detector → Universal Parser / Adapters
+→ NormalizedSubscription → Location → Node
+→ Capability Resolver + Builder → VPN Direct Core → Libbox → NetworkExtension
 ```
 
 ## Hozirgi Core holati
 
-Builder yoki parser borligi — bu hali **production** emas.
+**So‘nggi reliz:** [`v1.0.5`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.5)
 
-Production uchun: `import → Core validate → Packet Tunnel → handshake → TCP/UDP → DNS → reconnect → iOS memory`.
-
-Jonli holat: [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md).
+Builder/parser borligi — hali `tested` / production emas. Holat: [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md).
 
 | Yo‘nalish | Holat |
 | --- | --- |
-| Libbox build pipeline | Tayyor |
-| ABI + CapabilityJSON | Tayyor |
-| VLESS baseline (TCP/TLS/REALITY/…) | Runtime |
-| XHTTP / PQ / AWG / MASQUE | Integratsiya + kvalifikatsiya |
-| Universal parser | Ishlanmoqda |
-| Mieru | Baseline’dan keyin |
+| Libbox + Core baseline CI | Tayyor |
+| ABI + CapabilityJSON (fail-closed) | Tayyor |
+| Remnawave/Happ topology | Tayyor |
+| VLESS + XHTTP/PQ / HY2 / multi-scheme parsers | Parser+runtime; interop davom etmoqda |
+| Clash YAML + content detector + production gate | Tayyor |
+| Mieru | Swift parse fail-closed; Core runtime yo‘q |
+| CONNECT-UDP / Tailscale / OpenVPN | `out_of_scope` |
 
 ## Build profillari
 

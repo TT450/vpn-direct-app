@@ -50,19 +50,19 @@ VPN Direct Core держит Apple-клиент стабильным и дела
 Subscription / Config
         │
         ▼
-Universal Parser
+Content Detector
         │
         ▼
-Normalized Node
+Universal Parser / Format Adapters
         │
         ▼
-Capability Resolver
+NormalizedSubscription → Location → Node
         │
         ▼
-VPN Direct Core
+Capability Resolver + Outbound Builder
         │
         ▼
-Libbox / sing-box
+VPN Direct Core (Libbox / sing-box)
         │
         ▼
 NetworkExtension
@@ -72,26 +72,30 @@ Core намеренно близок к upstream sing-box. Кастомные в
 
 ## Текущий статус Core
 
-VPN Direct Core активно hardening-ится. Фича не считается production только потому, что есть builder или парсер.
+**Последний релиз:** [`v1.0.5`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.5) · pin Core: [`core/VERSION`](core/VERSION).
 
-Протокол становится **production** только после:
+Фича не считается **production / `tested`** только из‑за builder. Нужен полный путь:
 
-`import → валидация Core → старт Packet Tunnel → handshake → TCP/UDP → DNS → reconnect → проверка памяти на iOS`
+`import → валидация Core → старт Packet Tunnel → handshake → TCP/UDP → DNS → reconnect → память на iOS`
 
-Актуальный статус — в живой [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md).
+Актуальный статус по строкам — [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) · [`core/protocol-matrix.json`](core/protocol-matrix.json).
 
 | Область | Состояние |
 | --- | --- |
-| Свой пайплайн сборки Libbox | Реализован |
-| ABI Core + capability-документ | Реализован |
+| Свой пайплайн Libbox + Core baseline CI | Реализован |
+| ABI Core + CapabilityJSON (fail-closed) | Реализован |
+| Remnawave / Happ topology (locations, Auto, detour) | Реализован (harvest P0) |
 | VLESS TCP / TLS / REALITY / WS / gRPC / HTTPUpgrade | Runtime baseline |
-| VLESS XHTTP | Интегрирован, идёт interop-квалификация |
-| VLESS encryption / PQ | Интегрирован, идёт interop-квалификация |
-| AmneziaWG 2 / 3.0 / 3.1 | Parser + Core, device-квалификация в процессе |
-| MASQUE CONNECT-IP / WARP profile | Интегрирован, квалификация в процессе |
-| Универсальный multi-format parser | В разработке |
-| Mieru | Планируется после baseline-квалификации |
-| Реальная interop-лаборатория | В разработке |
+| VLESS XHTTP / encryption (PQ) | Parser + runtime; interop в процессе |
+| Hysteria / Hysteria2 | Parser + runtime; interop в процессе |
+| VMess / Trojan / SS / TUIC / AnyTLS / ShadowTLS / Naive | Parser + builder; interop в процессе |
+| WireGuard / AmneziaWG 2–3.1 | Parser + runtime; device-квалификация в процессе |
+| MASQUE CONNECT-IP / WARP | Parser + runtime; квалификация в процессе |
+| Clash / Mihomo YAML (только proxies) | Реализован |
+| Content detector + production gate | Реализован (`make check-production-ready`) |
+| Mieru | Swift parse fail-closed; Core runtime ещё не зарегистрирован |
+| Interop lab / evidence `tested` | Каркасы + checklist; live evidence pending |
+| CONNECT-UDP / Tailscale / OpenVPN | `out_of_scope` для Core 1.x |
 
 ## Архитектура
 
@@ -149,6 +153,7 @@ cd vpn-direct-app
 make libbox
 make check-fixtures
 make check-abi
+make check-production-ready
 ```
 
 Откройте `sing-box.xcodeproj`:
@@ -167,19 +172,17 @@ make check-abi
 vpn-direct-app/
 ├── ApplicationLibrary/      UI и app-specific компоненты
 ├── Extension/               Packet Tunnel / Network Extension
-├── Library/                 Core bridge, подписки, builders, shared
+├── Library/                 Core bridge, подписки, VPNDirect parsers/builders
 ├── core/
 │   ├── VERSION              pins Core/toolchain
+│   ├── protocol-matrix.json машиночитаемая матрица
 │   ├── overlays/            capability-слой Libbox
 │   └── sing-box/            pinned submodule Core
-├── scripts/
-│   ├── build_libbox.sh
-│   ├── check_abi.sh
-│   ├── check_fixtures.sh
-│   └── tags/                build-профили Core
+├── scripts/                 build_libbox, check-fixtures, check-production-ready, tags/
 ├── tests/fixtures/          regression fixtures
-├── interop/                 зона interop-тестов
-└── docs/core/               инженерная документация Core
+├── interop/                 interop scaffolds + evidence/
+├── docs/core/               инженерная документация Core
+└── docs/device/             iPhone qualification checklist
 ```
 
 ## Документация
@@ -188,15 +191,13 @@ vpn-direct-app/
 | --- | --- |
 | [Индекс docs](docs/README.md) | Карта документации |
 | [Architecture](docs/core/ARCHITECTURE.md) | Дизайн Core и Apple-интеграция |
-| [Current Architecture](docs/core/CURRENT_ARCHITECTURE.md) | Архитектура репозитория сейчас |
 | [Build Guide](docs/core/BUILDING.md) | Воспроизведение Libbox и Apple-сборок |
 | [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) | Что парсится, компилируется, тестируется |
 | [Production Audit](docs/core/PRODUCTION_READINESS_AUDIT.md) | Честный статус по реальному коду |
-| [Production Plan](docs/core/VPN_DIRECT_PRODUCTION_PLAN.md) | Milestone'ы hardening |
 | [Roadmap](ROADMAP.md) | Публичный roadmap |
 | [What's New](WHATS_NEW.md) | Релизные заметки последнего тега |
-| [Changelog](CHANGELOG.md) | Полная история релизов |
-| [Support](SUPPORT.md) | Куда писать за помощью |
+| [Mieru Status](docs/core/MIERU_DEFERRED.md) | Статус Mieru |
+| [iPhone Qualification](docs/device/IPHONE_QUALIFICATION.md) | Чеклист device evidence |
 
 ## Публичные идентификаторы
 

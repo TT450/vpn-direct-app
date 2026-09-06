@@ -1,6 +1,6 @@
 # Protocol matrix — VPN Direct Core 0.1
 
-Status legend: `planned` | `parser` | `runtime` | `parser+runtime` | `tested` | `deferred` | `out_of_scope`
+Last docs sync: **2026-09-07** (app release **v1.0.5**). Status legend: `planned` | `parser` | `runtime` | `parser+runtime` | `tested` | `deferred` | `out_of_scope`
 
 ## Support definition (`tested`)
 

@@ -2,21 +2,24 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
-## [1.0.4] — 2026-09-07
+## [1.0.5] — 2026-09-07
 
 ### What's New
 
 See [`WHATS_NEW.md`](WHATS_NEW.md).
 
-#### TheTochka Compatibility Harvest P0
-- NormalizedSubscription / NormalizedLocation hierarchy
-- Remnawave location urltest + global auto; per-profile dedupe
-- Hysteria/HY2 share + XRAY conversion; dialerProxy → detour
-- Subscription graph fixtures + `check_subscription_graph.sh`
+#### Universal import + honesty gate
+- Content detector; multi-scheme URI parsers; Clash YAML; Xray multi-proto leaves
+- Validator / redaction; `check_production_ready.sh`; `protocol-matrix.json`
+- Docs: README / Architecture / Matrix / Build / Contribute refreshed for post-harvest state
 
-## [1.0.3] — 2026-09-07
+## [1.0.4] — 2026-09-07
 
 ### What's New
+
+TheTochka Compatibility Harvest P0: NormalizedSubscription / Location, HY2, Remnawave balancers/Auto, per-profile dedupe, dialerProxy→detour.
+
+## [1.0.3] — 2026-09-07
 
 Happ-first subscription UA, Keychain HWID migration, CI ExtensionProfile deinit fix.
 
