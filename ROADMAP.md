@@ -10,8 +10,8 @@ Public roadmap for VPN Direct (Apple client + VPN Direct Core). Status language 
 - [x] Compile-time proofs for MASQUE / VLESS encryption / gecko
 - [x] NormalizedNode + VLESS adapter skeleton
 - [x] Happ-first subscription identity + Keychain HWID
-- [ ] Universal multi-scheme URI parsers (VMess, Trojan, SS, HY2, TUIC, …)
-- [ ] TheTochka harvest: Hysteria/HY2, Remnawave balancers, location urltest, cascades
+- [x] TheTochka harvest P0: HY2, Remnawave location urltest, global auto, per-profile dedupe, dialerProxy→detour
+- [ ] Universal multi-scheme URI parsers (VMess, Trojan, SS, TUIC, …) — blocked until harvest fixtures stay green
 - [ ] Clash / Mihomo YAML import
 - [ ] Expanded regression fixtures + `sing-box check` in CI
 

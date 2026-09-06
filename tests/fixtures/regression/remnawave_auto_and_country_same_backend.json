@@ -1,0 +1,50 @@
+[
+  {
+    "remarks": "Автовыбор",
+    "outbounds": [
+      {
+        "protocol": "vless",
+        "tag": "proxy",
+        "settings": {
+          "vnext": [
+            {
+              "address": "1.2.3.4",
+              "port": 443,
+              "users": [{ "id": "22222222-2222-2222-2222-222222222222", "encryption": "none" }]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "ws",
+          "security": "tls",
+          "tlsSettings": { "serverName": "cdn.example.com", "fingerprint": "chrome" },
+          "wsSettings": { "path": "/ws", "headers": { "Host": "cdn.example.com" } }
+        }
+      }
+    ]
+  },
+  {
+    "remarks": "Germany",
+    "outbounds": [
+      {
+        "protocol": "vless",
+        "tag": "proxy",
+        "settings": {
+          "vnext": [
+            {
+              "address": "1.2.3.4",
+              "port": 443,
+              "users": [{ "id": "22222222-2222-2222-2222-222222222222", "encryption": "none" }]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "ws",
+          "security": "tls",
+          "tlsSettings": { "serverName": "cdn.example.com", "fingerprint": "chrome" },
+          "wsSettings": { "path": "/ws", "headers": { "Host": "cdn.example.com" } }
+        }
+      }
+    ]
+  }
+]

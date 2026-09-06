@@ -44,6 +44,7 @@ public protocol VPNDirectParser {
 public enum VPNDirectParserRegistry {
     public static var shareLinkParsers: [VPNDirectParser] = [
         VLESSShareLinkParser(),
+        HysteriaShareLinkParser(),
     ]
 
     public static func parseShareLinks(_ links: [String]) -> VPNDirectParseResult {

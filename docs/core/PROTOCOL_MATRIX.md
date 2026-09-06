@@ -34,7 +34,7 @@ Until then, keep `runtime` / `parser+runtime` / `planned` even if builders exist
 | VMess | current | * | * | — | planned | yes | yes | — | runtime(JSON) | sing-box |
 | Trojan | current | * | * | — | planned | yes | yes | — | runtime(JSON) | sing-box |
 | Shadowsocks / 2022 | current | — | — | — | planned | yes | yes | — | runtime(JSON) | sing-box |
-| Hysteria / Hysteria2 | current | quic | tls | salamander/gecko* | planned | yes* | yes | planned | runtime(JSON) | sing-box (*gecko via CapabilityJSON) |
+| Hysteria / Hysteria2 | current | quic | tls | salamander/gecko* | yes | yes* | yes | planned | parser+runtime | sing-box / TheTochka harvest |
 | TUIC | v5 | quic | tls | — | planned | yes | yes | — | runtime(JSON) | sing-box |
 | AnyTLS | current | — | — | — | planned | yes | yes | — | runtime(JSON) | sing-box |
 | ShadowTLS | current | — | — | — | planned | yes | yes | — | runtime(JSON) | sing-box |

@@ -10,6 +10,7 @@ public struct VPNDirectProtocolID: RawRepresentable, Hashable, Sendable, Codable
     public static let trojan = VPNDirectProtocolID(rawValue: "trojan")
     public static let shadowsocks = VPNDirectProtocolID(rawValue: "shadowsocks")
     public static let hysteria2 = VPNDirectProtocolID(rawValue: "hysteria2")
+    public static let hysteria = VPNDirectProtocolID(rawValue: "hysteria")
     public static let tuic = VPNDirectProtocolID(rawValue: "tuic")
     public static let anytls = VPNDirectProtocolID(rawValue: "anytls")
     public static let wireguard = VPNDirectProtocolID(rawValue: "wireguard")

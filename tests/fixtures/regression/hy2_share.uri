@@ -1,0 +1,1 @@
+hy2://secretpass@hy2.example.com:443?sni=hy2.example.com&obfs=salamander&obfs-password=obfspass&alpn=h3#HY2-Test

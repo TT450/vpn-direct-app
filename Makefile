@@ -37,6 +37,7 @@ libbox-restore-stock:
 
 check-fixtures:
 	"$(ROOT)/scripts/check_fixtures.sh"
+	"$(ROOT)/scripts/check_subscription_graph.sh"
 
 check-abi:
 	"$(ROOT)/scripts/check_abi.sh"

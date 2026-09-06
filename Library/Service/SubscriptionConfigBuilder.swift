@@ -189,394 +189,36 @@ public enum SubscriptionConfigBuilder {
     }
 
     public static func buildConfig(from links: [String]) throws -> Result {
-        // Milestone 2: share-link path goes parser → NormalizedNode → outbound builder.
         let parsed = VPNDirectParserRegistry.parseShareLinks(links)
-        var proxyTags: [String] = []
-        var outbounds: [[String: Any]] = []
-        var usedTags = Set<String>()
-        var firstName: String?
-
-        for (index, node) in parsed.nodes.enumerated() {
-            guard var outbound = node.outbound else {
-                continue
-            }
-            let tag = uniqueTag(from: node.name, fallback: "proxy-\(index + 1)", used: &usedTags)
-            outbound["tag"] = tag
-            proxyTags.append(tag)
-            outbounds.append(outbound)
-            if firstName == nil {
-                firstName = node.name
-            }
-        }
-
-        if proxyTags.isEmpty {
+        if parsed.nodes.isEmpty {
             if !parsed.diagnostics.unsupportedComponents.isEmpty {
                 throw SubscriptionError.unsupportedFeatures(parsed.diagnostics.unsupportedComponents)
             }
             throw SubscriptionError.noSupportedLinks
         }
-
-        return try finalizeConfig(proxyTags: proxyTags, outbounds: outbounds, firstName: firstName)
+        let graph = try SingBoxGraphBuilder.build(fromShareNodes: parsed.nodes)
+        return Result(
+            name: graph.firstName,
+            json: graph.json,
+            nodeCount: graph.leafCount,
+            metadata: SubscriptionMetadata()
+        )
     }
 
     /// Converts Remnawave / Happ `XRAY_JSON` array into a sing-box selector config.
     public static func buildConfig(fromXrayJSON content: String) throws -> Result {
-        guard let data = content.data(using: .utf8),
-              let profiles = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
-        else {
-            throw SubscriptionError.xrayJSONUnsupported
-        }
-
-        var proxyTags: [String] = []
-        var outbounds: [[String: Any]] = []
-        var usedTags = Set<String>()
-        var firstName: String?
-        var seenServers = Set<String>()
-
-        for (index, profile) in profiles.enumerated() {
-            let remarks = ((profile["remarks"] as? String) ?? "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            let displayName = remarks.isEmpty ? "Server \(index + 1)" : remarks
-            let xrayOutbounds = (profile["outbounds"] as? [[String: Any]]) ?? []
-
-            let vlessOutbounds = xrayOutbounds.filter {
-                ($0["protocol"] as? String)?.lowercased() == "vless"
-            }
-
-            // Remnawave "Автовыбор" packs every node into one profile with a balancer.
-            // Prefer the separate named country profiles (same as Happ server list).
-            let isAutoBalancer = displayName.localizedCaseInsensitiveContains("автовыбор")
-                || displayName.localizedCaseInsensitiveContains("autoselect")
-                || vlessOutbounds.count > 3
-            if isAutoBalancer, profiles.count > 1 {
-                continue
-            }
-
-            // One list row per profile: use primary `proxy` outbound (skip xhttp).
-            let ordered = vlessOutbounds.sorted { lhs, rhs in
-                let lt = (lhs["tag"] as? String) ?? ""
-                let rt = (rhs["tag"] as? String) ?? ""
-                if lt == "proxy" { return true }
-                if rt == "proxy" { return false }
-                return false
-            }
-
-            var converted: [String: Any]?
-            var fingerprint = ""
-            for xray in ordered {
-                if let outbound = convertXrayVLESSOutbound(xray, fallbackTag: "proxy-\(index + 1)") {
-                    let server = (outbound["server"] as? String) ?? ""
-                    let port = outbound["server_port"] as? Int ?? 0
-                    fingerprint = "\(server):\(port)"
-                    converted = outbound
-                    break
-                }
-            }
-            guard var outbound = converted else { continue }
-
-            if !fingerprint.isEmpty, !seenServers.insert(fingerprint).inserted {
-                continue
-            }
-
-            let tag = uniqueTag(from: displayName, fallback: "proxy-\(index + 1)", used: &usedTags)
-            outbound["tag"] = tag
-            proxyTags.append(tag)
-            outbounds.append(outbound)
-            if firstName == nil {
-                firstName = displayName
-            }
-        }
-
-        return try finalizeConfig(proxyTags: proxyTags, outbounds: outbounds, firstName: firstName)
+        let subscription = try XrayJSONAdapter.parse(content)
+        let graph = try SingBoxGraphBuilder.build(from: subscription)
+        return Result(
+            name: graph.firstName,
+            json: graph.json,
+            nodeCount: graph.leafCount,
+            metadata: SubscriptionMetadata()
+        )
     }
 
-    private static func finalizeConfig(
-        proxyTags: [String],
-        outbounds: [[String: Any]],
-        firstName: String?
-    ) throws -> Result {
-        guard !proxyTags.isEmpty else {
-            throw SubscriptionError.noSupportedLinks
-        }
-
-        let selectorOutbounds = ["auto"] + proxyTags
-        let urlTest: [String: Any] = [
-            "type": "urltest",
-            "tag": "auto",
-            "outbounds": proxyTags,
-            "url": "https://www.gstatic.com/generate_204",
-            "interval": "1m",
-            "tolerance": 80,
-            "idle_timeout": "30m",
-        ]
-        let selector: [String: Any] = [
-            "type": "selector",
-            "tag": "proxy",
-            "outbounds": selectorOutbounds,
-            "default": "auto",
-        ]
-
-        let config: [String: Any] = [
-            "log": [
-                "level": "info",
-                "timestamp": true,
-            ],
-            "dns": [
-                "servers": [
-                    [
-                        "type": "udp",
-                        "tag": "dns-remote",
-                        "server": "1.1.1.1",
-                    ],
-                    [
-                        "type": "local",
-                        "tag": "dns-local",
-                    ],
-                ],
-                "final": "dns-remote",
-                "strategy": "prefer_ipv4",
-            ],
-            "inbounds": [
-                [
-                    "type": "tun",
-                    "tag": "tun-in",
-                    "address": ["172.19.0.1/30"],
-                    "mtu": 9000,
-                    "auto_route": true,
-                    "strict_route": true,
-                    "stack": "gvisor",
-                ],
-            ],
-            "outbounds": [selector, urlTest] + outbounds + [[
-                "type": "direct",
-                "tag": "direct",
-            ]],
-            "route": [
-                "auto_detect_interface": true,
-                "default_domain_resolver": [
-                    "server": "dns-remote",
-                    "strategy": "prefer_ipv4",
-                ],
-                "rules": [
-                    [
-                        "action": "sniff",
-                    ],
-                    [
-                        "protocol": ["dns"],
-                        "action": "hijack-dns",
-                    ],
-                    [
-                        "ip_is_private": true,
-                        "outbound": "direct",
-                    ],
-                ],
-                "final": "proxy",
-            ],
-        ]
-
-        let data = try JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys])
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw SubscriptionError.serializationFailed
-        }
-
-        var error: NSError?
-        LibboxCheckConfig(json, &error)
-        if let error {
-            throw error
-        }
-
-        let migrated = try SingBoxConfigMigrator.migrate(json)
-        return Result(name: firstName, json: migrated, nodeCount: proxyTags.count, metadata: SubscriptionMetadata())
-    }
-
-    /// Maps a single Xray VLESS outbound object to sing-box. Returns nil for unsupported transports.
-    private static func convertXrayVLESSOutbound(_ xray: [String: Any], fallbackTag: String) -> [String: Any]? {
-        let stream = (xray["streamSettings"] as? [String: Any]) ?? [:]
-        let network = ((stream["network"] as? String) ?? "tcp").lowercased()
-        // Fail closed: never invent an alternate transport for XHTTP.
-        if (network == "xhttp" || network == "splithttp"), !VPNDirectCoreCapabilities.current.supportsXHTTP {
-            return nil
-        }
-
-        let settings = (xray["settings"] as? [String: Any]) ?? [:]
-        guard let vnext = (settings["vnext"] as? [[String: Any]])?.first else { return nil }
-        let address = (vnext["address"] as? String) ?? ""
-        guard !address.isEmpty else { return nil }
-        let port = vnext["port"] as? Int ?? 443
-        guard let user = (vnext["users"] as? [[String: Any]])?.first else { return nil }
-        let uuid = (user["id"] as? String) ?? ""
-        guard !uuid.isEmpty else { return nil }
-        let flow = ((user["flow"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-
-        var outbound: [String: Any] = [
-            "type": "vless",
-            "tag": (xray["tag"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? fallbackTag,
-            "server": address,
-            "server_port": port,
-            "uuid": uuid,
-            "packet_encoding": "xudp",
-        ]
-        if !flow.isEmpty {
-            outbound["flow"] = flow
-        }
-        if let encryption = user["encryption"] as? String,
-           !encryption.isEmpty,
-           encryption.lowercased() != "none",
-           VPNDirectCoreCapabilities.current.supportsVLESSEncryption
-        {
-            outbound["encryption"] = encryption
-        }
-
-        let security = ((stream["security"] as? String) ?? "none").lowercased()
-        if security == "tls" || security == "reality" {
-            let tlsSettings = (stream["tlsSettings"] as? [String: Any]) ?? [:]
-            let realitySettings = (stream["realitySettings"] as? [String: Any]) ?? [:]
-
-            let sni = (realitySettings["serverName"] as? String)
-                ?? (tlsSettings["serverName"] as? String)
-                ?? address
-            var tls: [String: Any] = [
-                "enabled": true,
-                "server_name": sni,
-            ]
-
-            if let insecure = tlsSettings["allowInsecure"] as? Bool {
-                tls["insecure"] = insecure
-            }
-
-            let fingerprint = (realitySettings["fingerprint"] as? String)
-                ?? (tlsSettings["fingerprint"] as? String)
-            if let fingerprint, !fingerprint.isEmpty {
-                tls["utls"] = [
-                    "enabled": true,
-                    "fingerprint": fingerprint,
-                ]
-            }
-
-            if let alpn = tlsSettings["alpn"] as? [String], !alpn.isEmpty {
-                tls["alpn"] = alpn
-            }
-
-            if security == "reality" {
-                var reality: [String: Any] = ["enabled": true]
-                if let pbk = realitySettings["publicKey"] as? String, !pbk.isEmpty {
-                    reality["public_key"] = pbk
-                }
-                if let sid = realitySettings["shortId"] as? String {
-                    let hex = String(sid.filter(\.isHexDigit))
-                    if !hex.isEmpty {
-                        reality["short_id"] = hex
-                    }
-                }
-                tls["reality"] = reality
-            }
-
-            outbound["tls"] = tls
-        }
-
-        if let transport = xrayTransport(network: network, stream: stream) {
-            outbound["transport"] = transport
-        }
-
-        return outbound
-    }
-
-    private static func xrayTransport(network: String, stream: [String: Any]) -> [String: Any]? {
-        switch network {
-        case "ws", "websocket":
-            let ws = (stream["wsSettings"] as? [String: Any]) ?? [:]
-            var transport: [String: Any] = ["type": "ws"]
-            if let path = ws["path"] as? String, !path.isEmpty {
-                transport["path"] = path
-            }
-            if let headers = ws["headers"] as? [String: String], let host = headers["Host"] ?? headers["host"] {
-                transport["headers"] = ["Host": host]
-            }
-            return transport
-        case "grpc":
-            let grpc = (stream["grpcSettings"] as? [String: Any]) ?? [:]
-            var transport: [String: Any] = ["type": "grpc"]
-            if let service = grpc["serviceName"] as? String, !service.isEmpty {
-                transport["service_name"] = service
-            }
-            return transport
-        case "httpupgrade":
-            let http = (stream["httpupgradeSettings"] as? [String: Any])
-                ?? (stream["httpUpgradeSettings"] as? [String: Any])
-                ?? [:]
-            var transport: [String: Any] = ["type": "httpupgrade"]
-            if let path = http["path"] as? String, !path.isEmpty {
-                transport["path"] = path
-            }
-            if let host = http["host"] as? String, !host.isEmpty {
-                transport["host"] = host
-            }
-            return transport
-        case "xhttp", "splithttp":
-            let xhttp = (stream["xhttpSettings"] as? [String: Any])
-                ?? (stream["splithttpSettings"] as? [String: Any])
-                ?? [:]
-            var transport: [String: Any] = ["type": "xhttp"]
-            if let path = xhttp["path"] as? String, !path.isEmpty {
-                transport["path"] = path
-            }
-            if let host = xhttp["host"] as? String, !host.isEmpty {
-                transport["host"] = host
-            } else if let headers = xhttp["headers"] as? [String: String],
-                      let host = headers["Host"] ?? headers["host"], !host.isEmpty
-            {
-                transport["host"] = host
-            }
-            if let mode = xhttp["mode"] as? String, !mode.isEmpty {
-                transport["mode"] = mode
-            } else {
-                transport["mode"] = "auto"
-            }
-            if let extra = xhttp["extra"] as? String, !extra.isEmpty {
-                transport["extra"] = extra
-            } else if let extraObj = xhttp["extra"] as? [String: Any],
-                      let data = try? JSONSerialization.data(withJSONObject: extraObj),
-                      let extraJSON = String(data: data, encoding: .utf8)
-            {
-                transport["extra"] = extraJSON
-            }
-            return transport
-        case "http", "h2":
-            let http = (stream["httpSettings"] as? [String: Any]) ?? [:]
-            var transport: [String: Any] = ["type": "http"]
-            if let path = http["path"] as? String, !path.isEmpty {
-                transport["path"] = [path]
-            } else if let paths = http["path"] as? [String], !paths.isEmpty {
-                transport["path"] = paths
-            }
-            if let host = http["host"] as? [String], !host.isEmpty {
-                transport["host"] = host
-            } else if let host = http["host"] as? String, !host.isEmpty {
-                transport["host"] = [host]
-            }
-            return transport
-        case "tcp", "raw", "":
-            let tcp = (stream["tcpSettings"] as? [String: Any]) ?? [:]
-            let header = (tcp["header"] as? [String: Any]) ?? [:]
-            if ((header["type"] as? String) ?? "none").lowercased() == "http" {
-                var transport: [String: Any] = ["type": "http"]
-                let request = (header["request"] as? [String: Any]) ?? [:]
-                if let path = request["path"] as? [String], !path.isEmpty {
-                    transport["path"] = path
-                }
-                if let headers = request["headers"] as? [String: Any] {
-                    if let host = headers["Host"] as? [String], !host.isEmpty {
-                        transport["host"] = host
-                    } else if let host = headers["Host"] as? String, !host.isEmpty {
-                        transport["host"] = [host]
-                    }
-                }
-                return transport
-            }
-            return nil
-        default:
-            return nil
-        }
+    private static func uniqueTag(from name: String, fallback: String, used: inout Set<String>) -> String {
+        VPNDirectTagFactory.uniqueTag(from: name, fallback: fallback, used: &used)
     }
 
     private static func nameFromHeaders(_ headers: [String: String]) -> String? {
@@ -687,6 +329,7 @@ public enum SubscriptionConfigBuilder {
                     || lower.hasPrefix("vmess://")
                     || lower.hasPrefix("ss://")
                     || lower.hasPrefix("trojan://")
+                    || lower.hasPrefix("hysteria://")
                     || lower.hasPrefix("hysteria2://")
                     || lower.hasPrefix("hy2://")
             }
@@ -727,9 +370,7 @@ public enum SubscriptionConfigBuilder {
 
     private static func unsupportedPlaceholderMessage(in links: [String]) -> String? {
         guard links.count == 1, let link = links.first else { return nil }
-        let lower = link.lowercased()
-        let isLoopbackStub = lower.contains("@127.0.0.1:1") || lower.contains("00000000-0000-0000-0000-000000000000")
-        guard isLoopbackStub else { return nil }
+        guard EndpointValidator.isPanelStubLink(link) else { return nil }
         if let hashIndex = link.lastIndex(of: "#") {
             let fragment = String(link[link.index(after: hashIndex)...])
             let name = fragment.removingPercentEncoding ?? fragment
@@ -738,26 +379,6 @@ public enum SubscriptionConfigBuilder {
             }
         }
         return String(localized: "Subscription rejected this client")
-    }
-
-    private static func uniqueTag(from name: String, fallback: String, used: inout Set<String>) -> String {
-        var base = name
-            .replacingOccurrences(of: #"\s+"#, with: "-", options: .regularExpression)
-            .replacingOccurrences(of: #"[^A-Za-z0-9._\-а-яА-ЯёЁ]"#, with: "", options: .regularExpression)
-        if base.isEmpty {
-            base = fallback
-        }
-        if base.count > 48 {
-            base = String(base.prefix(48))
-        }
-        var tag = base
-        var index = 2
-        while used.contains(tag) || tag == "proxy" || tag == "direct" {
-            tag = "\(base)-\(index)"
-            index += 1
-        }
-        used.insert(tag)
-        return tag
     }
 
     public enum SubscriptionError: LocalizedError {
