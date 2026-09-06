@@ -30,6 +30,9 @@ jobs:
       - name: check-abi
         run: make check-abi
 
+      - name: check-capability-proofs
+        run: make check-capability-proofs
+
   libbox:
     name: Build Libbox.xcframework
     runs-on: macos-15

@@ -44,7 +44,7 @@ Until then, keep `runtime` / `parser+runtime` / `planned` even if builders exist
 | MASQUE | CONNECT-IP | h3/h2 | tls | — | yes | yes | yes | planned | parser+runtime | sing-box-lx |
 | MASQUE | CONNECT-UDP | — | — | — | — | no | — | — | deferred | — |
 | WARP | via MASQUE | h3/h2 | pin | — | yes | yes | yes | planned | parser+runtime | sing-box-lx |
-| Mieru | TCP/UDP/LE | — | — | low entropy | — | tag | trial | planned | deferred (see MIERU_DEFERRED.md) | mbox |
+| Mieru | TCP/UDP/LE | — | — | low entropy | — | no (tag off) | trial | planned | deferred (see MIERU_DEFERRED.md) | mbox |
 | SSH/SOCKS/HTTP | current | — | — | — | planned | yes | yes | — | runtime(JSON) | sing-box |
 | Tailscale | — | — | — | — | — | no (ios profile) | — | — | deferred | — |
 | OpenVPN / OpenConnect | — | — | — | — | — | no (ios profile) | — | — | deferred | — |

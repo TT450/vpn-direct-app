@@ -89,14 +89,19 @@ type vpnDirectCapabilityDocument struct {
 	Tags    string `json:"tags"`
 	XHTTP   bool   `json:"xhttp"`
 	AWG     bool   `json:"awg"`
-	AWGVersions []string `json:"awgVersions"`
-	MasqueConnectIP  bool `json:"masqueConnectIP"`
-	MasqueConnectUDP bool `json:"masqueConnectUDP"`
-	VLESSEncryption  bool `json:"vlessEncryption"`
-	Mieru            bool `json:"mieru"`
+	AWGVersions      []string `json:"awgVersions"`
+	MasqueConnectIP  bool     `json:"masqueConnectIP"`
+	MasqueConnectUDP bool     `json:"masqueConnectUDP"`
+	VLESSEncryption  bool     `json:"vlessEncryption"`
+	Mieru            bool     `json:"mieru"`
 	Hysteria2Obfuscations []string `json:"hysteria2Obfuscations"`
 	Transports struct {
-		XHTTP bool `json:"xhttp"`
+		TCP         bool `json:"tcp"`
+		WS          bool `json:"ws"`
+		GRPC        bool `json:"grpc"`
+		HTTPUpgrade bool `json:"httpupgrade"`
+		HTTP        bool `json:"http"`
+		XHTTP       bool `json:"xhttp"`
 	} `json:"transports"`
 	Protocols struct {
 		AmneziaWG struct {
@@ -104,6 +109,7 @@ type vpnDirectCapabilityDocument struct {
 			Versions  []string `json:"versions"`
 		} `json:"amneziawg"`
 		Hysteria2 struct {
+			Supported  bool     `json:"supported"`
 			Obfuscation []string `json:"obfuscation"`
 		} `json:"hysteria2"`
 		Masque struct {
@@ -114,37 +120,50 @@ type vpnDirectCapabilityDocument struct {
 			Supported bool `json:"supported"`
 		} `json:"mieru"`
 		VLESS struct {
-			Encryption bool `json:"encryption"`
+			Supported  bool     `json:"supported"`
+			Transports []string `json:"transports"`
+			Security   []string `json:"security"`
+			Encryption bool     `json:"encryption"`
 		} `json:"vless"`
 	} `json:"protocols"`
 }
 
 // VPNDirectCapabilityJSON is the preferred versioned capability document for Swift.
 func VPNDirectCapabilityJSON() string {
+	vlessTransports := vpnDirectVLESSTransports()
 	doc := vpnDirectCapabilityDocument{
-		API:     vpnDirectCoreAPIVersionValue,
-		Magic:   vpnDirectCoreMagicValue,
-		Core:    VPNDirectCoreName(),
-		Version: VPNDirectCoreVersion(),
-		SingBox: Version(),
-		Go:      runtime.Version(),
-		Tags:    VPNDirectBuildTagsCSV(),
-		XHTTP:   VPNDirectSupportsXHTTP(),
-		AWG:     VPNDirectSupportsAWG(),
-		AWGVersions:          vpnDirectAWGVersions(),
-		MasqueConnectIP:      VPNDirectSupportsMASQUEConnectIP(),
-		MasqueConnectUDP:     VPNDirectSupportsMASQUEConnectUDP(),
-		VLESSEncryption:      VPNDirectSupportsVLESSEncryption(),
-		Mieru:                VPNDirectSupportsMieru(),
+		API:                   vpnDirectCoreAPIVersionValue,
+		Magic:                 vpnDirectCoreMagicValue,
+		Core:                  VPNDirectCoreName(),
+		Version:               VPNDirectCoreVersion(),
+		SingBox:               Version(),
+		Go:                    runtime.Version(),
+		Tags:                  VPNDirectBuildTagsCSV(),
+		XHTTP:                 VPNDirectSupportsXHTTP(),
+		AWG:                   VPNDirectSupportsAWG(),
+		AWGVersions:           vpnDirectAWGVersions(),
+		MasqueConnectIP:       VPNDirectSupportsMASQUEConnectIP(),
+		MasqueConnectUDP:      VPNDirectSupportsMASQUEConnectUDP(),
+		VLESSEncryption:       VPNDirectSupportsVLESSEncryption(),
+		Mieru:                 VPNDirectSupportsMieru(),
 		Hysteria2Obfuscations: vpnDirectHysteria2Obfuscations(),
 	}
+	doc.Transports.TCP = true
+	doc.Transports.WS = true
+	doc.Transports.GRPC = true
+	doc.Transports.HTTPUpgrade = true
+	doc.Transports.HTTP = true
 	doc.Transports.XHTTP = VPNDirectSupportsXHTTP()
 	doc.Protocols.AmneziaWG.Supported = VPNDirectSupportsAWG()
 	doc.Protocols.AmneziaWG.Versions = vpnDirectAWGVersions()
+	doc.Protocols.Hysteria2.Supported = true
 	doc.Protocols.Hysteria2.Obfuscation = vpnDirectHysteria2Obfuscations()
 	doc.Protocols.Masque.ConnectIP = VPNDirectSupportsMASQUEConnectIP()
 	doc.Protocols.Masque.ConnectUDP = VPNDirectSupportsMASQUEConnectUDP()
 	doc.Protocols.Mieru.Supported = VPNDirectSupportsMieru()
+	doc.Protocols.VLESS.Supported = true
+	doc.Protocols.VLESS.Transports = vlessTransports
+	doc.Protocols.VLESS.Security = []string{"none", "tls", "reality"}
 	doc.Protocols.VLESS.Encryption = VPNDirectSupportsVLESSEncryption()
 
 	data, err := json.Marshal(doc)
@@ -152,6 +171,14 @@ func VPNDirectCapabilityJSON() string {
 		return `{"api":1,"magic":"VPN_DIRECT_CORE","error":"marshal"}`
 	}
 	return string(data)
+}
+
+func vpnDirectVLESSTransports() []string {
+	out := []string{"tcp", "ws", "grpc", "httpupgrade", "http"}
+	if vpnDirectTagXHTTP {
+		out = append(out, "xhttp")
+	}
+	return out
 }
 
 func vpnDirectAWGVersions() []string {

@@ -11,7 +11,7 @@ import Foundation
 ///
 /// Sources (priority):
 /// 1. Env `VPN_DIRECT_CAPABILITY_JSON` — tests/CI
-/// 2. Linked Libbox CapabilityJSON when ABI magic + API version match
+/// 2. Linked Libbox CapabilityJSON when ABI magic + API version match (source of truth)
 /// 3. Linked per-feature exports (fallback when JSON missing but ABI ok)
 /// 4. Sidecar / build-tag strings are **informational only** (`buildTags`); they never
 ///    enable custom VPN Direct features when ABI is incompatible
@@ -35,9 +35,33 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
     public var supportsMieru: Bool
     public var hysteria2Obfuscations: [String]
     public var vlessTransports: [String]
+    public var vlessSecurity: [String]
+    public var supportsHysteria2: Bool
+
+    /// Raw Core CapabilityJSON object when ABI is compatible (mirrored, not rewritten).
+    public var coreDocument: [String: Any]
 
     public static var current: VPNDirectCoreCapabilities {
         probe()
+    }
+
+    public static func == (lhs: VPNDirectCoreCapabilities, rhs: VPNDirectCoreCapabilities) -> Bool {
+        lhs.coreName == rhs.coreName
+            && lhs.coreVersion == rhs.coreVersion
+            && lhs.singBoxVersion == rhs.singBoxVersion
+            && lhs.buildTags == rhs.buildTags
+            && lhs.abiCompatible == rhs.abiCompatible
+            && lhs.supportsXHTTP == rhs.supportsXHTTP
+            && lhs.supportsAWG == rhs.supportsAWG
+            && lhs.amneziaWGVersions == rhs.amneziaWGVersions
+            && lhs.supportsMASQUEConnectIP == rhs.supportsMASQUEConnectIP
+            && lhs.supportsMASQUEConnectUDP == rhs.supportsMASQUEConnectUDP
+            && lhs.supportsVLESSEncryption == rhs.supportsVLESSEncryption
+            && lhs.supportsMieru == rhs.supportsMieru
+            && lhs.hysteria2Obfuscations == rhs.hysteria2Obfuscations
+            && lhs.vlessTransports == rhs.vlessTransports
+            && lhs.vlessSecurity == rhs.vlessSecurity
+            && lhs.supportsHysteria2 == rhs.supportsHysteria2
     }
 
     public static func probe() -> VPNDirectCoreCapabilities {
@@ -80,9 +104,11 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
             let hasXHTTP = linked.xhttp ?? false
             let hasAWG = linked.awg ?? false
             let versions = linked.awgVersions
-            let hysteriaObfs = linked.hysteria2Obfuscations.isEmpty
-                ? ["salamander"]
-                : linked.hysteria2Obfuscations
+            let hysteriaObfs = linked.hysteria2Obfuscations
+            let transports = linked.vlessTransports.isEmpty
+                ? fallbackVLESSTransports(xhttp: hasXHTTP)
+                : linked.vlessTransports
+            let security = linked.vlessSecurity.isEmpty ? ["none", "tls", "reality"] : linked.vlessSecurity
 
             return VPNDirectCoreCapabilities(
                 coreName: linked.coreName ?? stamped.coreName ?? "VPNDirectCore",
@@ -101,7 +127,10 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
                 supportsVLESSEncryption: linked.vlessEncryption ?? false,
                 supportsMieru: linked.mieru ?? false,
                 hysteria2Obfuscations: hysteriaObfs,
-                vlessTransports: Self.vlessTransportList(xhttp: hasXHTTP)
+                vlessTransports: transports,
+                vlessSecurity: security,
+                supportsHysteria2: linked.supportsHysteria2 ?? !hysteriaObfs.isEmpty,
+                coreDocument: [:]
             )
         }
 
@@ -121,23 +150,51 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
             supportsMASQUEConnectUDP: false,
             supportsVLESSEncryption: false,
             supportsMieru: false,
-            hysteria2Obfuscations: ["salamander"],
-            vlessTransports: Self.vlessTransportList(xhttp: false)
+            hysteria2Obfuscations: [],
+            vlessTransports: [],
+            vlessSecurity: [],
+            supportsHysteria2: false,
+            coreDocument: [:]
         )
     }
 
+    /// Mirrors Core CapabilityJSON when available. Does not invent protocol lists.
     public func jsonObject() -> [String: Any] {
-        [
+        if !coreDocument.isEmpty {
+            var mirrored = coreDocument
+            mirrored["abiCompatible"] = abiCompatible
+            return mirrored
+        }
+
+        return [
             "abiCompatible": abiCompatible,
+            "api": Self.expectedAPIVersion,
+            "magic": Self.expectedMagic,
             "core": coreName,
             "version": coreVersion,
-            "singBoxVersion": singBoxVersion,
-            "buildTags": buildTags,
+            "singBox": singBoxVersion,
+            "tags": buildTags.joined(separator: ","),
+            "xhttp": supportsXHTTP,
+            "awg": supportsAWG,
+            "awgVersions": amneziaWGVersions,
+            "masqueConnectIP": supportsMASQUEConnectIP,
+            "masqueConnectUDP": supportsMASQUEConnectUDP,
+            "vlessEncryption": supportsVLESSEncryption,
+            "mieru": supportsMieru,
+            "hysteria2Obfuscations": hysteria2Obfuscations,
+            "transports": [
+                "tcp": vlessTransports.contains("tcp"),
+                "ws": vlessTransports.contains("ws"),
+                "grpc": vlessTransports.contains("grpc"),
+                "httpupgrade": vlessTransports.contains("httpupgrade"),
+                "http": vlessTransports.contains("http"),
+                "xhttp": supportsXHTTP,
+            ],
             "protocols": [
                 "vless": [
-                    "supported": true,
+                    "supported": !vlessTransports.isEmpty,
                     "transports": vlessTransports,
-                    "security": ["none", "tls", "reality"],
+                    "security": vlessSecurity,
                     "encryption": supportsVLESSEncryption,
                 ],
                 "amneziawg": [
@@ -152,14 +209,14 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
                     "supported": supportsMieru,
                 ],
                 "hysteria2": [
-                    "supported": true,
+                    "supported": supportsHysteria2,
                     "obfuscation": hysteria2Obfuscations,
                 ],
             ],
         ]
     }
 
-    private static func vlessTransportList(xhttp: Bool) -> [String] {
+    private static func fallbackVLESSTransports(xhttp: Bool) -> [String] {
         var list = ["tcp", "ws", "grpc", "httpupgrade", "http"]
         if xhttp { list.append("xhttp") }
         return list
@@ -189,6 +246,9 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
         var vlessEncryption: Bool?
         var mieru: Bool?
         var hysteria2Obfuscations: [String] = []
+        var vlessTransports: [String] = []
+        var vlessSecurity: [String] = []
+        var supportsHysteria2: Bool?
     }
 
     private static func readLinkedExports() -> LinkedExport {
@@ -215,6 +275,17 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
                 .split(separator: ",")
                 .map(String.init)
                 .filter { !$0.isEmpty }
+            if let json = out.capabilityJSON,
+               let data = json.data(using: .utf8),
+               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            {
+                let protocols = obj["protocols"] as? [String: Any] ?? [:]
+                let vless = protocols["vless"] as? [String: Any] ?? [:]
+                let hysteria2 = protocols["hysteria2"] as? [String: Any] ?? [:]
+                out.vlessTransports = (vless["transports"] as? [String]) ?? []
+                out.vlessSecurity = (vless["security"] as? [String]) ?? []
+                out.supportsHysteria2 = hysteria2["supported"] as? Bool
+            }
             return out
         #else
             return LinkedExport()
@@ -302,7 +373,10 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
         let hasMieru = (obj["mieru"] as? Bool) ?? (mieru["supported"] as? Bool) ?? false
         let hysteriaObfs = (obj["hysteria2Obfuscations"] as? [String])
             ?? (hysteria2["obfuscation"] as? [String])
-            ?? ["salamander"]
+            ?? []
+        let hasHysteria2 = (hysteria2["supported"] as? Bool) ?? !hysteriaObfs.isEmpty
+        let vlessTransports = (vless["transports"] as? [String]) ?? []
+        let vlessSecurity = (vless["security"] as? [String]) ?? []
         let tagsCSV = obj["tags"] as? String ?? ""
         let tags = tagsCSV.split(separator: ",").map(String.init).filter { !$0.isEmpty }
 
@@ -320,7 +394,10 @@ public struct VPNDirectCoreCapabilities: Equatable, Sendable {
             supportsVLESSEncryption: hasVLESSEnc,
             supportsMieru: hasMieru,
             hysteria2Obfuscations: hysteriaObfs,
-            vlessTransports: Self.vlessTransportList(xhttp: hasXHTTP)
+            vlessTransports: vlessTransports,
+            vlessSecurity: vlessSecurity,
+            supportsHysteria2: hasHysteria2,
+            coreDocument: obj
         )
     }
 }

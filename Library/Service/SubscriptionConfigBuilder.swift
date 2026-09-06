@@ -180,53 +180,33 @@ public enum SubscriptionConfigBuilder {
     }
 
     public static func buildConfig(from links: [String]) throws -> Result {
+        // Milestone 2: share-link path goes parser → NormalizedNode → outbound builder.
+        let parsed = VPNDirectParserRegistry.parseShareLinks(links)
         var proxyTags: [String] = []
         var outbounds: [[String: Any]] = []
         var usedTags = Set<String>()
         var firstName: String?
-        var unsupportedComponents = Set<String>()
-        var parseFailures = 0
 
-        for (index, link) in links.enumerated() {
-            let lower = link.lowercased()
-            guard lower.hasPrefix("vless://") else {
+        for (index, node) in parsed.nodes.enumerated() {
+            guard var outbound = node.outbound else {
                 continue
             }
-            do {
-                let parsed = try VLESSConfigBuilder.parseOutbound(link, tag: "proxy-\(index + 1)")
-                var outbound = parsed.outbound
-                let tag = uniqueTag(from: parsed.name, fallback: "proxy-\(index + 1)", used: &usedTags)
-                outbound["tag"] = tag
-                proxyTags.append(tag)
-                outbounds.append(outbound)
-                if firstName == nil {
-                    firstName = parsed.name
-                }
-            } catch let error as VLESSConfigBuilder.VLESSError {
-                if case let .unsupportedFeature(component, _) = error {
-                    unsupportedComponents.insert(component)
-                } else {
-                    parseFailures += 1
-                }
-            } catch let error as VPNDirectCoreError {
-                if case let .unsupportedFeature(component, _) = error {
-                    unsupportedComponents.insert(component)
-                } else {
-                    parseFailures += 1
-                }
-            } catch {
-                parseFailures += 1
+            let tag = uniqueTag(from: node.name, fallback: "proxy-\(index + 1)", used: &usedTags)
+            outbound["tag"] = tag
+            proxyTags.append(tag)
+            outbounds.append(outbound)
+            if firstName == nil {
+                firstName = node.name
             }
         }
 
         if proxyTags.isEmpty {
-            if !unsupportedComponents.isEmpty {
-                throw SubscriptionError.unsupportedFeatures(Array(unsupportedComponents).sorted())
+            if !parsed.diagnostics.unsupportedComponents.isEmpty {
+                throw SubscriptionError.unsupportedFeatures(parsed.diagnostics.unsupportedComponents)
             }
             throw SubscriptionError.noSupportedLinks
         }
 
-        _ = parseFailures
         return try finalizeConfig(proxyTags: proxyTags, outbounds: outbounds, firstName: firstName)
     }
 

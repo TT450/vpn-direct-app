@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "singBox": "1.14.0-lx.35-test",
   "go": "go1.26.6",
-  "tags": "with_xhttp,with_awg",
+  "tags": "with_xhttp,with_awg,with_masque",
   "xhttp": true,
   "awg": true,
   "awgVersions": ["1", "2", "3.0", "3.1"],
@@ -14,12 +14,24 @@
   "vlessEncryption": true,
   "mieru": false,
   "hysteria2Obfuscations": ["salamander", "gecko"],
-  "transports": { "xhttp": true },
+  "transports": {
+    "tcp": true,
+    "ws": true,
+    "grpc": true,
+    "httpupgrade": true,
+    "http": true,
+    "xhttp": true
+  },
   "protocols": {
     "amneziawg": { "supported": true, "versions": ["1", "2", "3.0", "3.1"] },
-    "hysteria2": { "obfuscation": ["salamander", "gecko"] },
+    "hysteria2": { "supported": true, "obfuscation": ["salamander", "gecko"] },
     "masque": { "connect_ip": true, "connect_udp": false },
     "mieru": { "supported": false },
-    "vless": { "encryption": true }
+    "vless": {
+      "supported": true,
+      "transports": ["tcp", "ws", "grpc", "httpupgrade", "http", "xhttp"],
+      "security": ["none", "tls", "reality"],
+      "encryption": true
+    }
   }
 }

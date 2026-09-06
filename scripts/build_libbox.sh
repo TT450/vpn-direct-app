@@ -69,8 +69,12 @@ if [[ "${NEED_INSTALL}" -eq 1 ]]; then
 fi
 
 GOMOBILE_SHA="$(go env GOMODCACHE 2>/dev/null || true)"
-# Resolve installed module version when available
-GOMOBILE_MOD_INFO="$(go version -m "$(command -v gomobile)" 2>/dev/null | awk '/golang.org\/x\/mobile/{print $2; exit}' || true)"
+# Resolve installed module version (sagernet fork first; fallback to golang.org/x/mobile).
+GOMOBILE_BIN="$(command -v gomobile)"
+GOMOBILE_MOD_INFO="$(go version -m "${GOMOBILE_BIN}" 2>/dev/null | awk '/github.com\/sagernet\/gomobile/{print $2; exit}' || true)"
+if [[ -z "${GOMOBILE_MOD_INFO}" ]]; then
+  GOMOBILE_MOD_INFO="$(go version -m "${GOMOBILE_BIN}" 2>/dev/null | awk '/golang.org\/x\/mobile/{print $2; exit}' || true)"
+fi
 GOMOBILE_SHA="${GOMOBILE_MOD_INFO:-${GOMOBILE_REV}}"
 
 SING_BOX_SHA="unknown"
@@ -100,7 +104,10 @@ if [[ -d "${OVERLAY_DIR}" ]]; then
 fi
 
 if [[ "${BUILD_TAGS}" == *with_awg* ]]; then
-  git submodule update --init --recursive || true
+  if ! git submodule update --init --recursive; then
+    echo "error: required AWG submodules failed to initialize (with_awg is mandatory for this profile)" >&2
+    exit 1
+  fi
 fi
 
 export LIBBOX_BUILD_TAGS="${BUILD_TAGS}"

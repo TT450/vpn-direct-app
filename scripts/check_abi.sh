@@ -75,6 +75,16 @@ else
   echo "note: Libbox.xcframework not present — overlay-only ABI check"
 fi
 
+# Default profiles must not claim Mieru until runtime exists.
+for tags_file in "${ROOT}/scripts/tags/vpn_direct_ios.tags" "${ROOT}/scripts/tags/vpn_direct_full.tags"; do
+  if [[ -f "${tags_file}" ]] && grep -q 'with_mieru' "${tags_file}"; then
+    echo "ERROR ${tags_file} enables with_mieru without runtime" >&2
+    fail=1
+  else
+    echo "OK mieru disabled in $(basename "${tags_file}")"
+  fi
+done
+
 # Compile-check Go overlays against donor package when submodule present.
 # Compile failure must fail this script (not WARN-and-continue).
 if [[ -d "${CORE}/experimental/libbox" ]]; then
@@ -93,6 +103,23 @@ if [[ -d "${CORE}/experimental/libbox" ]]; then
   else
     echo "ERROR go test -c experimental/libbox failed (exit ${go_status})" >&2
     tail -40 /tmp/vpndirect-libbox-abi-test.log || true
+    fail=1
+  fi
+
+  set +e
+  (
+    cd "${CORE}"
+    go test ./experimental/libbox -count=1 -run 'TestVPNDirectCapabilityJSONMieruFalseByDefault' \
+      -tags 'with_gvisor,with_quic,with_wireguard,with_utls,with_xhttp,with_awg' \
+      >/tmp/vpndirect-mieru-cap.log 2>&1
+  )
+  mieru_status=$?
+  set -e
+  if [[ "${mieru_status}" -eq 0 ]]; then
+    echo "OK CapabilityJSON asserts mieru=false"
+  else
+    echo "ERROR mieru=false capability assertion failed" >&2
+    tail -40 /tmp/vpndirect-mieru-cap.log || true
     fail=1
   fi
 fi
