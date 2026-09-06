@@ -23,7 +23,12 @@ enum SingBoxGraphBuilder {
             var leafOutbounds: [[String: Any]] = []
 
             for (entryIndex, endpoint) in location.endpoints.enumerated() {
-                guard var outbound = endpoint.outbound else { continue }
+                var outbound: [String: Any]
+                do {
+                    outbound = try UniversalOutboundBuilder.build(from: endpoint)
+                } catch {
+                    continue
+                }
                 let leafTag = VPNDirectTagFactory.uniqueTag(
                     from: "\(location.name)-n\(entryIndex + 1)",
                     fallback: "leaf-\(locationTags.count + 1)-\(entryIndex + 1)",
@@ -188,9 +193,8 @@ enum SingBoxGraphBuilder {
 
     /// Share-link list → one location per node, then same graph.
     static func build(fromShareNodes nodes: [NormalizedNode]) throws -> GraphResult {
-        let locations: [NormalizedLocation] = nodes.enumerated().compactMap { index, node in
-            guard node.outbound != nil else { return nil }
-            return NormalizedLocation(
+        let locations: [NormalizedLocation] = nodes.enumerated().map { index, node in
+            NormalizedLocation(
                 id: "share-\(index + 1)",
                 name: node.name.isEmpty ? "Server \(index + 1)" : node.name,
                 kind: .country,

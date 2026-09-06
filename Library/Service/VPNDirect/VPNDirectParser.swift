@@ -45,6 +45,17 @@ public enum VPNDirectParserRegistry {
     public static var shareLinkParsers: [VPNDirectParser] = [
         VLESSShareLinkParser(),
         HysteriaShareLinkParser(),
+        VMessShareLinkParser(),
+        TrojanShareLinkParser(),
+        ShadowsocksShareLinkParser(),
+        TUICShareLinkParser(),
+        AnyTLSShareLinkParser(),
+        WireGuardShareLinkParser(),
+        SOCKSShareLinkParser(),
+        HTTPProxyShareLinkParser(),
+        SSHShareLinkParser(),
+        ShadowTLSShareLinkParser(),
+        NaiveProxyShareLinkParser(),
     ]
 
     public static func parseShareLinks(_ links: [String]) -> VPNDirectParseResult {

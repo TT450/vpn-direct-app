@@ -1,0 +1,13 @@
+proxies:
+  - name: clash-ss
+    type: ss
+    server: 203.0.113.19
+    port: 8388
+    cipher: aes-256-gcm
+    password: password123
+  - name: clash-trojan
+    type: trojan
+    server: 203.0.113.20
+    port: 443
+    password: password123
+    sni: example.com

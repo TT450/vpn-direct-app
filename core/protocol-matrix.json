@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "core": "0.1",
+  "updated": "2026-09-07",
+  "protocols": [
+    {
+      "id": "vless-baseline",
+      "name": "VLESS",
+      "parser": "yes",
+      "core": true,
+      "status": "runtime",
+      "evidence": {}
+    },
+    {
+      "id": "vless-xhttp",
+      "name": "VLESS XHTTP",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "hysteria2",
+      "name": "Hysteria2",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "vmess",
+      "name": "VMess",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "trojan",
+      "name": "Trojan",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "shadowsocks",
+      "name": "Shadowsocks",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "tuic",
+      "name": "TUIC",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "anytls",
+      "name": "AnyTLS",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "wireguard",
+      "name": "WireGuard",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "amneziawg",
+      "name": "AmneziaWG",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "masque-connect-ip",
+      "name": "MASQUE CONNECT-IP",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "mieru",
+      "name": "Mieru",
+      "parser": "yes",
+      "core": false,
+      "status": "deferred",
+      "notes": "Swift parser present; Core outbound not registered; capability false",
+      "evidence": {}
+    },
+    {
+      "id": "socks-http-ssh",
+      "name": "SSH/SOCKS/HTTP",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "masque-connect-udp",
+      "name": "MASQUE CONNECT-UDP",
+      "parser": "—",
+      "core": false,
+      "status": "out_of_scope",
+      "evidence": {}
+    },
+    {
+      "id": "tailscale",
+      "name": "Tailscale",
+      "parser": "—",
+      "core": false,
+      "status": "out_of_scope",
+      "evidence": {}
+    },
+    {
+      "id": "openvpn",
+      "name": "OpenVPN / OpenConnect",
+      "parser": "—",
+      "core": false,
+      "status": "out_of_scope",
+      "evidence": {}
+    }
+  ]
+}

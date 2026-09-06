@@ -371,31 +371,46 @@ public struct MasqueOutboundOptions: Equatable, Sendable {
     }
 }
 
-/// Normalized Core-facing errors for UI.
+/// Normalized Core-facing errors for UI (v2).
 public enum VPNDirectCoreError: LocalizedError {
     case unsupportedFeature(component: String, detail: String)
     case malformedConfig(component: String, detail: String)
     case coreError(detail: String)
+    case coreRejected(ecosystem: String?, protocolID: String?, detail: String)
+    case unsupportedTransport(transport: String, detail: String)
+    case unsupportedSecurity(security: String, detail: String)
 
     public var errorDescription: String? {
         switch self {
         case let .unsupportedFeature(component, _):
-            return "This VPN Direct build does not support \(component)."
+            return String(localized: "This server uses \(component), which is not available in this build.")
         case let .malformedConfig(component, _):
-            return "Invalid \(component) configuration."
-        case let .coreError(detail):
-            return detail
+            return String(localized: "Invalid \(component) configuration.")
+        case .coreError, .coreRejected:
+            return String(localized: "The VPN core rejected this configuration.")
+        case let .unsupportedTransport(transport, _):
+            return String(localized: "This server uses transport \(transport), which is not supported yet.")
+        case let .unsupportedSecurity(security, _):
+            return String(localized: "This server uses security \(security), which is not supported yet.")
         }
     }
 
     public var debugDescription: String {
         switch self {
         case let .unsupportedFeature(component, detail):
-            return "unsupportedFeature(\(component)): \(detail)"
+            return VPNDirectRedactor.redact("unsupportedFeature(\(component)): \(detail)")
         case let .malformedConfig(component, detail):
-            return "malformedConfig(\(component)): \(detail)"
+            return VPNDirectRedactor.redact("malformedConfig(\(component)): \(detail)")
         case let .coreError(detail):
-            return "coreError: \(detail)"
+            return VPNDirectRedactor.redact("coreError: \(detail)")
+        case let .coreRejected(ecosystem, protocolID, detail):
+            return VPNDirectRedactor.redact(
+                "coreRejected ecosystem=\(ecosystem ?? "-") protocol=\(protocolID ?? "-"): \(detail)"
+            )
+        case let .unsupportedTransport(transport, detail):
+            return VPNDirectRedactor.redact("unsupportedTransport(\(transport)): \(detail)")
+        case let .unsupportedSecurity(security, detail):
+            return VPNDirectRedactor.redact("unsupportedSecurity(\(security)): \(detail)")
         }
     }
 }

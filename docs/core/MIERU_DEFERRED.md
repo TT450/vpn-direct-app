@@ -1,27 +1,25 @@
-# Mieru (Phase K) — deferred
+# Mieru (Phase K) — port status
 
 ## Status
 
-**Deferred for Core 0.1.** Libbox baseline from `sing-box-lx` (XHTTP / AWG / MASQUE / VLESS encryption) is the acceptance gate. Mieru from [enfein/mbox](https://github.com/enfein/mbox) is not merged into `core/sing-box` yet.
+**Swift side: DONE for this tranche.** `MieruConfigAdapter` parses client JSON → `NormalizedNode(protocolID: .mieru)`. Builder emits only when `VPNDirectCoreCapabilities.supportsMieru`.
 
-**Capability policy:** `with_mieru` is **not** present in `vpn_direct_ios.tags` or `vpn_direct_full.tags`. `VPNDirectSupportsMieru` / CapabilityJSON `mieru` stay `false` until a real runtime is registered.
+**Core runtime: NOT REGISTERED.** `with_mieru` remains absent from `scripts/tags/vpn_direct_*.tags`. CapabilityJSON `mieru=false`.
 
-## Why defer
-
-1. mbox carries a separate portable package set (`protocol/mieru` + option/registry wiring); merging before an Apple `vpn_direct_ios` Libbox boots risks rebase noise on an already large lx tree.
-2. Network Extension memory budget: extra protocol surface should land only after size/RAM of the lx Libbox is measured on device.
-3. Capability surface already reserves `supportsMieru` / `with_mieru` (Go stubs + Swift gate) so UI/builders can stay unchanged when the tag appears.
+Donor: [enfein/mieru](https://github.com/enfein/mieru) / [enfein/mbox](https://github.com/enfein/mbox) — pin a modern revision (Low Entropy 32/40/48/56) when merging.
 
 ## Unblock checklist
 
-- [ ] `scripts/build_libbox.sh` produces a device-linked Libbox with XHTTP+AWG green
-- [ ] Measure NE RSS with idle_suspend on a mid-tier iPhone
-- [ ] Port only `protocol/mieru` + option/registry (+ tests) behind `with_mieru`
-- [ ] Add `with_mieru` to `scripts/tags/vpn_direct_ios.tags` (and full) when size is acceptable
-- [ ] Share-link / JSON fixtures under `tests/fixtures/regression/mieru/`
-- [ ] Flip `PROTOCOL_MATRIX.md` Mieru row to **builder+core**
-- [ ] CapabilityJSON `mieru=true` only after outbound registration proof
+- [x] Libbox baseline builds in CI (XHTTP/AWG/MASQUE)
+- [ ] Measure NE RSS with idle_suspend on mid-tier iPhone
+- [ ] Port `protocol/mieru` + option/registry behind `with_mieru` into `core/sing-box`
+- [ ] Call real Register; set capability true only after validate
+- [ ] Add `with_mieru` to tags only after size budget OK
+- [x] Fixtures under `tests/fixtures/regression/mieru/`
+- [x] Swift fail-closed builder when capability false
+- [ ] Flip matrix Core column + status after registration proof
+- [ ] Interop TCP / UDP / Low Entropy evidence under `interop/mieru/evidence/`
 
 ## Interim behavior
 
-`VPNDirectCoreCapabilities.supportsMieru` is `false`. No Swift Mieru parser ships in 0.1. CI asserts profile tags and CapabilityJSON keep mieru disabled.
+Parse succeeds; graph build / outbound emit throws `unsupportedFeature(mieru)` until Core registers the outbound. Happ UA is never used for Mieru.

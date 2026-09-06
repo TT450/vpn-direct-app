@@ -115,69 +115,89 @@ public enum SubscriptionConfigBuilder {
         throw lastError
     }
 
-    /// Accepts raw remote body: sing-box JSON, base64 share list, or plain share links.
+    /// Accepts raw remote body: sing-box JSON, Xray JSON, Clash YAML, WG/AWG conf, Mieru JSON, URI lists.
     public static func normalizeRemoteContent(
         _ content: String,
         sourceURL: String = "",
         headers: [String: String] = [:]
     ) throws -> Result {
-        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        let detection = VPNDirectContentDetector.detect(text: content)
+        guard detection.kind != .unknown, !detection.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw SubscriptionError.empty
         }
 
-        if looksLikeSingBoxJSON(trimmed) {
-            let migrated = try SingBoxConfigMigrator.migrate(trimmed)
-            let meta = SubscriptionMetadata.parse(headers: headers, body: trimmed)
+        switch detection.kind {
+        case .singBoxJSON:
+            let migrated = try SingBoxConfigMigrator.migrate(detection.text)
+            let validated = try VPNDirectConfigValidator.validateSingBoxJSON(migrated)
+            let meta = SubscriptionMetadata.parse(headers: headers, body: detection.text)
             let name = resolveSubscriptionName(urlString: sourceURL, headers: headers, contentName: meta.title)
             return Result(
                 name: name == "Subscription" ? meta.title : name,
-                json: migrated,
+                json: validated.json,
                 nodeCount: 0,
                 metadata: meta
             )
-        }
 
-        // Happ / Remnawave XRAY_JSON: [{ remarks, outbounds: [{protocol:vless,...}], ...}, ...]
-        if trimmed.hasPrefix("[") {
-            var result = try buildConfig(fromXrayJSON: trimmed)
-            let meta = SubscriptionMetadata.parse(headers: headers, body: trimmed)
+        case .xrayJSON:
+            var result = try buildConfig(fromXrayJSON: detection.text)
+            let meta = SubscriptionMetadata.parse(headers: headers, body: detection.text)
             let resolvedName = resolveSubscriptionName(
                 urlString: sourceURL,
                 headers: headers,
                 contentName: meta.title ?? result.name
             )
-            result = Result(
+            return Result(
                 name: resolvedName == "Subscription" ? result.name : resolvedName,
                 json: result.json,
                 nodeCount: result.nodeCount,
                 metadata: meta
             )
-            return result
-        }
 
-        let links = decodeShareLinks(trimmed)
-        if links.isEmpty {
+        case .clashYAML:
+            let subscription = try ClashYAMLAdapter.parse(detection.text)
+            let graph = try SingBoxGraphBuilder.build(from: subscription)
+            let meta = SubscriptionMetadata.parse(headers: headers, body: detection.text)
+            let resolved = resolveSubscriptionName(urlString: sourceURL, headers: headers, contentName: meta.title ?? graph.firstName)
+            return Result(name: resolved, json: graph.json, nodeCount: graph.leafCount, metadata: meta)
+
+        case .wireGuardConf:
+            let subscription = try WireGuardConfAdapter.parse(detection.text)
+            let graph = try SingBoxGraphBuilder.build(from: subscription)
+            let meta = SubscriptionMetadata.parse(headers: headers, body: detection.text)
+            return Result(name: graph.firstName ?? "WireGuard", json: graph.json, nodeCount: graph.leafCount, metadata: meta)
+
+        case .mieruJSON:
+            let subscription = try MieruConfigAdapter.parse(detection.text)
+            let graph = try SingBoxGraphBuilder.build(from: subscription)
+            let meta = SubscriptionMetadata.parse(headers: headers, body: detection.text)
+            return Result(name: graph.firstName ?? "Mieru", json: graph.json, nodeCount: graph.leafCount, metadata: meta)
+
+        case .uriList, .base64URIList:
+            let links = extractLinks(from: detection.text)
+            if links.isEmpty {
+                throw SubscriptionError.noSupportedLinks
+            }
+            if let blocked = unsupportedPlaceholderMessage(in: links) {
+                throw SubscriptionError.panelRejected(blocked)
+            }
+            var result = try buildConfig(from: links)
+            let meta = SubscriptionMetadata.parse(headers: headers, body: detection.text)
+            let resolvedName = resolveSubscriptionName(
+                urlString: sourceURL,
+                headers: headers,
+                contentName: meta.title ?? result.name
+            )
+            return Result(
+                name: resolvedName == "Subscription" ? result.name : resolvedName,
+                json: result.json,
+                nodeCount: result.nodeCount,
+                metadata: meta
+            )
+
+        case .unknown:
             throw SubscriptionError.noSupportedLinks
         }
-
-        if let blocked = unsupportedPlaceholderMessage(in: links) {
-            throw SubscriptionError.panelRejected(blocked)
-        }
-
-        var result = try buildConfig(from: links)
-        let meta = SubscriptionMetadata.parse(headers: headers, body: trimmed)
-        let resolvedName = resolveSubscriptionName(
-            urlString: sourceURL,
-            headers: headers,
-            contentName: meta.title ?? result.name
-        )
-        if resolvedName != "Subscription" {
-            result = Result(name: resolvedName, json: result.json, nodeCount: result.nodeCount, metadata: meta)
-        } else {
-            result = Result(name: result.name, json: result.json, nodeCount: result.nodeCount, metadata: meta)
-        }
-        return result
     }
 
     public static func decodeShareLinks(_ content: String) -> [String] {
@@ -332,6 +352,17 @@ public enum SubscriptionConfigBuilder {
                     || lower.hasPrefix("hysteria://")
                     || lower.hasPrefix("hysteria2://")
                     || lower.hasPrefix("hy2://")
+                    || lower.hasPrefix("tuic://")
+                    || lower.hasPrefix("anytls://")
+                    || lower.hasPrefix("wireguard://")
+                    || lower.hasPrefix("wg://")
+                    || lower.hasPrefix("awg://")
+                    || lower.hasPrefix("socks://")
+                    || lower.hasPrefix("socks5://")
+                    || lower.hasPrefix("socks4://")
+                    || lower.hasPrefix("ssh://")
+                    || lower.hasPrefix("http-proxy://")
+                    || lower.hasPrefix("https-proxy://")
             }
     }
 
@@ -394,7 +425,7 @@ public enum SubscriptionConfigBuilder {
             case .empty:
                 return String(localized: "Subscription is empty")
             case .noSupportedLinks:
-                return String(localized: "No supported vless:// links found in subscription")
+                return String(localized: "No supported share links or subscription format found")
             case let .unsupportedFeatures(components):
                 let joined = components.joined(separator: ", ")
                 return String(localized: "Subscription requires unsupported features: \(joined)")

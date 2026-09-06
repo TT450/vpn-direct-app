@@ -6,7 +6,7 @@ INSTALLER_SIGN_IDENTITY := 16480CA444F481F8DEAF9421FAD2CCE590FC54E4
 XCODEBUILD_FLAGS ?=
 ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
-.PHONY: core-bootstrap libbox libbox-backup-stock libbox-restore-stock libbox-install check-fixtures check-abi check-capability-proofs
+.PHONY: core-bootstrap libbox libbox-backup-stock libbox-restore-stock libbox-install check-fixtures check-abi check-capability-proofs check-production-ready
 
 core-bootstrap:
 	"$(ROOT)/scripts/bootstrap_core.sh"
@@ -38,12 +38,16 @@ libbox-restore-stock:
 check-fixtures:
 	"$(ROOT)/scripts/check_fixtures.sh"
 	"$(ROOT)/scripts/check_subscription_graph.sh"
+	"$(ROOT)/scripts/check_universal_parsers.sh"
 
 check-abi:
 	"$(ROOT)/scripts/check_abi.sh"
 
 check-capability-proofs:
 	"$(ROOT)/scripts/check_capability_proofs.sh"
+
+check-production-ready:
+	"$(ROOT)/scripts/check_production_ready.sh"
 
 build_all: build_ios build_macos build_tvos
 

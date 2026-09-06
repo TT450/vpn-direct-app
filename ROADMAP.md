@@ -11,25 +11,30 @@ Public roadmap for VPN Direct (Apple client + VPN Direct Core). Status language 
 - [x] NormalizedNode + VLESS adapter skeleton
 - [x] Happ-first subscription identity + Keychain HWID
 - [x] TheTochka harvest P0: HY2, Remnawave location urltest, global auto, per-profile dedupe, dialerProxy→detour
-- [ ] Universal multi-scheme URI parsers (VMess, Trojan, SS, TUIC, …) — blocked until harvest fixtures stay green
-- [ ] Clash / Mihomo YAML import
-- [ ] Expanded regression fixtures + `sing-box check` in CI
+- [x] Core baseline CI green (fixtures + ABI + Libbox + SFI)
+- [x] Content detector (JSON / YAML / conf / URI / base64) without destructive trim
+- [x] Universal multi-scheme URI parsers (VMess, Trojan, SS, TUIC, AnyTLS, WG/AWG, SOCKS/HTTP/SSH, ShadowTLS, Naive)
+- [x] Clash / Mihomo YAML import (proxies only)
+- [x] Expanded regression fixtures + universal parser checks
+- [x] `VPNDirectConfigValidator` + Core error model v2 + redacted logging
+- [x] Interop lab scaffolds + iPhone qualification checklist
+- [x] Machine-readable `core/protocol-matrix.json`
+- [x] `scripts/check_production_ready.sh` release gate
+- [ ] Mieru Core runtime registration behind `with_mieru` (Swift parse/fail-closed done; capability still false)
 
 ## Next
 
-- [ ] `VPNDirectConfigValidator` + Core error model v2 + redacted logging
-- [ ] Interop lab under `interop/` (Xray, Amnezia, Hysteria, …)
-- [ ] iPhone device qualification matrix (RSS, reconnect, TCP/UDP/DNS)
-- [ ] Machine-readable `core/protocol-matrix.json`
-- [ ] `scripts/check_production_ready.sh` release gate
+- [ ] Mieru protocol merge + RSS budget + capability true
+- [ ] Interop evidence per family (`interop/*/evidence/`)
+- [ ] iPhone device qualification filled for Tier‑1 protocols
+- [ ] Flip matrix rows to `tested` only with interop+device evidence
 
 ## Later
 
-- [ ] Mieru behind `with_mieru` after memory-budget path
 - [ ] Screenshots / architecture diagram assets for GitHub
 - [ ] Ecosystem / “Used by” section when appropriate
 - [ ] Optional thin-fork strategy for a dedicated Core remote
 
-## Non-goals (near term)
+## Non-goals / out of scope (Core 1.x)
 
-OpenVPN / OpenConnect, SoftEther, CONNECT-UDP, claiming full Core “production complete” without interop + device evidence.
+OpenVPN / OpenConnect, SoftEther, MASQUE CONNECT-UDP, Tailscale — not claimed as product features. See matrix `out_of_scope` rows.

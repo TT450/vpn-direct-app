@@ -24,7 +24,13 @@ enum XrayJSONAdapter {
             let xrayOutbounds = (profile["outbounds"] as? [[String: Any]]) ?? []
             let proxyOutbounds = xrayOutbounds.filter { outbound in
                 let proto = ((outbound["protocol"] as? String) ?? "").lowercased()
-                return proto == "vless" || proto == "hysteria" || proto == "hysteria2"
+                return proto == "vless"
+                    || proto == "hysteria"
+                    || proto == "hysteria2"
+                    || proto == "vmess"
+                    || proto == "trojan"
+                    || proto == "shadowsocks"
+                    || proto == "ss"
             }
 
             let routing = (profile["routing"] as? [String: Any]) ?? [:]
@@ -54,8 +60,10 @@ enum XrayJSONAdapter {
                 let converted: [String: Any]?
                 if proto == "vless" {
                     converted = XrayVLESSConverter.convert(xray, fallbackTag: fallbackTag)
-                } else {
+                } else if proto == "hysteria" || proto == "hysteria2" {
                     converted = HysteriaOutboundFactory.fromXray(xray, fallbackTag: fallbackTag)
+                } else {
+                    converted = XrayLeafConverter.convert(xray, fallbackTag: fallbackTag)
                 }
                 guard var outbound = converted else { continue }
 
