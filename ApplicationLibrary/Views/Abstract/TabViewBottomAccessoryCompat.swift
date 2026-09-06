@@ -4,22 +4,23 @@ import SwiftUI
     import UIKit
 
     public extension View {
-        @ViewBuilder
         func tabViewBottomAccessoryCompat(
             isEnabled: Bool = true,
             useSystemAccessory: Bool = true,
             @ViewBuilder content: @escaping () -> some View
         ) -> some View {
-            if isEnabled {
-                // `tabViewBottomAccessory` is not in the Xcode 16.4 / iOS 18 SDK.
-                // Keep the safeAreaInset path until CI builds with an SDK that declares it.
-                // `useSystemAccessory` is reserved for that future branch.
-                _ = useSystemAccessory
-                safeAreaInset(edge: .bottom, spacing: 0) {
-                    TabViewBottomAccessoryContainer(content: content)
+            // `tabViewBottomAccessory` is not in the Xcode 16.4 / iOS 18 SDK.
+            // Keep the safeAreaInset path until CI builds with an SDK that declares it.
+            // `useSystemAccessory` is reserved for that future branch.
+            _ = useSystemAccessory
+            return Group {
+                if isEnabled {
+                    safeAreaInset(edge: .bottom, spacing: 0) {
+                        TabViewBottomAccessoryContainer(content: content)
+                    }
+                } else {
+                    self
                 }
-            } else {
-                self
             }
         }
     }
