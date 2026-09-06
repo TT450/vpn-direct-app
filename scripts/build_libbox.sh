@@ -9,7 +9,6 @@ VERSION_FILE="${ROOT}/core/VERSION"
 
 # shellcheck disable=SC1090
 if [[ -f "${VERSION_FILE}" ]]; then
-  # Export KEY=VAL lines (ignore comments / blanks)
   while IFS= read -r line || [[ -n "${line}" ]]; do
     [[ -z "${line}" || "${line}" =~ ^# ]] && continue
     if [[ "${line}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
@@ -18,8 +17,18 @@ if [[ -f "${VERSION_FILE}" ]]; then
   done < "${VERSION_FILE}"
 fi
 
+BUILD_PROFILE="${BUILD_PROFILE:-vpn_direct_ios}"
+PROFILE_TAGS_FILE="${ROOT}/scripts/tags/${BUILD_PROFILE}.tags"
+if [[ -f "${PROFILE_TAGS_FILE}" ]]; then
+  BUILD_TAGS="$(tr -d ' \n' < "${PROFILE_TAGS_FILE}")"
+elif [[ -f "${ROOT}/scripts/vpn_direct_ios.tags" ]]; then
+  BUILD_TAGS="$(tr -d ' \n' < "${ROOT}/scripts/vpn_direct_ios.tags")"
+fi
 BUILD_TAGS="${BUILD_TAGS:-with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_naive_outbound,with_clash_api,with_xhttp,with_awg,with_lx_idle_suspend}"
 CORE_VERSION="${CORE_VERSION:-0.1.0}"
+GOMOBILE_MODULE="${GOMOBILE_MODULE:-github.com/sagernet/gomobile}"
+GOMOBILE_REV="${GOMOBILE_REV:-v0.1.12}"
+GOBIND_REV="${GOBIND_REV:-${GOMOBILE_REV}}"
 
 if [[ ! -d "${CORE}" ]]; then
   echo "error: missing ${CORE}" >&2
@@ -35,56 +44,71 @@ fi
 
 command -v go >/dev/null || { echo "error: go not installed" >&2; exit 1; }
 
-# Prefer pinned Go from sing-box-lx when available
 if [[ -f "${CORE}/go.version" ]]; then
   PINNED="$(tr -d ' \n' < "${CORE}/go.version")"
   echo "note: donor pins Go ${PINNED}; current $(go version)"
 fi
 
 export PATH="${PATH}:$(go env GOPATH)/bin"
-if ! command -v gomobile >/dev/null; then
-  echo "installing gomobile…"
-  go install golang.org/x/mobile/cmd/gomobile@latest
-  go install golang.org/x/mobile/cmd/gobind@latest
+
+install_mobile_tools() {
+  echo "installing ${GOMOBILE_MODULE}/cmd/gomobile@${GOMOBILE_REV} and gobind@${GOBIND_REV}…"
+  go install "${GOMOBILE_MODULE}/cmd/gomobile@${GOMOBILE_REV}"
+  go install "${GOMOBILE_MODULE}/cmd/gobind@${GOBIND_REV}"
   gomobile init || true
+}
+
+NEED_INSTALL=0
+if ! command -v gomobile >/dev/null || ! command -v gobind >/dev/null; then
+  NEED_INSTALL=1
+elif [[ "${VPN_DIRECT_FORCE_GOMOBILE_INSTALL:-}" == "1" ]]; then
+  NEED_INSTALL=1
+fi
+if [[ "${NEED_INSTALL}" -eq 1 ]]; then
+  install_mobile_tools
+fi
+
+GOMOBILE_SHA="$(go env GOMODCACHE 2>/dev/null || true)"
+# Resolve installed module version when available
+GOMOBILE_MOD_INFO="$(go version -m "$(command -v gomobile)" 2>/dev/null | awk '/golang.org\/x\/mobile/{print $2; exit}' || true)"
+GOMOBILE_SHA="${GOMOBILE_MOD_INFO:-${GOMOBILE_REV}}"
+
+SING_BOX_SHA="unknown"
+if git -C "${CORE}" rev-parse HEAD >/dev/null 2>&1; then
+  SING_BOX_SHA="$(git -C "${CORE}" rev-parse HEAD)"
+fi
+SING_BOX_TAG="${SING_BOX_REV:-unknown}"
+if git -C "${CORE}" describe --tags --exact-match >/dev/null 2>&1; then
+  SING_BOX_TAG="$(git -C "${CORE}" describe --tags --exact-match)"
 fi
 
 echo "=== VPN Direct Libbox build ==="
-echo "core:    ${CORE}"
-echo "tags:    ${BUILD_TAGS}"
-echo "version: ${CORE_VERSION}"
-echo "out:     ${OUT_FRAMEWORK}"
+echo "core:       ${CORE}"
+echo "profile:    ${BUILD_PROFILE}"
+echo "tags:       ${BUILD_TAGS}"
+echo "version:    ${CORE_VERSION}"
+echo "sing-box:   ${SING_BOX_SHA} (${SING_BOX_TAG})"
+echo "gomobile:   ${GOMOBILE_SHA}"
+echo "out:        ${OUT_FRAMEWORK}"
 
 cd "${CORE}"
 
-# Apply tracked VPN Direct overlays (capability export) into libbox package
 OVERLAY_DIR="${ROOT}/core/overlays/libbox"
 if [[ -d "${OVERLAY_DIR}" ]]; then
   echo "applying overlays from ${OVERLAY_DIR}"
   cp -f "${OVERLAY_DIR}"/*.go "${CORE}/experimental/libbox/"
 fi
 
-# Ensure AWG submodule present when with_awg is requested
 if [[ "${BUILD_TAGS}" == *with_awg* ]]; then
   git submodule update --init --recursive || true
 fi
 
-# build_libbox reads tags from env in some sing-box versions; pass via EXTRA
-# Common interface: go run ./cmd/internal/build_libbox -target apple
 export LIBBOX_BUILD_TAGS="${BUILD_TAGS}"
 export VPN_DIRECT_CORE_VERSION="${CORE_VERSION}"
 
-# Prefer lean Apple bind target for NE (faster); full set via VPN_DIRECT_APPLE_PLATFORM
 APPLE_PLATFORM="${VPN_DIRECT_APPLE_PLATFORM:-ios,iossimulator,macos,tvos}"
 
-# Try lx-aware tags file if present
-if [[ -f "${ROOT}/scripts/vpn_direct_ios.tags" ]]; then
-  BUILD_TAGS="$(tr -d ' \n' < "${ROOT}/scripts/vpn_direct_ios.tags")"
-  export LIBBOX_BUILD_TAGS="${BUILD_TAGS}"
-fi
-
 echo "running build_libbox (platform=${APPLE_PLATFORM})…"
-# Remove previous output inside core if any
 rm -rf "${CORE}/Libbox.xcframework" "${ROOT}/Libbox.xcframework.build"
 
 set +e
@@ -100,7 +124,6 @@ if [[ ${STATUS} -ne 0 ]]; then
   }
 fi
 
-# Locate produced framework
 CANDIDATE=""
 for p in \
   "${CORE}/Libbox.xcframework" \
@@ -124,14 +147,22 @@ if [[ "${CANDIDATE}" != "${OUT_FRAMEWORK}" ]]; then
   cp -R "${CANDIDATE}" "${OUT_FRAMEWORK}"
 fi
 
-# Stamp a sidecar version file for the app
+BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-}"
+
 cat > "${ROOT}/Libbox.xcframework/VPNDirectCore.version" <<EOF
 CORE_NAME=${CORE_NAME:-VPNDirectCore}
 CORE_VERSION=${CORE_VERSION}
+BUILD_PROFILE=${BUILD_PROFILE}
 BUILD_TAGS=${BUILD_TAGS}
-BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+BUILT_AT=${BUILT_AT}
 GO=$(go version)
-SING_BOX_REV=${SING_BOX_REV:-unknown}
+GOMOBILE_SHA=${GOMOBILE_SHA}
+SING_BOX_SHA=${SING_BOX_SHA}
+SING_BOX_TAG=${SING_BOX_TAG}
+SING_BOX_REV=${SING_BOX_TAG}
+UPSTREAM_VERSION=${UPSTREAM_VERSION:-}
+SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 EOF
 
 echo "OK: ${OUT_FRAMEWORK}"

@@ -78,6 +78,12 @@ public enum VLESSConfigBuilder {
 
         // VLESS encryption / PQ layer (extensible string; independent of TLS/REALITY).
         if let encryption = cleanOptional(query["encryption"]), !encryption.isEmpty, encryption.lowercased() != "none" {
+            guard VPNDirectCoreCapabilities.current.supportsVLESSEncryption else {
+                throw VLESSError.unsupportedFeature(
+                    component: "vless-encryption",
+                    detail: "Current Libbox build does not expose VLESS encryption"
+                )
+            }
             outbound["encryption"] = encryption
         }
 
@@ -115,7 +121,7 @@ public enum VLESSConfigBuilder {
             outbound["tls"] = tls
         }
 
-        if let transport = buildTransport(type: transportType, path: path, host: hostHeader, serviceName: serviceName, query: query) {
+        if let transport = try buildTransport(type: transportType, path: path, host: hostHeader, serviceName: serviceName, query: query) {
             outbound["transport"] = transport
         }
 
@@ -213,7 +219,7 @@ public enum VLESSConfigBuilder {
         raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix("vless://")
     }
 
-    private static func buildTransport(type: String, path: String?, host: String?, serviceName: String?, query: Query) -> [String: Any]? {
+    private static func buildTransport(type: String, path: String?, host: String?, serviceName: String?, query: Query) throws -> [String: Any]? {
         switch type {
         case "ws", "websocket":
             var transport: [String: Any] = ["type": "ws"]
@@ -249,10 +255,15 @@ public enum VLESSConfigBuilder {
             }
             return transport
         case "xhttp", "splithttp":
-            // Native XHTTP when Core supports it; otherwise degrade to httpupgrade.
-            let useNativeXHTTP = VPNDirectCoreCapabilities.current.supportsXHTTP
+            // Fail closed: never silent-downgrade XHTTP to HTTPUpgrade.
+            guard VPNDirectCoreCapabilities.current.supportsXHTTP else {
+                throw VLESSError.unsupportedFeature(
+                    component: "xhttp",
+                    detail: "Current Libbox build lacks native xhttp transport"
+                )
+            }
             var transport: [String: Any] = [
-                "type": useNativeXHTTP ? "xhttp" : "httpupgrade",
+                "type": "xhttp",
             ]
             if let path, !path.isEmpty {
                 transport["path"] = path
@@ -260,14 +271,10 @@ public enum VLESSConfigBuilder {
             if let host, !host.isEmpty {
                 transport["host"] = host
             }
-            if useNativeXHTTP {
-                let mode = cleanOptional(query["mode"]) ?? "auto"
-                transport["mode"] = mode
-                if let extra = cleanOptional(query["extra"]) {
-                    transport["extra"] = extra
-                }
-            } else if let mode = query["mode"], !mode.isEmpty {
-                transport["headers"] = ["X-HTTP-Mode": mode]
+            let mode = cleanOptional(query["mode"]) ?? "auto"
+            transport["mode"] = mode
+            if let extra = cleanOptional(query["extra"]) {
+                transport["extra"] = extra
             }
             return transport
         case "tcp", "raw", "":
@@ -316,6 +323,7 @@ public enum VLESSConfigBuilder {
         case missingUUID
         case missingHost
         case serializationFailed
+        case unsupportedFeature(component: String, detail: String)
 
         public var errorDescription: String? {
             switch self {
@@ -329,6 +337,8 @@ public enum VLESSConfigBuilder {
                 return "VLESS link is missing host"
             case .serializationFailed:
                 return "Failed to serialize configuration"
+            case let .unsupportedFeature(component, _):
+                return "This VPN Direct build does not support \(component)."
             }
         }
     }

@@ -137,43 +137,82 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
         if let maxHandshakeAttempts { endpoint["max_handshake_attempts"] = maxHandshakeAttempts }
         if let persistentKeepaliveInterval { endpoint["persistent_keepalive_interval"] = persistentKeepaliveInterval }
 
-        // Non-standard metadata for Capability / UI (ignored by sing-box if unknown — strip before check if needed)
-        endpoint["_vpndirect_amnezia_version"] = amneziaVersion
+        // amneziaVersion stays on the Swift model / UI metadata — never emit unknown sing-box keys.
         return endpoint
     }
 
+    /// True only when no Amnezia-specific fields are set (plain WireGuard).
     private var hasNoObfuscation: Bool {
         jc == nil && jmin == nil && jmax == nil
             && s1 == nil && s2 == nil && s3 == nil && s4 == nil
             && h1 == nil && h2 == nil && h3 == nil && h4 == nil
-            && i1 == nil && headerProtectionKey == nil
+            && i1 == nil && i2 == nil && i3 == nil && i4 == nil && i5 == nil
+            && id == nil && ip == nil && ib == nil
+            && headerProtectionKey == nil
+            && contentPaddingAddition == nil
+            && randomTrailers == nil
+            && disableCookies == nil
+            && rekeyAfterTime == nil
+            && rekeyTimeout == nil
+            && rejectAfterTime == nil
+            && keepaliveTimeout == nil
+            && maxHandshakeAttempts == nil
+            && persistentKeepaliveInterval == nil
     }
 
-    /// Parse a subset of Amnezia / wg-quick style `.conf` text into options.
+    /// Parse Amnezia / wg-quick style `.conf` text into options (multi-peer aware).
     public static func parseConf(_ text: String, amneziaVersion: String = "2") throws -> AmneziaWGEndpointOptions {
         var privateKey = ""
         var address: [String] = []
         var mtu: Int?
-        var peerPublicKey = ""
-        var peerPSK: String?
-        var allowedIPs: [String] = ["0.0.0.0/0", "::/0"]
-        var endpoint: String?
-        var keepalive: Int?
+        var peers: [Peer] = []
+        var currentPeer: MutablePeer?
         var jc: Int?; var jmin: Int?; var jmax: Int?
         var s1: Int?; var s2: Int?; var s3: Int?; var s4: Int?
         var h1: String?; var h2: String?; var h3: String?; var h4: String?
         var i1: String?; var i2: String?; var i3: String?; var i4: String?; var i5: String?
+        var id: String?; var ip: String?; var ib: String?
         var headerProtectionKey: String?
         var contentPaddingAddition: Int?
         var randomTrailers: Bool?
         var disableCookies: Bool?
+        var rekeyAfterTime: String?
+        var rekeyTimeout: String?
+        var rejectAfterTime: String?
+        var keepaliveTimeout: String?
+        var maxHandshakeAttempts: String?
+        var persistentKeepaliveInterval: String?
+
+        func flushPeer() {
+            guard let peer = currentPeer, !peer.publicKey.isEmpty else {
+                currentPeer = nil
+                return
+            }
+            peers.append(
+                Peer(
+                    publicKey: peer.publicKey,
+                    preSharedKey: peer.preSharedKey,
+                    allowedIPs: peer.allowedIPs.isEmpty ? ["0.0.0.0/0", "::/0"] : peer.allowedIPs,
+                    endpoint: peer.endpoint,
+                    persistentKeepaliveInterval: peer.persistentKeepaliveInterval
+                )
+            )
+            currentPeer = nil
+        }
 
         var section = ""
         for raw in text.split(whereSeparator: \.isNewline) {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.isEmpty || line.hasPrefix("#") || line.hasPrefix(";") { continue }
             if line.hasPrefix("[") && line.hasSuffix("]") {
-                section = line.lowercased()
+                let next = line.lowercased()
+                if next == "[peer]" {
+                    flushPeer()
+                    currentPeer = MutablePeer()
+                } else if section == "[peer]" {
+                    flushPeer()
+                }
+                section = next
                 continue
             }
             let parts = line.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
@@ -200,35 +239,51 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
             case ("[interface]", "i3"): i3 = value
             case ("[interface]", "i4"): i4 = value
             case ("[interface]", "i5"): i5 = value
+            case ("[interface]", "id"): id = value
+            case ("[interface]", "ip"): ip = value
+            case ("[interface]", "ib"): ib = value
             case ("[interface]", "headerprotectionkey"): headerProtectionKey = value
             case ("[interface]", "contentpaddingaddition"): contentPaddingAddition = Int(value)
             case ("[interface]", "randomtrailers"): randomTrailers = (value == "true" || value == "1")
-            case ("[interface]", "disablecookies"), ("[interface]", "disablecookie"): disableCookies = (value == "true" || value == "1")
-            case ("[peer]", "publickey"): peerPublicKey = value
-            case ("[peer]", "presharedkey"): peerPSK = value
-            case ("[peer]", "allowedips"): allowedIPs = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-            case ("[peer]", "endpoint"): endpoint = value
-            case ("[peer]", "persistentkeepalive"): keepalive = Int(value)
+            case ("[interface]", "disablecookies"), ("[interface]", "disablecookie"):
+                disableCookies = (value == "true" || value == "1")
+            case ("[interface]", "rekeyaftertime"): rekeyAfterTime = value
+            case ("[interface]", "rekeytimeout"): rekeyTimeout = value
+            case ("[interface]", "rejectaftertime"): rejectAfterTime = value
+            case ("[interface]", "keepalivetimeout"): keepaliveTimeout = value
+            case ("[interface]", "maxhandshakeattempts"): maxHandshakeAttempts = value
+            case ("[interface]", "persistentkeepaliveinterval"): persistentKeepaliveInterval = value
+            case ("[peer]", "publickey"):
+                currentPeer = currentPeer ?? MutablePeer()
+                currentPeer?.publicKey = value
+            case ("[peer]", "presharedkey"):
+                currentPeer = currentPeer ?? MutablePeer()
+                currentPeer?.preSharedKey = value
+            case ("[peer]", "allowedips"):
+                currentPeer = currentPeer ?? MutablePeer()
+                currentPeer?.allowedIPs = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            case ("[peer]", "endpoint"):
+                currentPeer = currentPeer ?? MutablePeer()
+                currentPeer?.endpoint = value
+            case ("[peer]", "persistentkeepalive"):
+                currentPeer = currentPeer ?? MutablePeer()
+                currentPeer?.persistentKeepaliveInterval = Int(value)
             default: break
             }
         }
+        flushPeer()
 
-        guard !privateKey.isEmpty, !peerPublicKey.isEmpty, !address.isEmpty else {
-            throw VPNDirectCoreError.malformedConfig(component: "amneziawg", detail: "Missing private key, peer public key, or address")
+        guard !privateKey.isEmpty, !peers.isEmpty, !address.isEmpty else {
+            throw VPNDirectCoreError.malformedConfig(
+                component: "amneziawg",
+                detail: "Missing private key, peer public key, or address"
+            )
         }
 
         var options = AmneziaWGEndpointOptions(
             privateKey: privateKey,
             address: address,
-            peers: [
-                .init(
-                    publicKey: peerPublicKey,
-                    preSharedKey: peerPSK,
-                    allowedIPs: allowedIPs,
-                    endpoint: endpoint,
-                    persistentKeepaliveInterval: keepalive
-                ),
-            ],
+            peers: peers,
             mtu: mtu,
             amneziaVersion: amneziaVersion
         )
@@ -236,11 +291,26 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
         options.s1 = s1; options.s2 = s2; options.s3 = s3; options.s4 = s4
         options.h1 = h1; options.h2 = h2; options.h3 = h3; options.h4 = h4
         options.i1 = i1; options.i2 = i2; options.i3 = i3; options.i4 = i4; options.i5 = i5
+        options.id = id; options.ip = ip; options.ib = ib
         options.headerProtectionKey = headerProtectionKey
         options.contentPaddingAddition = contentPaddingAddition
         options.randomTrailers = randomTrailers
         options.disableCookies = disableCookies
+        options.rekeyAfterTime = rekeyAfterTime
+        options.rekeyTimeout = rekeyTimeout
+        options.rejectAfterTime = rejectAfterTime
+        options.keepaliveTimeout = keepaliveTimeout
+        options.maxHandshakeAttempts = maxHandshakeAttempts
+        options.persistentKeepaliveInterval = persistentKeepaliveInterval
         return options
+    }
+
+    private struct MutablePeer {
+        var publicKey = ""
+        var preSharedKey: String?
+        var allowedIPs: [String] = []
+        var endpoint: String?
+        var persistentKeepaliveInterval: Int?
     }
 }
 

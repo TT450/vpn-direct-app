@@ -4,7 +4,7 @@
 
 - macOS with Xcode
 - Go toolchain matching `core/sing-box/go.version` (or `core/VERSION` pin)
-- `gomobile` (installed by build script if missing)
+- `gomobile` / `gobind` from **`github.com/sagernet/gomobile`** pinned by `GOMOBILE_REV` / `GOBIND_REV` in `core/VERSION` (matches `core/sing-box/go.mod`; not upstream `golang.org/x/mobile@latest`)
 - Git with submodule support
 
 ```bash
@@ -14,6 +14,10 @@ xcode-select -p
 # Go (example — use pinned version from core/VERSION)
 go version
 ```
+
+Capability discovery is **fail-closed**: builders throw `unsupportedFeature` when Core does not prove a feature (e.g. XHTTP is never downgraded to HTTPUpgrade). See [`PROTOCOL_MATRIX.md`](PROTOCOL_MATRIX.md).
+
+Tag profiles live under `scripts/tags/` (`vpn_direct_ios`, `vpn_direct_ios_minimal`, `vpn_direct_full`). Default profile is `BUILD_PROFILE` from `core/VERSION`.
 
 ## Bootstrap submodule
 

@@ -1,0 +1,25 @@
+{
+  "api": 1,
+  "magic": "VPN_DIRECT_CORE",
+  "core": "VPNDirectCore",
+  "version": "0.1.0",
+  "singBox": "stock-test",
+  "go": "go1.26.6",
+  "tags": "",
+  "xhttp": false,
+  "awg": false,
+  "awgVersions": [],
+  "masqueConnectIP": false,
+  "masqueConnectUDP": false,
+  "vlessEncryption": false,
+  "mieru": false,
+  "hysteria2Obfuscations": ["salamander"],
+  "transports": { "xhttp": false },
+  "protocols": {
+    "amneziawg": { "supported": false, "versions": [] },
+    "hysteria2": { "obfuscation": ["salamander"] },
+    "masque": { "connect_ip": false, "connect_udp": false },
+    "mieru": { "supported": false },
+    "vless": { "encryption": false }
+  }
+}

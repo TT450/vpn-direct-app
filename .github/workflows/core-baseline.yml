@@ -1,0 +1,110 @@
+name: Core baseline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  fixtures-abi:
+    name: Fixtures + ABI overlays
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.6"
+          cache-dependency-path: core/sing-box/go.sum
+
+      - name: check-fixtures
+        run: make check-fixtures
+
+      - name: check-abi
+        run: make check-abi
+
+  libbox:
+    name: Build Libbox.xcframework
+    runs-on: macos-15
+    needs: fixtures-abi
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.6"
+          cache-dependency-path: core/sing-box/go.sum
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Build Libbox
+        env:
+          VPN_DIRECT_APPLE_PLATFORM: ios,iossimulator
+          VPN_DIRECT_FORCE_GOMOBILE_INSTALL: "1"
+        run: |
+          # Stock backup is optional on clean CI runners
+          if [ -d Libbox.xcframework ]; then
+            make libbox-backup-stock || true
+          fi
+          ./scripts/build_libbox.sh
+
+      - name: Stamp / magic smoke
+        run: |
+          test -f Libbox.xcframework/VPNDirectCore.version
+          grep -q '^SING_BOX_SHA=' Libbox.xcframework/VPNDirectCore.version
+          grep -q '^GOMOBILE_SHA=' Libbox.xcframework/VPNDirectCore.version
+          BIN="$(find Libbox.xcframework -type f -name Libbox | head -1)"
+          strings "$BIN" | grep -q 'VPN_DIRECT_CORE'
+
+      - name: Upload Libbox artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Libbox.xcframework
+          path: Libbox.xcframework
+          if-no-files-found: error
+
+  sfi-compile:
+    name: Compile SFI (unsigned)
+    runs-on: macos-15
+    needs: libbox
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download Libbox
+        uses: actions/download-artifact@v4
+        with:
+          name: Libbox.xcframework
+          path: Libbox.xcframework
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: xcodebuild SFI
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project sing-box.xcodeproj \
+            -scheme SFI \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData-ci \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=- \
+            build

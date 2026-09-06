@@ -184,16 +184,12 @@ public enum SubscriptionConfigBuilder {
         var outbounds: [[String: Any]] = []
         var usedTags = Set<String>()
         var firstName: String?
+        var unsupportedComponents = Set<String>()
+        var parseFailures = 0
 
         for (index, link) in links.enumerated() {
             let lower = link.lowercased()
             guard lower.hasPrefix("vless://") else {
-                continue
-            }
-            // XHTTP requires VPN Direct Core (native transport). Skip on stock Libbox.
-            if (lower.contains("type=xhttp") || lower.contains("type=splithttp")),
-               !VPNDirectCoreCapabilities.current.supportsXHTTP
-            {
                 continue
             }
             do {
@@ -206,11 +202,31 @@ public enum SubscriptionConfigBuilder {
                 if firstName == nil {
                     firstName = parsed.name
                 }
+            } catch let error as VLESSConfigBuilder.VLESSError {
+                if case let .unsupportedFeature(component, _) = error {
+                    unsupportedComponents.insert(component)
+                } else {
+                    parseFailures += 1
+                }
+            } catch let error as VPNDirectCoreError {
+                if case let .unsupportedFeature(component, _) = error {
+                    unsupportedComponents.insert(component)
+                } else {
+                    parseFailures += 1
+                }
             } catch {
-                continue
+                parseFailures += 1
             }
         }
 
+        if proxyTags.isEmpty {
+            if !unsupportedComponents.isEmpty {
+                throw SubscriptionError.unsupportedFeatures(Array(unsupportedComponents).sorted())
+            }
+            throw SubscriptionError.noSupportedLinks
+        }
+
+        _ = parseFailures
         return try finalizeConfig(proxyTags: proxyTags, outbounds: outbounds, firstName: firstName)
     }
 
@@ -388,7 +404,7 @@ public enum SubscriptionConfigBuilder {
     private static func convertXrayVLESSOutbound(_ xray: [String: Any], fallbackTag: String) -> [String: Any]? {
         let stream = (xray["streamSettings"] as? [String: Any]) ?? [:]
         let network = ((stream["network"] as? String) ?? "tcp").lowercased()
-        // Native XHTTP when Core supports it; otherwise skip (cannot safely map all modes).
+        // Fail closed: never invent an alternate transport for XHTTP.
         if (network == "xhttp" || network == "splithttp"), !VPNDirectCoreCapabilities.current.supportsXHTTP {
             return nil
         }
@@ -758,6 +774,7 @@ public enum SubscriptionConfigBuilder {
     public enum SubscriptionError: LocalizedError {
         case empty
         case noSupportedLinks
+        case unsupportedFeatures([String])
         case serializationFailed
         case panelRejected(String)
         case xrayJSONUnsupported
@@ -768,6 +785,9 @@ public enum SubscriptionConfigBuilder {
                 return String(localized: "Subscription is empty")
             case .noSupportedLinks:
                 return String(localized: "No supported vless:// links found in subscription")
+            case let .unsupportedFeatures(components):
+                let joined = components.joined(separator: ", ")
+                return String(localized: "Subscription requires unsupported features: \(joined)")
             case .serializationFailed:
                 return String(localized: "Failed to serialize subscription configuration")
             case let .panelRejected(message):

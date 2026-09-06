@@ -29,7 +29,7 @@ Apps embed Network Extension; Libbox is linked into **Library** and used by the 
 
 | Builder | Path | Behavior |
 |---------|------|----------|
-| VLESS | `Library/Service/VLESSConfigBuilder.swift` | `vless://` only; XHTTP/splithttp **mapped to httpupgrade** |
+| VLESS | `Library/Service/VLESSConfigBuilder.swift` | `vless://`; XHTTP requires Core capability (no silent downgrade) |
 | Subscriptions | `Library/Service/SubscriptionConfigBuilder.swift` | HTTP(S) fetch; sing-box JSON / XRAY_JSON / share lists; **skips XHTTP** nodes |
 | Migrator | `Library/Service/SingBoxConfigMigrator.swift` | DNS/tun/domain_resolver for Libbox 1.13+ |
 
