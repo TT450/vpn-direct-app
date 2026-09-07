@@ -172,7 +172,7 @@ enum XrayVLESSConverter {
                 transport["host"] = host
             }
             if let mode = xhttp["mode"] as? String, !mode.isEmpty { transport["mode"] = mode }
-            XrayXHTTPExtra.merge(from: xhttp, into: &transport)
+            XrayXHTTPMapper.merge(from: xhttp, into: &transport)
             return transport
         case "http", "h2":
             let http = (stream["httpSettings"] as? [String: Any]) ?? [:]
