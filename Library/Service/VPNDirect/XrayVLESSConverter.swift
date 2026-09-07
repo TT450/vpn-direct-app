@@ -119,17 +119,9 @@ enum XrayVLESSConverter {
 
         if network != "tcp" && network != "raw" && !network.isEmpty {
             guard let transport = xrayTransport(network: network, stream: stream) else { return nil }
-            // Retained compatibility quirk pending exact pinned-XHTTP source proof.
-            if security == "reality",
-               (network == "xhttp" || network == "splithttp"),
-               ((transport["mode"] as? String) ?? "").lowercased() == "stream-one"
-            {
-                var fixed = transport
-                fixed["mode"] = "auto"
-                outbound["transport"] = fixed
-            } else {
-                outbound["transport"] = transport
-            }
+            // The pinned sing-box-lx XHTTP implementation supports `stream-one` directly.
+            // Preserve the producer-selected mode exactly; never rewrite it to `auto`.
+            outbound["transport"] = transport
         } else if let tcpTransport = xrayTransport(network: network, stream: stream) {
             outbound["transport"] = tcpTransport
         }
