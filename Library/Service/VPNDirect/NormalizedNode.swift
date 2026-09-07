@@ -1,10 +1,8 @@
 import Foundation
 
-/// Extensible protocol identity for VPN Direct normalized nodes.
 public struct VPNDirectProtocolID: RawRepresentable, Hashable, Sendable, Codable {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue.lowercased() }
-
     public static let vless = VPNDirectProtocolID(rawValue: "vless")
     public static let vmess = VPNDirectProtocolID(rawValue: "vmess")
     public static let trojan = VPNDirectProtocolID(rawValue: "trojan")
@@ -24,11 +22,9 @@ public struct VPNDirectProtocolID: RawRepresentable, Hashable, Sendable, Codable
     public static let shadowtls = VPNDirectProtocolID(rawValue: "shadowtls")
 }
 
-/// Extensible transport identity (tcp/ws/xhttp/…).
 public struct VPNDirectTransportID: RawRepresentable, Hashable, Sendable, Codable {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue.lowercased() }
-
     public static let tcp = VPNDirectTransportID(rawValue: "tcp")
     public static let ws = VPNDirectTransportID(rawValue: "ws")
     public static let grpc = VPNDirectTransportID(rawValue: "grpc")
@@ -38,17 +34,14 @@ public struct VPNDirectTransportID: RawRepresentable, Hashable, Sendable, Codabl
     public static let quic = VPNDirectTransportID(rawValue: "quic")
 }
 
-/// Extensible security identity (none/tls/reality/…).
 public struct VPNDirectSecurityID: RawRepresentable, Hashable, Sendable, Codable {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue.lowercased() }
-
     public static let none = VPNDirectSecurityID(rawValue: "none")
     public static let tls = VPNDirectSecurityID(rawValue: "tls")
     public static let reality = VPNDirectSecurityID(rawValue: "reality")
 }
 
-/// Extensible obfuscation identity (salamander/gecko/…).
 public struct VPNDirectObfuscationID: RawRepresentable, Hashable, Sendable, Codable {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue.lowercased() }
@@ -64,20 +57,14 @@ public struct NormalizedNode: Equatable {
     public var security: VPNDirectSecurityID?
     public var obfuscation: VPNDirectObfuscationID?
     public var uuid: String?
-    /// Protocol-specific fields preserved for builders (share-link query, JSON keys, …).
     public var attributes: [String: String]
-    /// Opaque extras: panel metadata, future fields, unclassified keys (never silently dropped).
-    /// Legacy string map — prefer `typedExtensions` for arrays/objects.
     public var rawExtensions: [String: String]
-    /// Typed extensions (lossless arrays/objects). Keys here are also mirrored into rawExtensions as flattened strings for policy scans.
     public var typedExtensions: [String: VPNDirectJSONValue]
-    /// Original share link / fragment when available.
+    /// Provenance only; never part of connection semantics.
     public var source: String?
-    /// Pre-built sing-box outbound when the adapter already constructed one.
+    /// Transitional legacy runtime JSON. Remove after all production writers migrate to typed fields.
     public var outbound: [String: Any]?
-    /// Structured WireGuard / AmneziaWG endpoint (multi-peer + AWG fields). Preferred over flat attrs.
     public var wireguardEndpoint: AmneziaWGEndpointOptions?
-    /// Optional detour / next-hop tag (Xray dialerProxy → sing-box detour).
     public var detour: String?
 
     public init(
@@ -108,14 +95,8 @@ public struct NormalizedNode: Equatable {
         self.attributes = attributes
         var raw = rawExtensions
         var typed = typedExtensions
-        for (k, v) in typed {
-            if raw[k] == nil {
-                raw[k] = v.flattenedString
-            }
-        }
-        for (k, v) in raw where typed[k] == nil {
-            typed[k] = .string(v)
-        }
+        for (key, value) in typed where raw[key] == nil { raw[key] = value.flattenedString }
+        for (key, value) in raw where typed[key] == nil { typed[key] = .string(value) }
         self.rawExtensions = raw
         self.typedExtensions = typed
         self.source = source
@@ -125,8 +106,8 @@ public struct NormalizedNode: Equatable {
     }
 
     /// Connection-critical equality (REQ-P136 / REQ-P137).
-    /// Excludes `source` (provenance) and legacy `outbound` prebuilt JSON
-    /// (builders must consume typed model; outbound is not part of semantic identity).
+    /// `source` is excluded because it is provenance. While the legacy `outbound` escape hatch exists,
+    /// its canonical JSON must participate in semantic equality so runtime changes cannot be missed.
     public func connectionEquals(_ other: NormalizedNode) -> Bool {
         name == other.name
             && protocolID == other.protocolID
@@ -141,10 +122,19 @@ public struct NormalizedNode: Equatable {
             && typedExtensions == other.typedExtensions
             && detour == other.detour
             && wireguardEndpoint == other.wireguardEndpoint
+            && Self.canonicalLegacyOutbound(outbound) == Self.canonicalLegacyOutbound(other.outbound)
     }
 
     public static func == (lhs: NormalizedNode, rhs: NormalizedNode) -> Bool {
-        // Semantic connection equality; provenance (`source`) intentionally excluded.
         lhs.connectionEquals(rhs)
+    }
+
+    private static func canonicalLegacyOutbound(_ value: [String: Any]?) -> Data? {
+        guard let value, !value.isEmpty else { return nil }
+        guard JSONSerialization.isValidJSONObject(value) else {
+            // A non-JSON legacy outbound must never compare equal to an unrelated runtime object.
+            return String(describing: value).data(using: .utf8)
+        }
+        return try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
     }
 }
