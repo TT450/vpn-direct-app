@@ -9,6 +9,7 @@ SRC="${PKG}/Sources/VPNDirectParsers"
 # allow target paths outside that root. Keep remediated production sources synchronized before
 # compiling so CI exercises the branch implementation rather than stale mirror files.
 for file in \
+  CompatibilityFieldPolicy.swift \
   NormalizedWireGuardEndpoint.swift \
   HysteriaShareLinkParser.swift \
   MieruConfigAdapter.swift \
