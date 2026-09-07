@@ -15,7 +15,11 @@ for file in \
   UniversalOutboundBuilder.swift \
   VPNDirectCoreCapabilities+Compatibility.swift
 do
-  cp -f "${ROOT}/Library/Service/VPNDirect/${file}" "${SRC}/${file}"
+  src="${ROOT}/Library/Service/VPNDirect/${file}"
+  dst="${SRC}/${file}"
+  if [[ ! -e "${dst}" ]] || ! cmp -s "${src}" "${dst}"; then
+    cp -f "${src}" "${dst}"
+  fi
 done
 
 # Prefer local Core binary when present (after prepare_core / check_parser_execution).
