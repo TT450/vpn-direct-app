@@ -1,10 +1,9 @@
 import Foundation
 import Libbox
 
-/// Builds sing-box JSON from NormalizedSubscription (location groups + global auto).
-/// WireGuard / AmneziaWG leaves go into top-level `endpoints`; other leaves into `outbounds`.
+/// Builds sing-box JSON from NormalizedSubscription.
+/// WireGuard / AmneziaWG leaves are emitted as top-level `endpoints`; proxy leaves as `outbounds`.
 enum SingBoxGraphBuilder {
-    /// Explicit product defaults when source config does not supply values.
     enum ProductDefaults {
         static let dnsServer = "1.1.1.1"
         static let dnsStrategy = "prefer_ipv4"
@@ -13,7 +12,6 @@ enum SingBoxGraphBuilder {
         static let urltestInterval = "1m"
         static let urltestTolerance = 80
         static let urltestIdleTimeout = "30m"
-        /// Product policy: RFC1918 stays direct unless source routing overrides (future).
         static let bypassPrivateNetworks = true
     }
 
@@ -44,79 +42,93 @@ enum SingBoxGraphBuilder {
 
     static func build(from subscription: NormalizedSubscription) throws -> GraphResult {
         var usedTags = Set<String>()
-        var locationTags: [String] = []
-        var leafTagCount = 0
         var outbounds: [[String: Any]] = []
         var endpoints: [[String: Any]] = []
         var rejected: [RejectedLeaf] = []
-        var warnings: [String] = subscription.importWarnings
+        var warnings = subscription.importWarnings
         warnings.append(contentsOf: VPNDirectRoutingHonesty.ignoredRoutingWarnings(for: subscription))
 
-        /// Graph reference id (display name / xrayTag) → final leaf tag.
-        var idToLeafTag: [String: String] = [:]
+        // Display names are NOT identities. A reference may resolve only when exactly one built leaf owns it.
+        var referenceCandidates: [String: [String]] = [:]
+        func registerReference(_ reference: String?, tag: String) {
+            guard let reference, !reference.isEmpty else { return }
+            var values = referenceCandidates[reference] ?? []
+            if !values.contains(tag) { values.append(tag) }
+            referenceCandidates[reference] = values
+        }
+        func resolveReference(_ reference: String) throws -> String {
+            let candidates = referenceCandidates[reference] ?? []
+            guard !candidates.isEmpty else {
+                throw VPNDirectCoreError.malformedConfig(
+                    component: "graph.reference",
+                    detail: "missing topology target '\(reference)'"
+                )
+            }
+            guard candidates.count == 1 else {
+                throw VPNDirectCoreError.malformedConfig(
+                    component: "graph.reference",
+                    detail: "ambiguous topology target '\(reference)' resolves to \(candidates.count) leaves"
+                )
+            }
+            return candidates[0]
+        }
 
         var referencedNames = Set<String>()
         for location in subscription.locations {
-            for ep in location.endpoints {
-                if let d = ep.detour, !d.isEmpty { referencedNames.insert(d) }
-                if let tag = ep.attributes["xrayTag"], !tag.isEmpty {
-                    referencedNames.insert(tag)
-                }
+            for endpoint in location.endpoints {
+                if let detour = endpoint.detour, !detour.isEmpty { referencedNames.insert(detour) }
+                if let xrayTag = endpoint.attributes["xrayTag"], !xrayTag.isEmpty { referencedNames.insert(xrayTag) }
             }
-            for mid in location.memberLocationIDs {
-                referencedNames.insert(mid)
-            }
+            for member in location.memberLocationIDs { referencedNames.insert(member) }
         }
 
-        // PASS 1 — build unique leaves once (shared across groups); assign provisional location tags.
-        var sharedLeavesByName: [String: BuiltLeaf] = [:]
-        var locationBuilt: [(location: NormalizedLocation, memberTags: [String])] = []
-        // location id/name → assigned tag (for nested group refs)
+        // Pre-assign every location tag so nested groups are order-independent.
         var locationIDToTag: [String: String] = [:]
-
-        // Pre-assign location tags so nested members can resolve.
-        for location in subscription.locations {
-            let locationTag = VPNDirectTagFactory.uniqueTag(
-                from: location.name,
-                fallback: "loc-\(locationIDToTag.count + 1)",
+        var ambiguousLocationNames = Set<String>()
+        for (index, location) in subscription.locations.enumerated() {
+            let tag = VPNDirectTagFactory.uniqueTag(
+                from: location.id.isEmpty ? location.name : location.id,
+                fallback: "loc-\(index + 1)",
                 used: &usedTags
             )
-            locationIDToTag[location.id] = locationTag
-            locationIDToTag[location.name] = locationTag
+            if !location.id.isEmpty { locationIDToTag[location.id] = tag }
+            if let existing = locationIDToTag[location.name], existing != tag {
+                ambiguousLocationNames.insert(location.name)
+            } else if !location.name.isEmpty {
+                locationIDToTag[location.name] = tag
+            }
         }
+        for name in ambiguousLocationNames { locationIDToTag.removeValue(forKey: name) }
 
-        for location in subscription.locations {
+        var builtLeaves: [BuiltLeaf] = []
+        var locationBuilt: [(location: NormalizedLocation, memberTags: [String])] = []
+
+        // PASS 1: build every endpoint instance exactly once. Never deduplicate by display name.
+        for (locationIndex, location) in subscription.locations.enumerated() {
             var memberTags: [String] = []
             var locationRejects = 0
 
             for (entryIndex, endpoint) in location.endpoints.enumerated() {
-                let sharedKey = endpoint.name
-                if let existing = sharedLeavesByName[sharedKey] {
-                    memberTags.append(existing.tag)
-                    continue
-                }
-
                 let leaf: [String: Any]
                 do {
                     leaf = try UniversalOutboundBuilder.build(from: endpoint)
                 } catch {
                     let (component, detail) = classifyBuildError(error)
+                    let xrayTag = endpoint.attributes["xrayTag"] ?? ""
                     let topologyReferenced = referencedNames.contains(endpoint.name)
-                        || referencedNames.contains(endpoint.attributes["xrayTag"] ?? "")
+                        || (!xrayTag.isEmpty && referencedNames.contains(xrayTag))
                         || endpoint.detour != nil
                         || location.strategy != .single
                         || !location.memberLocationIDs.isEmpty
                         || location.endpoints.count > 1
-                    rejected.append(
-                        RejectedLeaf(
-                            name: endpoint.name,
-                            protocolID: endpoint.protocolID.rawValue,
-                            component: component,
-                            userReason: detail,
-                            debugReason: String(describing: error),
-                            topologyReferenced: topologyReferenced
-                        )
-                    )
+                    rejected.append(RejectedLeaf(
+                        name: endpoint.name,
+                        protocolID: endpoint.protocolID.rawValue,
+                        component: component,
+                        userReason: detail,
+                        debugReason: String(describing: error),
+                        topologyReferenced: topologyReferenced
+                    ))
                     locationRejects += 1
                     if topologyReferenced {
                         throw VPNDirectCoreError.malformedConfig(
@@ -128,30 +140,35 @@ enum SingBoxGraphBuilder {
                     continue
                 }
 
+                let stableSourceID = endpoint.attributes["xrayTag"].flatMap { $0.isEmpty ? nil : $0 }
+                    ?? "\(location.id.isEmpty ? "loc-\(locationIndex + 1)" : location.id)/\(entryIndex)"
                 let leafTag = VPNDirectTagFactory.uniqueTag(
-                    from: "n-\(endpoint.name)",
-                    fallback: "leaf-\(sharedLeavesByName.count + 1)-\(entryIndex + 1)",
+                    from: "n-\(stableSourceID)",
+                    fallback: "leaf-\(locationIndex + 1)-\(entryIndex + 1)",
                     used: &usedTags
                 )
                 var tagged = leaf
                 tagged["tag"] = leafTag
-                registerIdentity(endpoint, tag: leafTag, into: &idToLeafTag)
                 let built = BuiltLeaf(
                     node: endpoint,
                     object: tagged,
                     tag: leafTag,
                     isEndpoint: isWireGuardEndpoint(tagged)
                 )
-                sharedLeavesByName[sharedKey] = built
+                builtLeaves.append(built)
                 memberTags.append(leafTag)
+
+                // Authoritative producer tag/internal scoped ID first; display name only as compatibility reference.
+                registerReference(endpoint.attributes["xrayTag"], tag: leafTag)
+                registerReference("\(location.id)/\(entryIndex)", tag: leafTag)
+                registerReference(endpoint.name, tag: leafTag)
             }
 
-            // Nested group members (Clash proxy-group → other groups).
-            for mid in location.memberLocationIDs {
-                guard let nestedTag = locationIDToTag[mid] else {
+            for memberID in location.memberLocationIDs {
+                guard let nestedTag = locationIDToTag[memberID] else {
                     throw VPNDirectCoreError.malformedConfig(
                         component: "graph.group",
-                        detail: "missing nested group '\(mid)' referenced by '\(location.name)'"
+                        detail: "missing or ambiguous nested group '\(memberID)' referenced by '\(location.name)'"
                     )
                 }
                 if nestedTag == locationIDToTag[location.id] {
@@ -169,110 +186,86 @@ enum SingBoxGraphBuilder {
                 }
                 continue
             }
-            leafTagCount += location.endpoints.count
             locationBuilt.append((location, memberTags))
         }
 
-        // Detect cycles among nested location refs.
         try detectGroupCycles(subscription.locations)
 
-        // PASS 2 — resolve detours (order-independent). Missing target is fatal.
-        for key in Array(sharedLeavesByName.keys) {
-            guard let detourName = sharedLeavesByName[key]?.node.detour, !detourName.isEmpty else { continue }
-            guard let detourTag = resolveReference(detourName, in: idToLeafTag) else {
-                throw VPNDirectCoreError.malformedConfig(
-                    component: "graph.detour",
-                    detail: "missing detour target '\(detourName)' for '\(sharedLeavesByName[key]!.node.name)'"
-                )
-            }
-            var leaf = sharedLeavesByName[key]!
-            leaf.object["detour"] = detourTag
-            sharedLeavesByName[key] = leaf
+        // PASS 2: resolve all detours after all identities exist. Missing/ambiguous target is fatal.
+        for index in builtLeaves.indices {
+            guard let detour = builtLeaves[index].node.detour, !detour.isEmpty else { continue }
+            builtLeaves[index].object["detour"] = try resolveReference(detour)
         }
 
-        // Emit each unique leaf once.
-        for leaf in sharedLeavesByName.values.sorted(by: { $0.tag < $1.tag }) {
-            if leaf.isEndpoint {
-                endpoints.append(leaf.object)
-            } else {
-                outbounds.append(leaf.object)
-            }
+        for leaf in builtLeaves.sorted(by: { $0.tag < $1.tag }) {
+            if leaf.isEndpoint { endpoints.append(leaf.object) }
+            else { outbounds.append(leaf.object) }
         }
 
-        // PASS 3 — assemble location groups. Strategy decides graph type (never leaf count alone).
+        // PASS 3: emit only strategies that have faithful Core semantics.
+        var locationTags: [String] = []
         for (location, memberTags) in locationBuilt {
             guard let locationTag = locationIDToTag[location.id] ?? locationIDToTag[location.name] else {
-                continue
+                throw VPNDirectCoreError.malformedConfig(
+                    component: "graph.group",
+                    detail: "missing or ambiguous group identity for '\(location.name)'"
+                )
             }
-
             switch location.strategy {
             case .urltest:
-                outbounds.append(
-                    urltestOutbound(
-                        tag: locationTag,
-                        members: memberTags,
-                        url: location.healthCheckURL,
-                        interval: location.healthCheckInterval
-                    )
-                )
-
-            case .select, .random:
+                outbounds.append(urltestOutbound(
+                    tag: locationTag,
+                    members: memberTags,
+                    url: location.healthCheckURL,
+                    interval: location.healthCheckInterval
+                ))
+            case .select:
                 outbounds.append([
                     "type": "selector",
                     "tag": locationTag,
                     "outbounds": memberTags,
                 ])
-
+            case .random:
+                throw VPNDirectCoreError.unsupportedFeature(
+                    component: "graph.strategy.random",
+                    detail: "Random group cannot be represented faithfully by selector/urltest in the pinned Core"
+                )
             case .fallback:
-                // sing-box has no native "fallback" outbound; use urltest with source interval when present.
-                outbounds.append(
-                    urltestOutbound(
-                        tag: locationTag,
-                        members: memberTags,
-                        url: location.healthCheckURL,
-                        interval: location.healthCheckInterval
-                    )
+                throw VPNDirectCoreError.unsupportedFeature(
+                    component: "graph.strategy.fallback",
+                    detail: "Fallback group cannot be replaced by latency urltest without changing semantics"
                 )
-                warnings.append(
-                    "location '\(location.name)' strategy=fallback → urltest (Core has no native fallback outbound)"
-                )
-
             case .single:
-                // Never retag shared leaves — other groups may reference the same leaf tag.
-                outbounds.append([
-                    "type": "selector",
-                    "tag": locationTag,
-                    "outbounds": memberTags,
-                ])
-                if memberTags.count > 1 {
-                    warnings.append(
-                        "location '\(location.name)' strategy=single with \(memberTags.count) members → selector"
+                guard memberTags.count == 1 else {
+                    throw VPNDirectCoreError.malformedConfig(
+                        component: "graph.strategy.single",
+                        detail: "Single location '\(location.name)' contains \(memberTags.count) members"
                     )
                 }
+                // Keep a semantic root so Global Auto never bypasses the location abstraction.
+                outbounds.append([
+                    "type": "selector",
+                    "tag": locationTag,
+                    "outbounds": memberTags,
+                    "default": memberTags[0],
+                ])
             }
-
             locationTags.append(locationTag)
         }
 
         guard !locationTags.isEmpty else {
             if !rejected.isEmpty {
                 let preview = rejected.prefix(5).map { "\($0.name):\($0.userReason)" }.joined(separator: "; ")
-                throw VPNDirectCoreError.malformedConfig(
-                    component: "graph",
-                    detail: "no buildable locations; rejects: \(preview)"
-                )
+                throw VPNDirectCoreError.malformedConfig(component: "graph", detail: "no buildable locations; rejects: \(preview)")
             }
             throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks
         }
 
-        // Global Auto uses semantic location roots — not every helper/detour leaf.
-        let autoMembers = locationTags
-        let selectorOutbounds = ["auto"] + locationTags
-        let urlTest = urltestOutbound(tag: "auto", members: autoMembers)
+        let urlTest = urltestOutbound(tag: "auto", members: locationTags)
         let selector: [String: Any] = [
             "type": "selector",
             "tag": "proxy",
-            "outbounds": selectorOutbounds,
+            "outbounds": ["auto"] + locationTags,
             "default": "auto",
         ]
 
@@ -281,108 +274,70 @@ enum SingBoxGraphBuilder {
         let dnsStrategy = subscription.metadata.dnsStrategy ?? ProductDefaults.dnsStrategy
         let bypassPrivate = subscription.metadata.bypassPrivateNetworks ?? ProductDefaults.bypassPrivateNetworks
         if subscription.metadata.dnsRemoteServer == nil {
-            warnings.append(
-                "DNS remote server absent in subscription metadata; using product default \(ProductDefaults.dnsServer) (REQ-P081)."
-            )
+            warnings.append("DNS remote server absent; using product default \(ProductDefaults.dnsServer) (REQ-P081).")
         }
         if subscription.metadata.dnsStrategy == nil {
-            warnings.append(
-                "DNS strategy absent; using product default \(ProductDefaults.dnsStrategy) (REQ-P082)."
-            )
+            warnings.append("DNS strategy absent; using product default \(ProductDefaults.dnsStrategy) (REQ-P082).")
         }
         if subscription.metadata.bypassPrivateNetworks == nil, ProductDefaults.bypassPrivateNetworks {
-            warnings.append(
-                "Private-network bypass uses product default (RFC1918 → direct); source routing not applied (REQ-P084)."
-            )
+            warnings.append("Private-network bypass uses product default; source routing is not applied (REQ-P084).")
         }
-        warnings.append(
-            "URLTest probe defaults to \(ProductDefaults.urltestProbe) unless location.healthCheckURL is set (REQ-P116/P117)."
-        )
-        // REQ-P133: sing-box-lx Outbound(tag) falls back to endpoint.Get(tag), so WG endpoint tags
-        // are valid selector/urltest members without a bridge outbound.
+        warnings.append("URLTest probe defaults to \(ProductDefaults.urltestProbe) unless source health check is set (REQ-P116/P117).")
+
         var routeRules: [[String: Any]] = [
             ["action": "sniff"],
-            [
-                "protocol": ["dns"],
-                "action": "hijack-dns",
-            ],
+            ["protocol": ["dns"], "action": "hijack-dns"],
         ]
-        if bypassPrivate {
-            routeRules.append([
-                "ip_is_private": true,
-                "outbound": "direct",
-            ])
-        }
+        if bypassPrivate { routeRules.append(["ip_is_private": true, "outbound": "direct"]) }
 
         var config: [String: Any] = [
-            "log": [
-                "level": "info",
-                "timestamp": true,
-            ],
+            "log": ["level": "info", "timestamp": true],
             "dns": [
                 "servers": [
-                    [
-                        "type": "udp",
-                        "tag": "dns-remote",
-                        "server": dnsServer,
-                    ],
-                    [
-                        "type": "local",
-                        "tag": "dns-local",
-                    ],
+                    ["type": "udp", "tag": "dns-remote", "server": dnsServer],
+                    ["type": "local", "tag": "dns-local"],
                 ],
                 "final": "dns-remote",
                 "strategy": dnsStrategy,
             ],
-            "inbounds": [
-                [
-                    "type": "tun",
-                    "tag": "tun-in",
-                    "address": ["172.19.0.1/30"],
-                    "mtu": tunMTU,
-                    "auto_route": true,
-                    "strict_route": true,
-                    "stack": "gvisor",
-                ],
-            ],
-            "outbounds": [selector, urlTest] + outbounds + [[
-                "type": "direct",
-                "tag": "direct",
+            "inbounds": [[
+                "type": "tun",
+                "tag": "tun-in",
+                "address": ["172.19.0.1/30"],
+                "mtu": tunMTU,
+                "auto_route": true,
+                "strict_route": true,
+                "stack": "gvisor",
             ]],
+            "outbounds": [selector, urlTest] + outbounds + [["type": "direct", "tag": "direct"]],
             "route": [
                 "auto_detect_interface": true,
-                "default_domain_resolver": [
-                    "server": "dns-remote",
-                    "strategy": dnsStrategy,
-                ],
+                "default_domain_resolver": ["server": "dns-remote", "strategy": dnsStrategy],
                 "rules": routeRules,
                 "final": "proxy",
             ],
         ]
-        if !endpoints.isEmpty {
-            config["endpoints"] = endpoints
-        }
+        if !endpoints.isEmpty { config["endpoints"] = endpoints }
 
         let data = try JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys])
         guard let json = String(data: data, encoding: .utf8) else {
             throw SubscriptionConfigBuilder.SubscriptionError.serializationFailed
         }
 
-        // Canonical lifecycle: migrate → LibboxCheckConfig(FINAL) inside migrator → return exact checked JSON.
+        // Canonical lifecycle: migrate and validate the exact final config that will be launched.
         let migrated = try SingBoxConfigMigrator.migrate(json)
         return GraphResult(
             json: migrated,
             locationCount: locationTags.count,
-            leafCount: leafTagCount,
+            leafCount: builtLeaves.count,
             firstName: subscription.name,
             rejected: rejected,
             warnings: warnings
         )
     }
 
-    /// Share-link list → one location per node, then same graph.
     static func build(fromShareNodes nodes: [NormalizedNode]) throws -> GraphResult {
-        let locations: [NormalizedLocation] = nodes.enumerated().map { index, node in
+        let locations = nodes.enumerated().map { index, node in
             NormalizedLocation(
                 id: "share-\(index + 1)",
                 name: node.name.isEmpty ? "Server \(index + 1)" : node.name,
@@ -391,21 +346,11 @@ enum SingBoxGraphBuilder {
                 endpoints: [node]
             )
         }
-        guard !locations.isEmpty else {
-            throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks
-        }
-        return try build(from: NormalizedSubscription(
-            name: locations.first?.name,
-            locations: locations
-        ))
+        guard !locations.isEmpty else { throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks }
+        return try build(from: NormalizedSubscription(name: locations.first?.name, locations: locations))
     }
 
-    private static func urltestOutbound(
-        tag: String,
-        members: [String],
-        url: String? = nil,
-        interval: String? = nil
-    ) -> [String: Any] {
+    private static func urltestOutbound(tag: String, members: [String], url: String? = nil, interval: String? = nil) -> [String: Any] {
         [
             "type": "urltest",
             "tag": tag,
@@ -419,55 +364,29 @@ enum SingBoxGraphBuilder {
 
     private static func detectGroupCycles(_ locations: [NormalizedLocation]) throws {
         var adjacency: [String: [String]] = [:]
-        for loc in locations {
-            let key = loc.id
-            adjacency[key] = loc.memberLocationIDs.compactMap { mid in
-                locations.first(where: { $0.id == mid || $0.name == mid })?.id
+        for location in locations {
+            adjacency[location.id] = location.memberLocationIDs.compactMap { member in
+                locations.first(where: { $0.id == member || $0.name == member })?.id
             }
         }
         var visiting = Set<String>()
         var visited = Set<String>()
         func dfs(_ node: String) throws {
             if visiting.contains(node) {
-                throw VPNDirectCoreError.malformedConfig(
-                    component: "graph.group",
-                    detail: "cycle detected involving group '\(node)'"
-                )
+                throw VPNDirectCoreError.malformedConfig(component: "graph.group", detail: "cycle detected involving group '\(node)'")
             }
             if visited.contains(node) { return }
             visiting.insert(node)
-            for child in adjacency[node] ?? [] {
-                try dfs(child)
-            }
+            for child in adjacency[node] ?? [] { try dfs(child) }
             visiting.remove(node)
             visited.insert(node)
         }
-        for key in adjacency.keys {
-            try dfs(key)
-        }
-    }
-
-    private static func registerIdentity(
-        _ endpoint: NormalizedNode,
-        tag: String,
-        into map: inout [String: String]
-    ) {
-        map[endpoint.name] = tag
-        if let xrayTag = endpoint.attributes["xrayTag"], !xrayTag.isEmpty {
-            map[xrayTag] = tag
-        }
-    }
-
-    private static func resolveReference(_ name: String, in map: [String: String]) -> String? {
-        map[name]
+        for key in adjacency.keys { try dfs(key) }
     }
 
     private static func resolvedTunnelMTU(endpoints: [[String: Any]]) -> Int {
         let mtus = endpoints.compactMap { $0["mtu"] as? Int }.filter { $0 > 0 }
-        if let minMTU = mtus.min() {
-            return minMTU
-        }
-        return ProductDefaults.tunMTUWithoutProtocolHint
+        return mtus.min() ?? ProductDefaults.tunMTUWithoutProtocolHint
     }
 
     private static func isWireGuardEndpoint(_ leaf: [String: Any]) -> Bool {
@@ -476,12 +395,8 @@ enum SingBoxGraphBuilder {
     }
 
     private static func classifyBuildError(_ error: Error) -> (String, String) {
-        if case let VPNDirectCoreError.unsupportedFeature(component, detail) = error {
-            return (component, detail)
-        }
-        if case let VPNDirectCoreError.malformedConfig(component, detail) = error {
-            return (component, detail)
-        }
+        if case let VPNDirectCoreError.unsupportedFeature(component, detail) = error { return (component, detail) }
+        if case let VPNDirectCoreError.malformedConfig(component, detail) = error { return (component, detail) }
         return ("builder", error.localizedDescription)
     }
 }
