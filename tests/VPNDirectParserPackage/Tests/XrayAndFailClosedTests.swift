@@ -78,6 +78,14 @@ final class XrayAndFailClosedTests: XCTestCase {
         XCTAssertThrowsError(try XrayJSONAdapter.parse(json))
     }
 
+    func testUnsupportedExplicitXrayTCPHeaderFailsClosed() throws {
+        let json = """
+        {"outbounds":[{"protocol":"vless","tag":"bad-tcp-header","settings":{"address":"203.0.113.52","port":443,"id":"77777777-7777-7777-7777-777777777777","encryption":"none"},"streamSettings":{"network":"tcp","security":"none","tcpSettings":{"header":{"type":"srtp"}}}}]}
+        """
+        XCTAssertThrowsError(try XrayJSONAdapter.parse(json),
+                             "An explicit unsupported Xray TCP header must never become ordinary TCP")
+    }
+
     func testVLESSPQDoesNotDowngradeWhenCapabilityMissing() throws {
         let previous = ProcessInfo.processInfo.environment["VPN_DIRECT_CAPABILITY_JSON"]
         _ = previous // Environment mutation is intentionally avoided; exercise converter by direct policy fixture in CI capability-negative suite.
@@ -92,7 +100,6 @@ final class XrayAndFailClosedTests: XCTestCase {
             ],
             "streamSettings": ["network": "tcp", "security": "none"],
         ]
-        // Positive-capability package tests must at least prove the exact encryption string survives.
         let converted = try XCTUnwrap(XrayVLESSConverter.convert(xray, fallbackTag: "pq"))
         XCTAssertEqual(converted["encryption"] as? String, "mlkem768x25519plus.native.1rtt.test-key")
     }
