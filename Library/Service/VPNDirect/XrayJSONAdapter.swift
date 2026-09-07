@@ -1,15 +1,29 @@
 import CryptoKit
 import Foundation
 
-/// Remnawave / Happ XRAY_JSON → NormalizedSubscription (TheTochka location semantics).
+/// Remnawave / Happ / 3x-ui XRAY_JSON → NormalizedSubscription.
 ///
-/// Converted leaf outbounds are flattened into `NormalizedNode.attributes` and rebuilt by
-/// `UniversalOutboundBuilder` (no LEGACY `outbound` attachment for new Xray imports).
+/// 3x-ui emits one complete Xray config as a JSON object for one client and an array for
+/// multiple clients. Both shapes are source formats, not heuristics. Converted leaf outbounds
+/// are flattened into `NormalizedNode.attributes` and rebuilt by `UniversalOutboundBuilder`.
 public enum XrayJSONAdapter {
     public static func parse(_ content: String) throws -> NormalizedSubscription {
         guard let data = content.data(using: .utf8),
-              let profiles = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+              let root = try? JSONSerialization.jsonObject(with: data)
         else {
+            throw SubscriptionConfigBuilder.SubscriptionError.xrayJSONUnsupported
+        }
+
+        let profiles: [[String: Any]]
+        if let array = root as? [[String: Any]] {
+            profiles = array
+        } else if let object = root as? [String: Any] {
+            // Current 3x-ui `/json/` response for one client is a single full config object.
+            profiles = [object]
+        } else {
+            throw SubscriptionConfigBuilder.SubscriptionError.xrayJSONUnsupported
+        }
+        guard !profiles.isEmpty else {
             throw SubscriptionConfigBuilder.SubscriptionError.xrayJSONUnsupported
         }
 
@@ -35,6 +49,32 @@ public enum XrayJSONAdapter {
                     || proto == "trojan"
                     || proto == "shadowsocks"
                     || proto == "ss"
+            }
+
+            // A full Xray client config normally also contains infrastructure outbounds such as
+            // freedom/direct and blackhole/block. Any other protocol outbound is connection-bearing;
+            // refusing it is safer than silently deleting a server the producer supplied.
+            let infrastructureProtocols: Set<String> = [
+                "freedom", "direct", "blackhole", "block", "dns",
+            ]
+            let supportedProxyProtocols: Set<String> = [
+                "vless", "hysteria", "hysteria2", "vmess", "trojan", "shadowsocks", "ss",
+            ]
+            let unsupportedOutbounds = xrayOutbounds.compactMap { outbound -> String? in
+                let proto = ((outbound["protocol"] as? String) ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+                guard !proto.isEmpty,
+                      !supportedProxyProtocols.contains(proto),
+                      !infrastructureProtocols.contains(proto)
+                else { return nil }
+                return proto
+            }
+            if !unsupportedOutbounds.isEmpty {
+                throw VPNDirectCoreError.unsupportedFeature(
+                    component: "xray.\(displayName)",
+                    detail: "unsupported outbound protocol(s): \(Array(Set(unsupportedOutbounds)).sorted().joined(separator: ","))"
+                )
             }
 
             let routing = (profile["routing"] as? [String: Any]) ?? [:]
@@ -106,7 +146,6 @@ public enum XrayJSONAdapter {
                             case .harmlessMetadata, .panelMetadata, .futureField:
                                 rawExtensions[k] = v
                             case .protocolExtension, .connectionCritical:
-                                // Keep for builder; fail closed later if still unconsumed at emit.
                                 rawExtensions[k] = v
                                 attributes[k] = v
                             }
@@ -269,9 +308,9 @@ public enum XrayJSONAdapter {
 
         if let tls = outbound["tls"] as? [String: Any] {
             put("sni", tls["server_name"])
-            if let insecure = tls["insecure"] as? Bool, insecure {
-                attrs["insecure"] = "1"
-                attrs["allowInsecure"] = "1"
+            if let insecure = tls["insecure"] as? Bool {
+                attrs["insecure"] = insecure ? "1" : "0"
+                attrs["allowInsecure"] = insecure ? "1" : "0"
             }
             if let alpn = tls["alpn"] as? [String], !alpn.isEmpty {
                 attrs["alpn"] = alpn.joined(separator: ",")
@@ -295,13 +334,27 @@ public enum XrayJSONAdapter {
             put("path", firstString(transport["path"]))
             put("host", firstString(transport["host"]))
             put("mode", transport["mode"])
-            put("extra", transport["extra"])
+            if let extra = transport["extra"] {
+                if JSONSerialization.isValidJSONObject(extra),
+                   let data = try? JSONSerialization.data(withJSONObject: extra, options: [.sortedKeys]),
+                   let json = String(data: data, encoding: .utf8)
+                {
+                    attrs["extra"] = json
+                } else {
+                    put("extra", extra)
+                }
+            }
             put("service_name", transport["service_name"])
             put("scMaxEachPostBytes", transport["sc_max_each_post_bytes"] ?? transport["scMaxEachPostBytes"])
             put("scMinPostsIntervalMs", transport["sc_min_posts_interval_ms"] ?? transport["scMinPostsIntervalMs"])
             put("scMaxConcurrentPosts", transport["sc_max_concurrent_posts"] ?? transport["scMaxConcurrentPosts"])
             put("x_padding_bytes", transport["x_padding_bytes"] ?? transport["xPaddingBytes"])
-            if let headers = transport["headers"] as? [String: String] {
+            if let headers = transport["headers"] as? [String: String], !headers.isEmpty {
+                if let data = try? JSONSerialization.data(withJSONObject: headers, options: [.sortedKeys]),
+                   let json = String(data: data, encoding: .utf8)
+                {
+                    attrs["headers_json"] = json
+                }
                 if let host = headers["Host"] ?? headers["host"], !host.isEmpty {
                     attrs["host"] = attrs["host"] ?? host
                     attrs["Host"] = host
@@ -312,6 +365,8 @@ public enum XrayJSONAdapter {
         if let obfs = outbound["obfs"] as? [String: Any] {
             put("obfs", obfs["type"])
             put("obfs_password", obfs["password"])
+            put("obfs_min_packet_size", obfs["min_packet_size"])
+            put("obfs_max_packet_size", obfs["max_packet_size"])
         } else {
             put("obfs", outbound["obfs"])
         }
@@ -374,7 +429,9 @@ public enum XrayJSONAdapter {
         return .tls
     }
 
-    /// Flatten nested JSON into dotted string keys for rawExtensions (lossy but auditable).
+    /// Flatten nested Xray source JSON into dotted strings only for diagnostics/unknown-field
+    /// auditing. Builder-facing typed objects are serialized explicitly above instead of relying
+    /// on this lossy representation.
     private static func flattenJSON(_ object: [String: Any], prefix: String, depth: Int = 0) -> [String: String] {
         guard depth < 6 else { return [:] }
         var out: [String: String] = [:]
@@ -385,9 +442,18 @@ public enum XrayJSONAdapter {
                     out[k] = v
                 }
             } else if let arr = value as? [Any] {
-                out[path] = arr.map { "\($0)" }.joined(separator: ",")
-            } else {
-                out[path] = "\(value)"
+                if JSONSerialization.isValidJSONObject(arr),
+                   let data = try? JSONSerialization.data(withJSONObject: arr, options: [.sortedKeys]),
+                   let json = String(data: data, encoding: .utf8)
+                {
+                    out[path] = json
+                }
+            } else if let bool = value as? Bool {
+                out[path] = bool ? "true" : "false"
+            } else if let number = value as? NSNumber {
+                out[path] = number.stringValue
+            } else if let string = value as? String {
+                out[path] = string
             }
         }
         return out
