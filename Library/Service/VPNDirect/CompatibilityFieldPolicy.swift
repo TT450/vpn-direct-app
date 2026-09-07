@@ -64,6 +64,19 @@ public enum CompatibilityFieldPolicy {
         if k.hasPrefix("x-") || k.hasPrefix("profile-") || k.hasPrefix("subscription-") {
             return .panelMetadata
         }
+
+        // Xray WS/HTTPUpgrade header dictionaries are serialized losslessly into `headers_json`
+        // by XrayJSONAdapter and emitted as the transport `headers` object by the builder. Their
+        // flattened diagnostic copies therefore must not be treated as independently unconsumed
+        // connection fields. Keep this narrow: XHTTP headers are NOT covered because the current
+        // converter only maps its Host field and must continue to fail closed on other headers.
+        if k.hasPrefix("stream.wssettings.headers.")
+            || k.hasPrefix("stream.httpupgradesettings.headers.")
+            || k.hasPrefix("stream.httpupgradesettings.headers.")
+        {
+            return .protocolExtension
+        }
+
         // Xray stream/settings dumps: known leaves stay auditable; unknown nested knobs fail closed.
         if k.hasPrefix("stream.") || k.hasPrefix("settings.") {
             let leaf = String(k.split(separator: ".").last ?? Substring(k)).lowercased()
