@@ -14,12 +14,23 @@ enum XrayVLESSConverter {
             "xhttp", "splithttp", "http", "h2",
         ]
         guard supportedNetworks.contains(network) else {
-            // Never turn an explicit unsupported Xray transport (kcp/quic/domainsocket/...)
-            // into a working-looking plain TCP outbound.
             return nil
         }
         if (network == "xhttp" || network == "splithttp"), !VPNDirectCoreCapabilities.current.supportsXHTTP {
             return nil
+        }
+        if network == "tcp" || network == "raw" || network.isEmpty {
+            let tcp = (stream["tcpSettings"] as? [String: Any]) ?? [:]
+            let header = (tcp["header"] as? [String: Any]) ?? [:]
+            let explicitHeader = ((header["type"] as? String) ?? "none")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            // sing-box has no generic Xray TCP-header transport. We can faithfully represent
+            // ordinary TCP (`none`) and Xray HTTP header mode only. Anything else must not
+            // silently degrade to plain TCP.
+            guard explicitHeader.isEmpty || explicitHeader == "none" || explicitHeader == "http" else {
+                return nil
+            }
         }
 
         let settings = (xray["settings"] as? [String: Any]) ?? [:]
@@ -34,14 +45,12 @@ enum XrayVLESSConverter {
            let flatPort = intValue(settings["port"]),
            let flatID = stringValue(settings["id"])
         {
-            // Current 3x-ui JSON subscription generator shape.
             address = flatAddress
             port = flatPort
             uuid = flatID
             flow = stringValue(settings["flow"]) ?? ""
             encryption = stringValue(settings["encryption"])
         } else {
-            // Legacy/native Xray client config shape.
             guard let vnext = (settings["vnext"] as? [[String: Any]])?.first,
                   let nestedAddress = stringValue(vnext["address"]),
                   let nestedPort = intValue(vnext["port"]),
@@ -68,14 +77,9 @@ enum XrayVLESSConverter {
             "server_port": port,
             "uuid": uuid,
         ]
-        if !flow.isEmpty {
-            outbound["flow"] = flow
-        }
+        if !flow.isEmpty { outbound["flow"] = flow }
         if let encryption, !encryption.isEmpty, encryption.lowercased() != "none" {
-            guard VPNDirectCoreCapabilities.current.supportsVLESSEncryption else {
-                // A PQ/encryption-bearing source must not silently become ordinary VLESS.
-                return nil
-            }
+            guard VPNDirectCoreCapabilities.current.supportsVLESSEncryption else { return nil }
             outbound["encryption"] = encryption
         }
 
@@ -86,27 +90,14 @@ enum XrayVLESSConverter {
         if security == "tls" || security == "reality" {
             let tlsSettings = (stream["tlsSettings"] as? [String: Any]) ?? [:]
             let realitySettings = (stream["realitySettings"] as? [String: Any]) ?? [:]
-
-            let sni = stringValue(realitySettings["serverName"])
-                ?? stringValue(tlsSettings["serverName"])
+            let sni = stringValue(realitySettings["serverName"]) ?? stringValue(tlsSettings["serverName"])
             var tls: [String: Any] = ["enabled": true]
-            if let sni, !sni.isEmpty {
-                tls["server_name"] = sni
-            }
-
-            if let insecure = tlsSettings["allowInsecure"] as? Bool {
-                tls["insecure"] = insecure
-            }
-
-            let fingerprint = stringValue(realitySettings["fingerprint"])
-                ?? stringValue(tlsSettings["fingerprint"])
+            if let sni, !sni.isEmpty { tls["server_name"] = sni }
+            if let insecure = tlsSettings["allowInsecure"] as? Bool { tls["insecure"] = insecure }
+            let fingerprint = stringValue(realitySettings["fingerprint"]) ?? stringValue(tlsSettings["fingerprint"])
             if let fingerprint, !fingerprint.isEmpty {
-                tls["utls"] = [
-                    "enabled": true,
-                    "fingerprint": fingerprint,
-                ]
+                tls["utls"] = ["enabled": true, "fingerprint": fingerprint]
             }
-
             if let alpn = tlsSettings["alpn"] as? [String], !alpn.isEmpty {
                 tls["alpn"] = alpn
             } else if let alpn = stringValue(tlsSettings["alpn"]), !alpn.isEmpty {
@@ -114,35 +105,23 @@ enum XrayVLESSConverter {
                     String($0).trimmingCharacters(in: .whitespacesAndNewlines)
                 }.filter { !$0.isEmpty }
             }
-
             if security == "reality" {
-                guard let pbk = stringValue(realitySettings["publicKey"]), !pbk.isEmpty else {
-                    return nil
-                }
-                var reality: [String: Any] = [
-                    "enabled": true,
-                    "public_key": pbk,
-                ]
+                guard let pbk = stringValue(realitySettings["publicKey"]), !pbk.isEmpty else { return nil }
+                var reality: [String: Any] = ["enabled": true, "public_key": pbk]
                 if let sid = stringValue(realitySettings["shortId"]) {
                     let hex = String(sid.filter(\.isHexDigit))
-                    if !hex.isEmpty {
-                        reality["short_id"] = hex
-                    }
+                    if !hex.isEmpty { reality["short_id"] = hex }
                 }
                 tls["reality"] = reality
             }
-
             outbound["tls"] = tls
         }
 
         if network != "tcp" && network != "raw" && !network.isEmpty {
-            guard let transport = xrayTransport(network: network, stream: stream) else {
-                return nil
-            }
-            // Reality + explicit stream-one → auto is a pinned lx compatibility quirk retained
-            // from the production TheTochka path. Keep this isolated to XHTTP only.
+            guard let transport = xrayTransport(network: network, stream: stream) else { return nil }
+            // Retained compatibility quirk pending exact pinned-XHTTP source proof.
             if security == "reality",
-               network == "xhttp" || network == "splithttp",
+               (network == "xhttp" || network == "splithttp"),
                ((transport["mode"] as? String) ?? "").lowercased() == "stream-one"
             {
                 var fixed = transport
@@ -152,7 +131,6 @@ enum XrayVLESSConverter {
                 outbound["transport"] = transport
             }
         } else if let tcpTransport = xrayTransport(network: network, stream: stream) {
-            // TCP with an explicit HTTP header has semantic transport content and must survive.
             outbound["transport"] = tcpTransport
         }
 
@@ -164,9 +142,7 @@ enum XrayVLESSConverter {
         case "ws", "websocket":
             let ws = (stream["wsSettings"] as? [String: Any]) ?? [:]
             var transport: [String: Any] = ["type": "ws"]
-            if let path = ws["path"] as? String, !path.isEmpty {
-                transport["path"] = path
-            }
+            if let path = ws["path"] as? String, !path.isEmpty { transport["path"] = path }
             if let headers = ws["headers"] as? [String: String], !headers.isEmpty {
                 transport["headers"] = headers
             } else if let headers = ws["headers"] as? [String: Any], !headers.isEmpty {
@@ -181,33 +157,21 @@ enum XrayVLESSConverter {
         case "grpc":
             let grpc = (stream["grpcSettings"] as? [String: Any]) ?? [:]
             var transport: [String: Any] = ["type": "grpc"]
-            if let service = grpc["serviceName"] as? String, !service.isEmpty {
-                transport["service_name"] = service
-            }
+            if let service = grpc["serviceName"] as? String, !service.isEmpty { transport["service_name"] = service }
             return transport
         case "httpupgrade":
             let http = (stream["httpupgradeSettings"] as? [String: Any])
-                ?? (stream["httpUpgradeSettings"] as? [String: Any])
-                ?? [:]
+                ?? (stream["httpUpgradeSettings"] as? [String: Any]) ?? [:]
             var transport: [String: Any] = ["type": "httpupgrade"]
-            if let path = http["path"] as? String, !path.isEmpty {
-                transport["path"] = path
-            }
-            if let host = http["host"] as? String, !host.isEmpty {
-                transport["host"] = host
-            }
-            if let headers = http["headers"] as? [String: String], !headers.isEmpty {
-                transport["headers"] = headers
-            }
+            if let path = http["path"] as? String, !path.isEmpty { transport["path"] = path }
+            if let host = http["host"] as? String, !host.isEmpty { transport["host"] = host }
+            if let headers = http["headers"] as? [String: String], !headers.isEmpty { transport["headers"] = headers }
             return transport
         case "xhttp", "splithttp":
             let xhttp = (stream["xhttpSettings"] as? [String: Any])
-                ?? (stream["splithttpSettings"] as? [String: Any])
-                ?? [:]
+                ?? (stream["splithttpSettings"] as? [String: Any]) ?? [:]
             var transport: [String: Any] = ["type": "xhttp"]
-            if let path = xhttp["path"] as? String, !path.isEmpty {
-                transport["path"] = path
-            }
+            if let path = xhttp["path"] as? String, !path.isEmpty { transport["path"] = path }
             if let host = xhttp["host"] as? String, !host.isEmpty {
                 transport["host"] = host
             } else if let headers = xhttp["headers"] as? [String: String],
@@ -215,11 +179,7 @@ enum XrayVLESSConverter {
             {
                 transport["host"] = host
             }
-            if let mode = xhttp["mode"] as? String, !mode.isEmpty {
-                transport["mode"] = mode
-            }
-            // Preserve `extra` object keys and merge sibling tuning (scMaxEachPostBytes, …).
-            // Do not invent a mode when the producer omitted it; pinned Core owns its default.
+            if let mode = xhttp["mode"] as? String, !mode.isEmpty { transport["mode"] = mode }
             XrayXHTTPExtra.merge(from: xhttp, into: &transport)
             return transport
         case "http", "h2":
@@ -243,9 +203,7 @@ enum XrayVLESSConverter {
             if headerType == "http" {
                 var transport: [String: Any] = ["type": "http"]
                 let request = (header["request"] as? [String: Any]) ?? [:]
-                if let path = request["path"] as? [String], !path.isEmpty {
-                    transport["path"] = path
-                }
+                if let path = request["path"] as? [String], !path.isEmpty { transport["path"] = path }
                 if let headers = request["headers"] as? [String: Any] {
                     if let host = headers["Host"] as? [String], !host.isEmpty {
                         transport["host"] = host
@@ -255,8 +213,7 @@ enum XrayVLESSConverter {
                 }
                 return transport
             }
-            // `none` means ordinary TCP and is faithfully represented by no transport object.
-            return headerType == "none" || headerType.isEmpty ? nil : nil
+            return nil
         default:
             return nil
         }
@@ -268,18 +225,14 @@ enum XrayVLESSConverter {
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
         }
-        if let value = raw as? NSNumber {
-            return value.stringValue
-        }
+        if let value = raw as? NSNumber { return value.stringValue }
         return nil
     }
 
     private static func intValue(_ raw: Any?) -> Int? {
         if let value = raw as? Int { return value }
         if let value = raw as? NSNumber { return value.intValue }
-        if let value = raw as? String {
-            return Int(value.trimmingCharacters(in: .whitespacesAndNewlines))
-        }
+        if let value = raw as? String { return Int(value.trimmingCharacters(in: .whitespacesAndNewlines)) }
         return nil
     }
 }
