@@ -27,8 +27,29 @@ jobs:
       - name: Prepare Core (overlays)
         run: ./scripts/prepare_core.sh
 
-      - name: check-fixtures
-        run: make check-fixtures
+      - name: Regression fixture shapes
+        run: ./scripts/check_fixtures.sh
+
+      - name: Subscription graph fixtures
+        run: ./scripts/check_subscription_graph.sh
+
+      - name: Universal parser structure
+        run: ./scripts/check_universal_parsers.sh
+
+      - name: Parser to Core execution
+        run: ./scripts/check_parser_execution.sh
+
+      - name: Panel compatibility fixtures
+        run: ./scripts/check_panel_compatibility.sh
+
+      - name: Matrix sync
+        run: ./scripts/check_matrix_sync.sh
+
+      - name: Swift parser tests
+        run: ./scripts/check_swift_parser_tests.sh
+
+      - name: Public battle catalog
+        run: ./scripts/battle/check_public_sources_catalog.sh
 
       - name: check-abi
         run: make check-abi
@@ -61,7 +82,6 @@ jobs:
           VPN_DIRECT_APPLE_PLATFORM: ios,iossimulator
           VPN_DIRECT_FORCE_GOMOBILE_INSTALL: "1"
         run: |
-          # Stock backup is optional on clean CI runners
           if [ -d Libbox.xcframework ]; then
             make libbox-backup-stock || true
           fi
