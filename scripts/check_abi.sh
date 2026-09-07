@@ -75,12 +75,21 @@ else
   echo "note: Libbox.xcframework not present — overlay-only ABI check"
 fi
 
-# Default profiles enable with_mieru only when protocol runtime is present.
-if [[ ! -f "${CORE}/protocol/mieru/outbound.go" ]] || [[ ! -f "${CORE}/include/mieru.go" ]]; then
-  echo "ERROR mieru runtime missing under core/sing-box (protocol/include)" >&2
+# Mieru runtime ships via core/overlays/sing-box (applied onto stock pin).
+OV_SB="${ROOT}/core/overlays/sing-box"
+if [[ ! -f "${OV_SB}/protocol/mieru/outbound.go" ]] || [[ ! -f "${OV_SB}/include/mieru.go" ]]; then
+  echo "ERROR mieru overlay sources missing under core/overlays/sing-box" >&2
   fail=1
 else
-  echo "OK mieru runtime sources present"
+  if [[ -f "${ROOT}/scripts/apply_singbox_overlays.sh" ]]; then
+    bash "${ROOT}/scripts/apply_singbox_overlays.sh" || fail=1
+  fi
+  if [[ ! -f "${CORE}/protocol/mieru/outbound.go" ]] || [[ ! -f "${CORE}/include/mieru.go" ]]; then
+    echo "ERROR mieru runtime missing under core/sing-box after overlay apply" >&2
+    fail=1
+  else
+    echo "OK mieru runtime sources present (overlay applied)"
+  fi
 fi
 for tags_file in "${ROOT}/scripts/tags/vpn_direct_ios.tags" "${ROOT}/scripts/tags/vpn_direct_full.tags"; do
   if [[ ! -f "${tags_file}" ]]; then

@@ -2,6 +2,14 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.6.1] — 2026-09-07
+
+### Core shipping fix
+
+- Mieru protocol sources live in `core/overlays/sing-box/` and are applied onto the public `sing-box-lx` pin (`v1.14.0-lx.35`) by `scripts/apply_singbox_overlays.sh`
+- Submodule points at fetchable `Leadaxe/sing-box-lx` again (no private fork push required)
+- `bootstrap_core.sh` / `build_libbox.sh` / ABI & production checks invoke overlay apply
+
 ## [1.0.6] — 2026-09-07
 
 ### Battle-key qualification ready

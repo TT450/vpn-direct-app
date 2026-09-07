@@ -46,4 +46,9 @@ BUILD_TAGS=with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_naive_o
 STOCK_LIBBOX_BACKUP=Libbox.xcframework.stock
 EOF
 
+# Apply in-tree protocol overlays (mieru) so Core builds without a private sing-box fork push
+if [[ -f "${ROOT}/scripts/apply_singbox_overlays.sh" ]]; then
+  bash "${ROOT}/scripts/apply_singbox_overlays.sh"
+fi
+
 echo "bootstrapped ${DESC} (upstream ${UPSTREAM}, go ${GOV})"

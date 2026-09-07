@@ -53,8 +53,15 @@ if ! grep -q "with_mieru" "${ROOT}/scripts/tags/vpn_direct_ios.tags" "${ROOT}/sc
 else
   echo "MIERU_TAG_ON_OK"
 fi
-if [[ ! -f "${ROOT}/core/sing-box/protocol/mieru/outbound.go" ]] || [[ ! -f "${ROOT}/core/sing-box/include/mieru.go" ]]; then
-  echo "MISSING mieru protocol/include registration files" >&2
+OV_SB="${ROOT}/core/overlays/sing-box"
+if [[ ! -f "${OV_SB}/protocol/mieru/outbound.go" ]] || [[ ! -f "${OV_SB}/include/mieru.go" ]]; then
+  echo "MISSING mieru overlay sources under core/overlays/sing-box" >&2
+  fail=1
+elif [[ -f "${ROOT}/scripts/apply_singbox_overlays.sh" ]] && ! bash "${ROOT}/scripts/apply_singbox_overlays.sh"; then
+  echo "FAILED applying sing-box mieru overlays" >&2
+  fail=1
+elif [[ ! -f "${ROOT}/core/sing-box/protocol/mieru/outbound.go" ]] || [[ ! -f "${ROOT}/core/sing-box/include/mieru.go" ]]; then
+  echo "MISSING mieru protocol/include after overlay apply" >&2
   fail=1
 else
   echo "MIERU_PROTOCOL_PRESENT_OK"

@@ -1,0 +1,66 @@
+diff --git a/constant/proxy.go b/constant/proxy.go
+index cae8a5f..383d6f9 100644
+--- a/constant/proxy.go
++++ b/constant/proxy.go
+@@ -22,6 +22,7 @@ const (
+ 	TypeSSH                = "ssh"
+ 	TypeShadowTLS          = "shadowtls"
+ 	TypeAnyTLS             = "anytls"
++	TypeMieru              = "mieru" // vpndirect mieru
+ 	TypeShadowsocksR       = "shadowsocksr"
+ 	TypeVLESS              = "vless"
+ 	TypeTUIC               = "tuic"
+@@ -128,6 +129,8 @@ func ProxyDisplayName(proxyType string) string {
+ 		return "MASQUE"
+ 	case TypeAnyTLS:
+ 		return "AnyTLS"
++	case TypeMieru: // vpndirect mieru
++		return "Mieru"
+ 	case TypeOpenConnect:
+ 		return "OpenConnect"
+ 	case TypeOpenVPNClient:
+diff --git a/go.mod b/go.mod
+index 20517d6..3449335 100644
+--- a/go.mod
++++ b/go.mod
+@@ -13,6 +13,7 @@ require (
+ 	github.com/cretz/bine v0.2.0
+ 	github.com/database64128/tfo-go/v2 v2.3.2
+ 	github.com/dblohm7/wingoes v0.0.0-20240119213807-a09d6be7affa
++	github.com/enfein/mieru/v3 v3.36.1
+ 	github.com/go-chi/chi/v5 v5.2.5
+ 	github.com/go-chi/render v1.0.3
+ 	github.com/godbus/dbus/v5 v5.2.2
+diff --git a/go.sum b/go.sum
+index b07200f..d5db971 100644
+--- a/go.sum
++++ b/go.sum
+@@ -78,6 +78,8 @@ github.com/dnaeon/go-vcr v1.2.0 h1:zHCHvJYTMh1N7xnV7zf1m1GPBF9Ad0Jk/whtQ1663qI=
+ github.com/dnaeon/go-vcr v1.2.0/go.mod h1:R4UdLID7HZT3taECzJs4YgbbH6PIGXB6W/sc5OLb6RQ=
+ github.com/ebitengine/purego v0.10.0 h1:QIw4xfpWT6GWTzaW5XEKy3HXoqrJGx1ijYHzTF0/ISU=
+ github.com/ebitengine/purego v0.10.0/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
++github.com/enfein/mieru/v3 v3.36.1 h1:g8iaFf+jNc/MGE3qiGslJ4BPSPTeWPmULa0HIvfhENM=
++github.com/enfein/mieru/v3 v3.36.1/go.mod h1:zJBUCsi5rxyvHM8fjFf+GLaEl4OEjjBXr1s5F6Qd3hM=
+ github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
+ github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
+ github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
+diff --git a/include/registry.go b/include/registry.go
+index d81cf7c..4f2a694 100644
+--- a/include/registry.go
++++ b/include/registry.go
+@@ -72,6 +72,7 @@ func InboundRegistry() *inbound.Registry {
+ 	shadowtls.RegisterInbound(registry)
+ 	vless.RegisterInbound(registry)
+ 	anytls.RegisterInbound(registry)
++	registerMieruInbound(registry) // vpndirect mieru
+ 
+ 	registerQUICInbounds(registry)
+ 	registerCloudflaredInbound(registry)
+@@ -101,6 +102,7 @@ func OutboundRegistry() *outbound.Registry {
+ 	vmess.RegisterOutbound(registry)
+ 	trojan.RegisterOutbound(registry)
+ 	registerNaiveOutbound(registry)
++	registerMieruOutbound(registry) // vpndirect mieru
+ 	tor.RegisterOutbound(registry)
+ 	ssh.RegisterOutbound(registry)
+ 	shadowtls.RegisterOutbound(registry)

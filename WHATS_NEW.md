@@ -13,7 +13,7 @@ Git tag: `v1.0.6`
 
 ## Engineering detail
 
-- Ported `protocol/mieru` from enfein/mbox; tags in `vpn_direct_*.tags`
+- Ported `protocol/mieru` from enfein/mbox into `core/overlays/sing-box` (applied on stock pin); tags in `vpn_direct_*.tags`
 - Content detector schemes: shadowtls / naive / http-proxy family
 - ClashYAMLAdapter nest flatten; VLESS/HY share links attributes-only (legacy outbound marked)
 - `scripts/check_parser_execution.sh` + `docs/core/PANIC_BOUNDARY.md`
