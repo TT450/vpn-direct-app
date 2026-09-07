@@ -41,16 +41,25 @@ final class GoldenPanelTopologyTests: XCTestCase {
         XCTAssertEqual(detection.kind, .singBoxJSON)
     }
 
-    func testWireGuardConfAmnezia() throws {
+    func testWireGuardConfAmneziaUsesEndpointSchema() throws {
         let conf = try ParserTestSupport.readFixture("panels/amnezia/awg2_sample.conf")
         XCTAssertEqual(VPNDirectContentDetector.detect(text: conf).kind, .wireGuardConf)
         let sub = try WireGuardConfAdapter.parse(conf, amneziaVersion: "2")
-        XCTAssertFalse(sub.allEndpoints.isEmpty)
-        let outbound = try UniversalOutboundBuilder.build(from: try XCTUnwrap(sub.allEndpoints.first))
-        XCTAssertTrue((outbound["type"] as? String) == "wireguard" || (outbound["type"] as? String) == "amneziawg"
-            || outbound["amnezia"] != nil || outbound["Jc"] != nil || outbound["jc"] != nil
-            || (outbound["type"] as? String) == "wireguard")
-        let data = try ParserTestSupport.wrapOutbound(outbound)
-        _ = try ParserTestSupport.singBoxCheck(data, label: "awg2")
+        let node = try XCTUnwrap(sub.allEndpoints.first)
+        XCTAssertEqual(node.protocolID, .amneziawg)
+
+        let model = try XCTUnwrap(node.wireguardEndpoint)
+        let endpoint = try model.endpointJSON(tag: "awg2")
+        XCTAssertEqual(endpoint["type"] as? String, "wireguard")
+        XCTAssertNotNil(endpoint["private_key"] as? String)
+        XCTAssertFalse((endpoint["address"] as? [String] ?? []).isEmpty)
+        XCTAssertEqual((endpoint["peers"] as? [[String: Any]])?.count, model.peers.count)
+        XCTAssertNotNil(endpoint["jc"] ?? endpoint["h1"] ?? endpoint["i1"])
+
+        // Production must not re-introduce the removed legacy WireGuard outbound path.
+        XCTAssertThrowsError(try UniversalOutboundBuilder.build(from: node))
+
+        let data = try ParserTestSupport.wrapOutbound(endpoint)
+        _ = try ParserTestSupport.singBoxCheck(data, label: "awg2-endpoint")
     }
 }
