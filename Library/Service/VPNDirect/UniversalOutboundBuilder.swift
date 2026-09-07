@@ -1,10 +1,11 @@
 import Foundation
 
-/// Builds sing-box outbound dictionaries from NormalizedNode fields (no pre-built outbound required).
+/// Builds sing-box outbound dictionaries from `NormalizedNode` fields.
+///
+/// Release invariant: an explicit connection-critical source value is either emitted with its
+/// original semantics or the builder fails. It is never silently replaced with a convenient default.
 public enum UniversalOutboundBuilder {
     public static func build(from node: NormalizedNode) throws -> [String: Any] {
-        // LEGACY outbound already encodes mapped Core JSON — do not re-fail on preserved Xray stream dumps.
-        // Attributes-only path: refuse connection-critical unknowns that builders do not consume.
         if node.outbound == nil || node.outbound?.isEmpty == true {
             let candidateKeys = Set(node.attributes.keys)
                 .union(node.rawExtensions.keys)
@@ -12,7 +13,6 @@ public enum UniversalOutboundBuilder {
                     let k = key.lowercased()
                     if k.hasPrefix("xray") { return false }
                     if k.hasPrefix("stream.") || k.hasPrefix("settings.") {
-                        // Keep connection-critical nested unknowns in the fail-closed scan.
                         return CompatibilityFieldPolicy.classify(key: key) == .connectionCritical
                     }
                     return true
@@ -25,13 +25,14 @@ public enum UniversalOutboundBuilder {
             )
         }
 
-        // LEGACY: pre-built outbound dictionaries from older converters.
-        // Prefer attributes-only NormalizedNode; keep this early-return until remaining writers migrate.
+        // Temporary compatibility bridge. Remaining writers must be migrated because this bypasses
+        // the typed builder path; until then preserve the exact already-mapped Core object.
         if let existing = node.outbound, !existing.isEmpty {
             var copy = existing
             if copy["tag"] == nil { copy["tag"] = node.name }
             return copy
         }
+
         switch node.protocolID {
         case .vless:
             return try buildVLESS(node)
@@ -42,10 +43,8 @@ public enum UniversalOutboundBuilder {
         case .shadowsocks:
             return try buildShadowsocks(node)
         case .hysteria, .hysteria2:
-            guard let built = HysteriaOutboundFactory.fromShareLink(node.source ?? "", fallbackTag: node.name)
-                    ?? HysteriaOutboundFactory.fromAttributes(node)
-            else {
-                throw VPNDirectCoreError.malformedConfig(component: "hysteria", detail: "Missing Hysteria fields")
+            guard let built = HysteriaOutboundFactory.fromAttributes(node) else {
+                throw VPNDirectCoreError.malformedConfig(component: "hysteria", detail: "Missing normalized Hysteria fields")
             }
             return built
         case .tuic:
@@ -53,7 +52,12 @@ public enum UniversalOutboundBuilder {
         case .anytls:
             return try buildAnyTLS(node)
         case .wireguard, .amneziawg:
-            return try buildWireGuard(node)
+            // The pinned Leadaxe Core registers WireGuard/AWG as top-level endpoints. Production
+            // graph emission owns this path; returning the removed legacy outbound would be invalid.
+            throw VPNDirectCoreError.unsupportedFeature(
+                component: "wireguard",
+                detail: "WireGuard/AmneziaWG must be emitted as a top-level endpoint by SingBoxGraphBuilder"
+            )
         case .socks:
             return try buildSOCKS(node)
         case .http:
@@ -65,43 +69,13 @@ public enum UniversalOutboundBuilder {
         case .mieru:
             return try buildMieru(node)
         default:
-            if node.protocolID.rawValue == "shadowtls" {
-                return try buildShadowTLS(node)
-            }
-            if node.protocolID.rawValue == "naive" {
-                return try buildNaive(node)
-            }
+            if node.protocolID.rawValue == "shadowtls" { return try buildShadowTLS(node) }
+            if node.protocolID.rawValue == "naive" { return try buildNaive(node) }
             throw VPNDirectCoreError.unsupportedFeature(
                 component: node.protocolID.rawValue,
                 detail: "No outbound builder for protocol"
             )
         }
-    }
-
-    private static func buildShadowTLS(_ node: NormalizedNode) throws -> [String: Any] {
-        var outbound: [String: Any] = [
-            "type": "shadowtls",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-        ]
-        if let version = attr(node, "version").flatMap(Int.init) { outbound["version"] = version }
-        if let password = attr(node, "password") { outbound["password"] = password }
-        if let tls = tlsObject(from: node, defaultSNI: node.server) { outbound["tls"] = tls }
-        return outbound
-    }
-
-    private static func buildNaive(_ node: NormalizedNode) throws -> [String: Any] {
-        var outbound: [String: Any] = [
-            "type": "naive",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-        ]
-        if let user = attr(node, "username") { outbound["username"] = user }
-        if let pass = attr(node, "password") { outbound["password"] = pass }
-        if let network = attr(node, "network") { outbound["quic"] = network == "quic" }
-        return outbound
     }
 
     // MARK: - Helpers
@@ -116,97 +90,165 @@ public enum UniversalOutboundBuilder {
             "service_name": ["service_name", "grpc-service-name", "grpc_service_name"],
             "plugin_opts": ["plugin_opts", "plugin-opts"],
             "transport": ["transport"],
-            "traffic_pattern": ["traffic_pattern", "traffic-pattern", "low_entropy", "low-entropy"],
+            "traffic_pattern": ["traffic_pattern", "traffic-pattern"],
+            "udp_over_tcp": ["udp_over_tcp", "udp-over-tcp", "uot"],
+            "packet_encoding": ["packet_encoding", "packet-encoding"],
+            "private_key": ["private_key", "private-key", "privateKey"],
+            "public_key": ["public_key", "public-key", "publicKey"],
         ]
         let keys = aliases[key] ?? [key, key.lowercased()]
         for k in keys {
-            if let v = node.attributes[k] ?? node.attributes[k.lowercased()], !v.isEmpty {
-                return v
-            }
+            if let v = node.attributes[k] ?? node.attributes[k.lowercased()], !v.isEmpty { return v }
         }
         return nil
     }
 
-    private static func tlsObject(from node: NormalizedNode, defaultSNI: String) -> [String: Any]? {
-        let securityRaw = node.security?.rawValue ?? attr(node, "security") ?? "none"
+    private static func boolAttr(_ node: NormalizedNode, _ key: String) throws -> Bool? {
+        guard let raw = attr(node, key) else { return nil }
+        switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "1", "true", "yes", "on": return true
+        case "0", "false", "no", "off": return false
+        default:
+            throw VPNDirectCoreError.malformedConfig(component: node.protocolID.rawValue, detail: "Invalid boolean \(key)=\(raw)")
+        }
+    }
+
+    private static func intAttr(_ node: NormalizedNode, _ key: String) throws -> Int? {
+        guard let raw = attr(node, key) else { return nil }
+        guard let value = Int(raw.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            throw VPNDirectCoreError.malformedConfig(component: node.protocolID.rawValue, detail: "Invalid integer \(key)=\(raw)")
+        }
+        return value
+    }
+
+    private static func listAttr(_ node: NormalizedNode, _ key: String) -> [String]? {
+        guard let raw = attr(node, key) else { return nil }
+        let values = raw.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return values.isEmpty ? nil : values
+    }
+
+    private static func tlsObject(from node: NormalizedNode, defaultSNI: String? = nil, forceEnabled: Bool = false) throws -> [String: Any]? {
+        let securityRaw = (node.security?.rawValue ?? attr(node, "security") ?? "none").lowercased()
         let hasReality = securityRaw == "reality"
             || attr(node, "pbk") != nil
-            || node.attributes.keys.contains(where: { $0.hasPrefix("reality-opts") || $0 == "public-key" })
-        let security = hasReality ? "reality" : securityRaw
-        guard security == "tls" || security == "reality" else { return nil }
-        var tls: [String: Any] = [
-            "enabled": true,
-            "server_name": attr(node, "sni") ?? attr(node, "peer") ?? defaultSNI,
-        ]
-        if attr(node, "insecure") == "1" || attr(node, "allowInsecure") == "1" {
-            tls["insecure"] = true
-        }
-        if let alpn = attr(node, "alpn") {
-            tls["alpn"] = alpn.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
-        }
+            || node.attributes.keys.contains(where: { $0.lowercased().hasPrefix("reality-opts") || $0.lowercased() == "public-key" })
+        let enabled = forceEnabled || securityRaw == "tls" || hasReality || attr(node, "sni") != nil || attr(node, "alpn") != nil
+        guard enabled else { return nil }
+
+        var tls: [String: Any] = ["enabled": true]
+        if let sni = attr(node, "sni") ?? attr(node, "peer") ?? defaultSNI, !sni.isEmpty { tls["server_name"] = sni }
+        if let insecure = try boolAttr(node, "insecure") ?? boolAttr(node, "allowInsecure") { tls["insecure"] = insecure }
+        if let alpn = listAttr(node, "alpn") { tls["alpn"] = alpn }
+        if let value = attr(node, "min_version") { tls["min_version"] = value }
+        if let value = attr(node, "max_version") { tls["max_version"] = value }
+        if let values = listAttr(node, "cipher_suites") { tls["cipher_suites"] = values }
+        if let values = listAttr(node, "curve_preferences") { tls["curve_preferences"] = values }
+        if let timeout = attr(node, "handshake_timeout") { tls["handshake_timeout"] = timeout }
+        if let fragment = try boolAttr(node, "fragment") { tls["fragment"] = fragment }
+        if let delay = attr(node, "fragment_fallback_delay") { tls["fragment_fallback_delay"] = delay }
+        if let record = try boolAttr(node, "record_fragment") { tls["record_fragment"] = record }
+
         if let fp = attr(node, "fp"), !fp.isEmpty {
             tls["utls"] = ["enabled": true, "fingerprint": fp]
         }
-        if security == "reality" {
-            var reality: [String: Any] = ["enabled": true]
-            if let pbk = attr(node, "pbk") { reality["public_key"] = pbk }
+        if hasReality {
+            guard let pbk = attr(node, "pbk"), !pbk.isEmpty else {
+                throw VPNDirectCoreError.malformedConfig(component: "reality", detail: "Missing public key")
+            }
+            var reality: [String: Any] = ["enabled": true, "public_key": pbk]
             if let sid = attr(node, "sid") { reality["short_id"] = sid }
             tls["reality"] = reality
         }
         return tls
     }
 
-    private static func transportObject(from node: NormalizedNode) -> [String: Any]? {
-        let t = (node.transport?.rawValue
-            ?? attr(node, "network")
-            ?? attr(node, "net")
-            ?? attr(node, "type")
-            ?? "tcp").lowercased()
+    private static func multiplexObject(from node: NormalizedNode) throws -> [String: Any]? {
+        let explicitlyEnabled = try boolAttr(node, "multiplex_enabled") ?? boolAttr(node, "mux")
+        let protocolName = attr(node, "multiplex_protocol") ?? attr(node, "mux_protocol")
+        let hasFields = explicitlyEnabled != nil || protocolName != nil
+            || attr(node, "max_connections") != nil || attr(node, "min_streams") != nil
+            || attr(node, "max_streams") != nil || attr(node, "multiplex_padding") != nil
+        guard hasFields else { return nil }
+
+        var mux: [String: Any] = ["enabled": explicitlyEnabled ?? true]
+        if let protocolName { mux["protocol"] = protocolName }
+        if let value = try intAttr(node, "max_connections") { mux["max_connections"] = value }
+        if let value = try intAttr(node, "min_streams") { mux["min_streams"] = value }
+        if let value = try intAttr(node, "max_streams") { mux["max_streams"] = value }
+        if let value = try boolAttr(node, "multiplex_padding") { mux["padding"] = value }
+        return mux
+    }
+
+    private static func transportObject(from node: NormalizedNode) throws -> [String: Any]? {
+        let explicit = node.transport?.rawValue ?? attr(node, "network") ?? attr(node, "net") ?? attr(node, "type")
+        guard let explicit else { return nil }
+        let t = explicit.lowercased()
         switch t {
+        case "tcp", "raw":
+            return nil
         case "ws", "websocket":
             var ws: [String: Any] = ["type": "ws"]
             if let path = attr(node, "path") { ws["path"] = path }
-            if let host = attr(node, "host") {
-                ws["headers"] = ["Host": host]
-            }
+            var headers: [String: String] = [:]
+            if let host = attr(node, "host") { headers["Host"] = host }
+            if let rawHeaders = attr(node, "headers_json"),
+               let data = rawHeaders.data(using: .utf8),
+               let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+            { headers.merge(parsed) { _, new in new } }
+            if !headers.isEmpty { ws["headers"] = headers }
+            if let value = try intAttr(node, "max_early_data") { ws["max_early_data"] = value }
+            if let value = attr(node, "early_data_header_name") { ws["early_data_header_name"] = value }
             return ws
         case "grpc":
             var grpc: [String: Any] = ["type": "grpc"]
-            if let service = attr(node, "service_name") ?? attr(node, "serviceName") ?? attr(node, "servicename") {
-                grpc["service_name"] = service
-            }
+            if let service = attr(node, "service_name") ?? attr(node, "serviceName") ?? attr(node, "servicename") { grpc["service_name"] = service }
+            if let value = attr(node, "idle_timeout") { grpc["idle_timeout"] = value }
+            if let value = attr(node, "ping_timeout") { grpc["ping_timeout"] = value }
+            if let value = try boolAttr(node, "permit_without_stream") { grpc["permit_without_stream"] = value }
             return grpc
         case "httpupgrade":
             var hu: [String: Any] = ["type": "httpupgrade"]
             if let path = attr(node, "path") { hu["path"] = path }
             if let host = attr(node, "host") { hu["host"] = host }
+            if let rawHeaders = attr(node, "headers_json"),
+               let data = rawHeaders.data(using: .utf8),
+               let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+            { hu["headers"] = parsed }
             return hu
         case "http", "h2":
             var http: [String: Any] = ["type": "http"]
-            if let path = attr(node, "path") { http["path"] = [path] }
-            if let host = attr(node, "host") { http["host"] = [host] }
+            if let hosts = listAttr(node, "host") { http["host"] = hosts }
+            if let path = attr(node, "path") { http["path"] = path }
+            if let method = attr(node, "method") { http["method"] = method }
+            if let rawHeaders = attr(node, "headers_json"),
+               let data = rawHeaders.data(using: .utf8),
+               let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+            { http["headers"] = parsed }
+            if let value = attr(node, "idle_timeout") { http["idle_timeout"] = value }
+            if let value = attr(node, "ping_timeout") { http["ping_timeout"] = value }
             return http
         case "xhttp", "splithttp":
+            guard VPNDirectCoreCapabilities.current.supportsXHTTP else {
+                throw VPNDirectCoreError.unsupportedFeature(component: "xhttp", detail: "Current Libbox build lacks native xhttp transport")
+            }
             var xhttp: [String: Any] = ["type": "xhttp"]
-            if let path = attr(node, "path") { xhttp["path"] = path } else { xhttp["path"] = "/" }
+            if let path = attr(node, "path") { xhttp["path"] = path }
             if let host = attr(node, "host") { xhttp["host"] = host }
-            xhttp["mode"] = attr(node, "mode") ?? "auto"
-            if let extra = attr(node, "extra") { xhttp["extra"] = extra }
-            if let sc = attr(node, "scMaxEachPostBytes") ?? attr(node, "sc_max_each_post_bytes") {
-                xhttp["sc_max_each_post_bytes"] = sc
+            if let mode = attr(node, "mode") { xhttp["mode"] = mode }
+            if let extra = attr(node, "extra") {
+                if let data = extra.data(using: .utf8), let json = try? JSONSerialization.jsonObject(with: data) {
+                    xhttp["extra"] = json
+                } else {
+                    throw VPNDirectCoreError.malformedConfig(component: "xhttp", detail: "extra must be valid JSON")
+                }
             }
-            if let sc = attr(node, "scMinPostsIntervalMs") ?? attr(node, "sc_min_posts_interval_ms") {
-                xhttp["sc_min_posts_interval_ms"] = sc
-            }
-            if let sc = attr(node, "scMaxConcurrentPosts") ?? attr(node, "sc_max_concurrent_posts") {
-                xhttp["sc_max_concurrent_posts"] = sc
-            }
-            if let pad = attr(node, "x_padding_bytes") ?? attr(node, "xPaddingBytes") {
-                xhttp["x_padding_bytes"] = pad
-            }
+            if let value = try intAttr(node, "scMaxEachPostBytes") ?? intAttr(node, "sc_max_each_post_bytes") { xhttp["sc_max_each_post_bytes"] = value }
+            if let value = try intAttr(node, "scMinPostsIntervalMs") ?? intAttr(node, "sc_min_posts_interval_ms") { xhttp["sc_min_posts_interval_ms"] = value }
+            if let value = try intAttr(node, "scMaxConcurrentPosts") ?? intAttr(node, "sc_max_concurrent_posts") { xhttp["sc_max_concurrent_posts"] = value }
+            if let value = try intAttr(node, "x_padding_bytes") ?? intAttr(node, "xPaddingBytes") { xhttp["x_padding_bytes"] = value }
             return xhttp
         default:
-            return nil
+            throw VPNDirectCoreError.unsupportedFeature(component: "transport", detail: "Unsupported explicit transport: \(explicit)")
         }
     }
 
@@ -216,27 +258,19 @@ public enum UniversalOutboundBuilder {
         guard let uuid = node.uuid ?? attr(node, "uuid"), !uuid.isEmpty else {
             throw VPNDirectCoreError.malformedConfig(component: "vless", detail: "Missing uuid")
         }
-        let network = (node.transport?.rawValue ?? attr(node, "network") ?? attr(node, "net") ?? "tcp").lowercased()
-        if network == "xhttp" || network == "splithttp" {
-            guard VPNDirectCoreCapabilities.current.supportsXHTTP else {
-                throw VPNDirectCoreError.unsupportedFeature(
-                    component: "xhttp",
-                    detail: "Current Libbox build lacks native xhttp transport"
-                )
-            }
-        }
-        var outbound: [String: Any] = [
-            "type": "vless",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-            "uuid": uuid,
-        ]
+        var outbound: [String: Any] = ["type": "vless", "tag": node.name, "server": node.server, "server_port": node.port, "uuid": uuid]
         if let flow = attr(node, "flow") { outbound["flow"] = flow }
-        if let tls = tlsObject(from: node, defaultSNI: node.server) { outbound["tls"] = tls }
-        if let transport = transportObject(from: node) { outbound["transport"] = transport }
-        if let encryption = attr(node, "encryption") { outbound["encryption"] = encryption }
+        if let network = attr(node, "outbound_network") { outbound["network"] = network }
+        if let tls = try tlsObject(from: node, defaultSNI: nil) { outbound["tls"] = tls }
+        if let transport = try transportObject(from: node) { outbound["transport"] = transport }
+        if let encryption = attr(node, "encryption") {
+            if encryption.lowercased() != "none" && !VPNDirectCoreCapabilities.current.supportsVLESSEncryption {
+                throw VPNDirectCoreError.unsupportedFeature(component: "vless.encryption", detail: "Current Libbox build lacks VLESS encryption/PQ support")
+            }
+            outbound["encryption"] = encryption
+        }
         if let packet = attr(node, "packet_encoding") { outbound["packet_encoding"] = packet }
+        if let mux = try multiplexObject(from: node) { outbound["multiplex"] = mux }
         return outbound
     }
 
@@ -244,26 +278,16 @@ public enum UniversalOutboundBuilder {
         guard let uuid = node.uuid ?? attr(node, "id") ?? attr(node, "uuid"), !uuid.isEmpty else {
             throw VPNDirectCoreError.malformedConfig(component: "vmess", detail: "Missing id")
         }
-        var outbound: [String: Any] = [
-            "type": "vmess",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-            "uuid": uuid,
-            "security": attr(node, "scy") ?? attr(node, "security") ?? "auto",
-        ]
-        if let alterId = attr(node, "aid").flatMap(Int.init) {
-            outbound["alter_id"] = alterId
-        }
-        let tlsMode = attr(node, "tls") ?? ""
-        if tlsMode == "tls" || node.security == .tls || node.security == .reality {
-            if let tls = tlsObject(from: node, defaultSNI: node.server) {
-                outbound["tls"] = tls
-            } else {
-                outbound["tls"] = ["enabled": true, "server_name": attr(node, "sni") ?? node.server]
-            }
-        }
-        if let transport = transportObject(from: node) { outbound["transport"] = transport }
+        var outbound: [String: Any] = ["type": "vmess", "tag": node.name, "server": node.server, "server_port": node.port, "uuid": uuid]
+        if let security = attr(node, "scy") ?? attr(node, "security") { outbound["security"] = security }
+        if let alterID = try intAttr(node, "aid") { outbound["alter_id"] = alterID }
+        if let value = try boolAttr(node, "global_padding") { outbound["global_padding"] = value }
+        if let value = try boolAttr(node, "authenticated_length") { outbound["authenticated_length"] = value }
+        if let network = attr(node, "outbound_network") { outbound["network"] = network }
+        if let tls = try tlsObject(from: node, defaultSNI: nil) { outbound["tls"] = tls }
+        if let transport = try transportObject(from: node) { outbound["transport"] = transport }
+        if let packet = attr(node, "packet_encoding") { outbound["packet_encoding"] = packet }
+        if let mux = try multiplexObject(from: node) { outbound["multiplex"] = mux }
         return outbound
     }
 
@@ -271,19 +295,11 @@ public enum UniversalOutboundBuilder {
         guard let password = attr(node, "password") ?? node.uuid, !password.isEmpty else {
             throw VPNDirectCoreError.malformedConfig(component: "trojan", detail: "Missing password")
         }
-        var outbound: [String: Any] = [
-            "type": "trojan",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-            "password": password,
-        ]
-        if let tls = tlsObject(from: node, defaultSNI: node.server) {
-            outbound["tls"] = tls
-        } else {
-            outbound["tls"] = ["enabled": true, "server_name": attr(node, "sni") ?? node.server]
-        }
-        if let transport = transportObject(from: node) { outbound["transport"] = transport }
+        var outbound: [String: Any] = ["type": "trojan", "tag": node.name, "server": node.server, "server_port": node.port, "password": password]
+        if let network = attr(node, "outbound_network") { outbound["network"] = network }
+        if let tls = try tlsObject(from: node, defaultSNI: nil, forceEnabled: true) { outbound["tls"] = tls }
+        if let transport = try transportObject(from: node) { outbound["transport"] = transport }
+        if let mux = try multiplexObject(from: node) { outbound["multiplex"] = mux }
         return outbound
     }
 
@@ -294,45 +310,32 @@ public enum UniversalOutboundBuilder {
         guard let password = attr(node, "password"), !password.isEmpty else {
             throw VPNDirectCoreError.malformedConfig(component: "shadowsocks", detail: "Missing password")
         }
-        var outbound: [String: Any] = [
-            "type": "shadowsocks",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-            "method": method,
-            "password": password,
-        ]
+        var outbound: [String: Any] = ["type": "shadowsocks", "tag": node.name, "server": node.server, "server_port": node.port, "method": method, "password": password]
         if let plugin = attr(node, "plugin") {
             outbound["plugin"] = plugin
             if let opts = attr(node, "plugin_opts") { outbound["plugin_opts"] = opts }
         }
+        if let network = attr(node, "outbound_network") { outbound["network"] = network }
+        if let uot = try boolAttr(node, "udp_over_tcp") { outbound["udp_over_tcp"] = uot }
+        if let mux = try multiplexObject(from: node) { outbound["multiplex"] = mux }
         return outbound
     }
 
     private static func buildTUIC(_ node: NormalizedNode) throws -> [String: Any] {
-        var outbound: [String: Any] = [
-            "type": "tuic",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-        ]
-        if let uuid = node.uuid ?? attr(node, "uuid") { outbound["uuid"] = uuid }
-        if let password = attr(node, "password") { outbound["password"] = password }
-        if let cc = attr(node, "congestion_control") ?? attr(node, "congestion") {
-            outbound["congestion_control"] = cc
+        guard let uuid = node.uuid ?? attr(node, "uuid"), !uuid.isEmpty else {
+            throw VPNDirectCoreError.malformedConfig(component: "tuic", detail: "Missing uuid")
         }
-        if let udpRelay = attr(node, "udp_relay_mode") {
-            outbound["udp_relay_mode"] = udpRelay
+        guard let password = attr(node, "password"), !password.isEmpty else {
+            throw VPNDirectCoreError.malformedConfig(component: "tuic", detail: "Missing password")
         }
-        var tls: [String: Any] = [
-            "enabled": true,
-            "server_name": attr(node, "sni") ?? node.server,
-        ]
-        if attr(node, "insecure") == "1" { tls["insecure"] = true }
-        if let alpn = attr(node, "alpn") {
-            tls["alpn"] = alpn.split(separator: ",").map(String.init)
-        }
-        outbound["tls"] = tls
+        var outbound: [String: Any] = ["type": "tuic", "tag": node.name, "server": node.server, "server_port": node.port, "uuid": uuid, "password": password]
+        if let cc = attr(node, "congestion_control") ?? attr(node, "congestion") { outbound["congestion_control"] = cc }
+        if let value = attr(node, "udp_relay_mode") { outbound["udp_relay_mode"] = value }
+        if let value = try boolAttr(node, "udp_over_stream") { outbound["udp_over_stream"] = value }
+        if let value = try boolAttr(node, "zero_rtt_handshake") { outbound["zero_rtt_handshake"] = value }
+        if let value = attr(node, "heartbeat") { outbound["heartbeat"] = value }
+        if let network = attr(node, "outbound_network") { outbound["network"] = network }
+        outbound["tls"] = try tlsObject(from: node, defaultSNI: nil, forceEnabled: true)
         return outbound
     }
 
@@ -340,145 +343,148 @@ public enum UniversalOutboundBuilder {
         guard let password = attr(node, "password"), !password.isEmpty else {
             throw VPNDirectCoreError.malformedConfig(component: "anytls", detail: "Missing password")
         }
-        // Do not inject client/device metadata (sing-box privacy default).
-        var outbound: [String: Any] = [
-            "type": "anytls",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-            "password": password,
-        ]
-        var tls: [String: Any] = [
-            "enabled": true,
-            "server_name": attr(node, "sni") ?? node.server,
-        ]
-        if attr(node, "insecure") == "1" { tls["insecure"] = true }
-        outbound["tls"] = tls
-        return outbound
-    }
-
-    private static func buildWireGuard(_ node: NormalizedNode) throws -> [String: Any] {
-        guard let privateKey = attr(node, "private_key") ?? attr(node, "privateKey"), !privateKey.isEmpty else {
-            throw VPNDirectCoreError.malformedConfig(component: "wireguard", detail: "Missing private key")
-        }
-        guard let peerKey = attr(node, "peer_public_key") ?? attr(node, "public_key") ?? attr(node, "publicKey"),
-              !peerKey.isEmpty
-        else {
-            throw VPNDirectCoreError.malformedConfig(component: "wireguard", detail: "Missing peer public key")
-        }
-        let localAddress = (attr(node, "local_address") ?? attr(node, "address") ?? "10.0.0.2/32")
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-        var outbound: [String: Any] = [
-            "type": "wireguard",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-            "private_key": privateKey,
-            "peer_public_key": peerKey,
-            "local_address": localAddress,
-        ]
-        if let psk = attr(node, "pre_shared_key") ?? attr(node, "preshared_key") {
-            outbound["pre_shared_key"] = psk
-        }
-        if let mtu = attr(node, "mtu").flatMap(Int.init) { outbound["mtu"] = mtu }
-        if node.protocolID == .amneziawg || attr(node, "amnezia_version") != nil {
-            if !VPNDirectCoreCapabilities.current.supportsAWG {
-                throw VPNDirectCoreError.unsupportedFeature(component: "amneziawg", detail: "Current Libbox build lacks with_awg")
-            }
-            // sing-box embeds AmneziaWGOptions on the wireguard object (no "amnezia" wrapper).
-            for key in ["jc", "jmin", "jmax", "s1", "s2", "s3", "s4"] {
-                if let n = attr(node, key).flatMap(Int.init) { outbound[key] = n }
-            }
-            for key in ["h1", "h2", "h3", "h4", "i1", "i2", "i3", "i4", "i5"] {
-                if let s = attr(node, key) { outbound[key] = s }
-            }
-        }
+        var outbound: [String: Any] = ["type": "anytls", "tag": node.name, "server": node.server, "server_port": node.port, "password": password]
+        if let value = attr(node, "idle_session_check_interval") { outbound["idle_session_check_interval"] = value }
+        if let value = attr(node, "idle_session_timeout") { outbound["idle_session_timeout"] = value }
+        if let value = try intAttr(node, "min_idle_session") { outbound["min_idle_session"] = value }
+        outbound["tls"] = try tlsObject(from: node, defaultSNI: nil, forceEnabled: true)
         return outbound
     }
 
     private static func buildSOCKS(_ node: NormalizedNode) throws -> [String: Any] {
-        var outbound: [String: Any] = [
-            "type": "socks",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-            "version": attr(node, "version") ?? "5",
-        ]
+        var outbound: [String: Any] = ["type": "socks", "tag": node.name, "server": node.server, "server_port": node.port]
+        if let version = attr(node, "version") { outbound["version"] = version }
         if let user = attr(node, "username") { outbound["username"] = user }
         if let pass = attr(node, "password") { outbound["password"] = pass }
+        if let network = attr(node, "outbound_network") { outbound["network"] = network }
+        if let uot = try boolAttr(node, "udp_over_tcp") { outbound["udp_over_tcp"] = uot }
         return outbound
     }
 
     private static func buildHTTP(_ node: NormalizedNode) throws -> [String: Any] {
-        var outbound: [String: Any] = [
-            "type": "http",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-        ]
+        var outbound: [String: Any] = ["type": "http", "tag": node.name, "server": node.server, "server_port": node.port]
         if let user = attr(node, "username") { outbound["username"] = user }
         if let pass = attr(node, "password") { outbound["password"] = pass }
-        if let tls = tlsObject(from: node, defaultSNI: node.server) { outbound["tls"] = tls }
+        if let path = attr(node, "path") { outbound["path"] = path }
+        if let rawHeaders = attr(node, "headers_json"),
+           let data = rawHeaders.data(using: .utf8),
+           let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+        { outbound["headers"] = parsed }
+        if let tls = try tlsObject(from: node, defaultSNI: nil) { outbound["tls"] = tls }
         return outbound
     }
 
     private static func buildSSH(_ node: NormalizedNode) throws -> [String: Any] {
-        var outbound: [String: Any] = [
-            "type": "ssh",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-            "user": attr(node, "user") ?? attr(node, "username") ?? "root",
-        ]
+        guard let user = attr(node, "user") ?? attr(node, "username"), !user.isEmpty else {
+            throw VPNDirectCoreError.malformedConfig(component: "ssh", detail: "Missing user; VPN Direct does not invent root")
+        }
+        var outbound: [String: Any] = ["type": "ssh", "tag": node.name, "server": node.server, "server_port": node.port, "user": user]
         if let password = attr(node, "password") { outbound["password"] = password }
         if let key = attr(node, "private_key") { outbound["private_key"] = key }
         if let path = attr(node, "private_key_path") { outbound["private_key_path"] = path }
+        if let value = attr(node, "private_key_passphrase") { outbound["private_key_passphrase"] = value }
+        if let values = listAttr(node, "host_key") { outbound["host_key"] = values }
+        if let values = listAttr(node, "host_key_algorithms") { outbound["host_key_algorithms"] = values }
+        if let value = attr(node, "client_version") { outbound["client_version"] = value }
+        if let values = listAttr(node, "cipher") { outbound["cipher"] = values }
+        if let values = listAttr(node, "mac") { outbound["mac"] = values }
+        if let values = listAttr(node, "kex_algorithm") { outbound["kex_algorithm"] = values }
+        return outbound
+    }
+
+    private static func buildShadowTLS(_ node: NormalizedNode) throws -> [String: Any] {
+        var outbound: [String: Any] = ["type": "shadowtls", "tag": node.name, "server": node.server, "server_port": node.port]
+        if let version = try intAttr(node, "version") { outbound["version"] = version }
+        if let password = attr(node, "password") { outbound["password"] = password }
+        outbound["tls"] = try tlsObject(from: node, defaultSNI: nil, forceEnabled: true)
+        return outbound
+    }
+
+    private static func buildNaive(_ node: NormalizedNode) throws -> [String: Any] {
+        var outbound: [String: Any] = ["type": "naive", "tag": node.name, "server": node.server, "server_port": node.port]
+        if let user = attr(node, "username") { outbound["username"] = user }
+        if let pass = attr(node, "password") { outbound["password"] = pass }
+        if let value = try intAttr(node, "insecure_concurrency") { outbound["insecure_concurrency"] = value }
+        if let value = try intAttr(node, "stream_receive_window") { outbound["stream_receive_window"] = value }
+        if let value = try boolAttr(node, "udp_over_tcp") { outbound["udp_over_tcp"] = value }
+        if let value = try boolAttr(node, "quic") { outbound["quic"] = value }
+        if let value = attr(node, "quic_congestion_control") { outbound["quic_congestion_control"] = value }
+        if let value = try intAttr(node, "quic_session_receive_window") { outbound["quic_session_receive_window"] = value }
+        if let rawHeaders = attr(node, "extra_headers_json"),
+           let data = rawHeaders.data(using: .utf8),
+           let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+        { outbound["extra_headers"] = parsed }
+        if let tls = try tlsObject(from: node, defaultSNI: nil, forceEnabled: true) { outbound["tls"] = tls }
         return outbound
     }
 
     private static func buildMasque(_ node: NormalizedNode) throws -> [String: Any] {
-        guard let privateKey = attr(node, "private_key"), let publicKey = attr(node, "public_key") else {
-            throw VPNDirectCoreError.malformedConfig(component: "masque", detail: "Missing WARP/MASQUE keys")
+        guard VPNDirectCoreCapabilities.current.supportsMasqueConnectIP else {
+            throw VPNDirectCoreError.unsupportedFeature(component: "masque", detail: "Current Libbox build lacks MASQUE CONNECT-IP")
         }
-        return try MasqueOutboundOptions(
-            server: node.server,
-            serverPort: node.port,
-            profile: attr(node, "profile") ?? "cloudflare",
-            vhttp: attr(node, "vhttp") ?? "h3",
-            privateKey: privateKey,
-            publicKey: publicKey,
-            ip: attr(node, "ip"),
-            ipv6: attr(node, "ipv6"),
-            tlsServerName: attr(node, "sni")
-        ).outboundJSON(tag: node.name)
+
+        let profile = (attr(node, "profile") ?? "cloudflare").lowercased()
+        guard profile == "cloudflare" || profile == "standard" else {
+            throw VPNDirectCoreError.unsupportedFeature(component: "masque.profile", detail: "Unsupported MASQUE profile: \(profile)")
+        }
+        if let vhttp = attr(node, "vhttp") {
+            guard ["h3", "h2", "auto"].contains(vhttp.lowercased()) else {
+                throw VPNDirectCoreError.malformedConfig(component: "masque", detail: "vhttp must be h3, h2, or auto")
+            }
+            if profile == "standard" && vhttp.lowercased() == "h2" {
+                throw VPNDirectCoreError.unsupportedFeature(component: "masque.standard", detail: "Pinned Core standard profile has no h2 leg")
+            }
+        }
+
+        var outbound: [String: Any] = ["type": "masque", "tag": node.name, "server": node.server, "server_port": node.port, "profile": profile]
+        if let vhttp = attr(node, "vhttp") { outbound["vhttp"] = vhttp.lowercased() }
+        if let uri = attr(node, "uri") { outbound["uri"] = uri }
+        if let mtu = try intAttr(node, "mtu") { outbound["mtu"] = mtu }
+        if let timeout = attr(node, "idle_timeout") { outbound["idle_timeout"] = timeout }
+        if let keepalive = attr(node, "keep_alive_period") { outbound["keep_alive_period"] = keepalive }
+        if let networks = listAttr(node, "network_list") { outbound["network_list"] = networks }
+
+        if profile == "cloudflare" {
+            guard let privateKey = attr(node, "private_key"), !privateKey.isEmpty,
+                  let publicKey = attr(node, "public_key"), !publicKey.isEmpty
+            else {
+                throw VPNDirectCoreError.malformedConfig(component: "masque.cloudflare", detail: "Missing WARP private/public key")
+            }
+            guard attr(node, "ip") != nil || attr(node, "ipv6") != nil else {
+                throw VPNDirectCoreError.malformedConfig(component: "masque.cloudflare", detail: "At least one WARP tunnel IP is required")
+            }
+            outbound["private_key"] = privateKey
+            outbound["public_key"] = publicKey
+            if let ip = attr(node, "ip") { outbound["ip"] = ip }
+            if let ipv6 = attr(node, "ipv6") { outbound["ipv6"] = ipv6 }
+        }
+
+        if let tls = try tlsObject(from: node, defaultSNI: nil, forceEnabled: true) { outbound["tls"] = tls }
+        return outbound
     }
 
     private static func buildMieru(_ node: NormalizedNode) throws -> [String: Any] {
         guard VPNDirectCoreCapabilities.current.supportsMieru else {
-            throw VPNDirectCoreError.unsupportedFeature(
-                component: "mieru",
-                detail: "Mieru runtime not registered in this Libbox build"
-            )
+            throw VPNDirectCoreError.unsupportedFeature(component: "mieru", detail: "Mieru runtime not registered in this Libbox build")
         }
-        var outbound: [String: Any] = [
-            "type": "mieru",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-            // mbox / enfein mieru require transport TCP|UDP
-            "transport": (attr(node, "transport") ?? "TCP").uppercased(),
-        ]
-        if let user = attr(node, "username") { outbound["username"] = user }
-        if let pass = attr(node, "password") { outbound["password"] = pass }
+        guard let transport = attr(node, "transport")?.uppercased(), transport == "TCP" || transport == "UDP" else {
+            throw VPNDirectCoreError.malformedConfig(component: "mieru", detail: "transport must be explicitly TCP or UDP")
+        }
+        guard let user = attr(node, "username"), !user.isEmpty else {
+            throw VPNDirectCoreError.malformedConfig(component: "mieru", detail: "Missing username")
+        }
+        guard let pass = attr(node, "password"), !pass.isEmpty else {
+            throw VPNDirectCoreError.malformedConfig(component: "mieru", detail: "Missing password")
+        }
+        guard node.port > 0 || attr(node, "server_ports") != nil else {
+            throw VPNDirectCoreError.malformedConfig(component: "mieru", detail: "Either server_port or server_ports is required")
+        }
+
+        var outbound: [String: Any] = ["type": "mieru", "tag": node.name, "server": node.server, "transport": transport, "username": user, "password": pass]
+        if node.port > 0 { outbound["server_port"] = node.port }
+        if let ports = listAttr(node, "server_ports") { outbound["server_ports"] = ports }
         if let multiplexing = attr(node, "multiplexing") { outbound["multiplexing"] = multiplexing }
-        // Low entropy is encoded as traffic_pattern string (not a closed enum).
-        if let pattern = attr(node, "traffic_pattern") {
-            outbound["traffic_pattern"] = pattern
-        }
-        if let ports = attr(node, "server_ports") {
-            outbound["server_ports"] = ports.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
-        }
+        if let pattern = attr(node, "traffic_pattern") { outbound["traffic_pattern"] = pattern }
         return outbound
     }
 }
@@ -488,32 +494,43 @@ extension HysteriaOutboundFactory {
         let auth = node.attributes["auth"] ?? node.attributes["password"] ?? node.uuid
         guard let auth, !auth.isEmpty, !node.server.isEmpty, node.port > 0 else { return nil }
         let isV2 = node.protocolID == .hysteria2
-        var tls: [String: Any] = [
-            "enabled": true,
-            "server_name": node.attributes["sni"] ?? node.server,
-        ]
-        if node.attributes["insecure"] == "1" { tls["insecure"] = true }
-        if isV2 { tls["alpn"] = ["h3"] }
-        var outbound: [String: Any] = [
-            "type": isV2 ? "hysteria2" : "hysteria",
-            "tag": node.name,
-            "server": node.server,
-            "server_port": node.port,
-            "tls": tls,
-        ]
-        if isV2 {
-            outbound["password"] = auth
-        } else {
-            outbound["auth_str"] = auth
+        var tls: [String: Any] = ["enabled": true]
+        if let sni = node.attributes["sni"], !sni.isEmpty { tls["server_name"] = sni }
+        if let raw = node.attributes["insecure"]?.lowercased() {
+            if ["1", "true"].contains(raw) { tls["insecure"] = true }
+            if ["0", "false"].contains(raw) { tls["insecure"] = false }
         }
-        if let up = node.attributes["up"].flatMap(Int.init) { outbound["up_mbps"] = up }
-        if let down = node.attributes["down"].flatMap(Int.init) { outbound["down_mbps"] = down }
+        if let alpn = node.attributes["alpn"] {
+            tls["alpn"] = alpn.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        }
+
+        var outbound: [String: Any] = ["type": isV2 ? "hysteria2" : "hysteria", "tag": node.name, "server": node.server, "server_port": node.port, "tls": tls]
+        if isV2 { outbound["password"] = auth } else { outbound["auth_str"] = auth }
+        if let up = node.attributes["up"]?.trimmingCharacters(in: .whitespaces), let value = Int(up) { outbound["up_mbps"] = value }
+        if let down = node.attributes["down"]?.trimmingCharacters(in: .whitespaces), let value = Int(down) { outbound["down_mbps"] = value }
+        if let serverPorts = node.attributes["server_ports"] {
+            outbound["server_ports"] = serverPorts.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        }
+        if let hop = node.attributes["hop_interval"] { outbound["hop_interval"] = hop }
+        if let hopMax = node.attributes["hop_interval_max"] { outbound["hop_interval_max"] = hopMax }
+        if let network = node.attributes["outbound_network"] { outbound["network"] = network }
         if let obfs = node.attributes["obfs"] {
             if isV2 {
-                outbound["obfs"] = ["type": obfs, "password": node.attributes["obfs_password"] ?? ""]
+                var object: [String: Any] = ["type": obfs]
+                if let password = node.attributes["obfs_password"], !password.isEmpty { object["password"] = password }
+                if let min = node.attributes["obfs_min_packet_size"].flatMap(Int.init) { object["min_packet_size"] = min }
+                if let max = node.attributes["obfs_max_packet_size"].flatMap(Int.init) { object["max_packet_size"] = max }
+                outbound["obfs"] = object
             } else {
                 outbound["obfs"] = obfs
             }
+        }
+        if let profile = node.attributes["bbr_profile"] { outbound["bbr_profile"] = profile }
+        if let raw = node.attributes["brutal_debug"]?.lowercased(), ["1", "true", "0", "false"].contains(raw) {
+            outbound["brutal_debug"] = ["1", "true"].contains(raw)
+        }
+        if let raw = node.attributes["disable_chrome_parrot"]?.lowercased(), ["1", "true", "0", "false"].contains(raw) {
+            outbound["disable_chrome_parrot"] = ["1", "true"].contains(raw)
         }
         return outbound
     }
