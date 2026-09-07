@@ -12,7 +12,7 @@ Companion: [`FINAL_IMPLEMENTATION_AUDIT.md`](FINAL_IMPLEMENTATION_AUDIT.md), [`.
 | **C — Subscription HTTP** | ETag / headers | **DONE** If-None-Match / 304; fingerprint lab still live |
 | **D — Interop labs** | Runnable panels | Scaffolds ready — need `.env` + live export evidence |
 | **E — Device** | iPhone qualification | Schema + RSS hint ready — need physical device |
-| **F — Clash depth** | Nested YAML | Hardened subset parser (no Yams); SPM optional later |
+| **F — Clash depth** | Nested YAML | **DONE** Yams SPM + hardened fallback |
 | **G — XHTTP / CDN** | Extras | Sibling + `extra` merge; invented keys fail-closed |
 | **H — Release honesty** | Gates | `prepare_core` + matrix sync + Swift tests in `check-fixtures` |
 
@@ -37,7 +37,7 @@ D live lab export (interop/panels)  →  E device evidence  →  matrix/panel st
 - [ ] Remnawave Response Rules matrix lab (all body types including BLOCK/404/451)  
 - [ ] Marzban OpenAPI create-user automation  
 - [ ] Hiddify + Libertea VPS labs (install-script pinned)  
-- [ ] Optional: Yams SPM for full Clash YAML  
+- [x] Optional: Yams SPM for Clash YAML  
 
 ## P2
 

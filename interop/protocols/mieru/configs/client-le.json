@@ -1,0 +1,11 @@
+{
+  "profiles": [{
+    "profileName": "mieru-le-40",
+    "serverAddress": "203.0.113.100",
+    "serverPort": 8964,
+    "userName": "lab",
+    "password": "lab-mieru-password",
+    "transport": "TCP",
+    "traffic_pattern": "40"
+  }]
+}

@@ -1,3 +1,5 @@
+> **Canonical lab:** [`../protocols/xray/`](../protocols/xray/)
+
 # Interop — xray (VLESS Reality / VMess / Trojan)
 
 ## Inject battle keys (env)

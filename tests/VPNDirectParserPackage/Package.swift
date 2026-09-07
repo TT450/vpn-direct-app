@@ -10,6 +10,10 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .library(name: "VPNDirectParsers", targets: ["VPNDirectParsers"]),
+        .executable(name: "BattleParse", targets: ["BattleParse"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.0"),
     ],
     targets: [
         .target(
@@ -18,8 +22,16 @@ let package = Package(
         ),
         .target(
             name: "VPNDirectParsers",
-            dependencies: ["Libbox"],
+            dependencies: [
+                "Libbox",
+                "Yams",
+            ],
             path: "Sources/VPNDirectParsers"
+        ),
+        .executableTarget(
+            name: "BattleParse",
+            dependencies: ["VPNDirectParsers"],
+            path: "Sources/BattleParse"
         ),
         .testTarget(
             name: "VPNDirectParserTests",

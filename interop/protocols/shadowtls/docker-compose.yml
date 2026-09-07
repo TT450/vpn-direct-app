@@ -1,0 +1,7 @@
+services:
+  shadowtls:
+    image: alpine:3.20
+    profiles: ["lab"]
+    command: ["sh", "-c", "echo 'Chain ShadowTLS → SS using configs/; pin binaries in VERSION'; sleep infinity"]
+    volumes:
+      - ./configs:/configs:ro

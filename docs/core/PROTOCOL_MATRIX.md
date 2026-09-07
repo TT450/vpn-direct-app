@@ -1,6 +1,6 @@
 # Protocol matrix — VPN Direct Core 0.1
 
-Last docs sync: **2026-09-07** (app release **v1.0.7**). Status legend: `planned` | `parser` | `runtime` | `parser+runtime` | `qualification_ready` | `tested` | `deferred` | `out_of_scope`
+Last docs sync: **2026-09-07** (app release **v1.0.8**). Status legend: `planned` | `parser` | `runtime` | `parser+runtime` | `qualification_ready` | `tested` | `deferred` | `out_of_scope`
 
 ## Support definition (`tested`)
 
@@ -28,7 +28,7 @@ Panel / format compatibility (URI × Xray × Clash × fixtures) lives in [`docs/
 - AWG versions and Hysteria2 `gecko` come from Core CapabilityJSON, not Swift hardcodes.
 - Mieru capability is `true` only in Libbox builds tagged `with_mieru` (registered outbound).
 - Parser=`yes` requires a fixture + builder path in-tree.
-- Clash nested `ws-opts` / `grpc-opts` / `reality-opts` / `plugin-opts` flatten to attributes (no SPM YAML).
+- Clash nested `ws-opts` / `grpc-opts` / `reality-opts` / `plugin-opts` flatten to attributes (**Yams** when linked; hardened subset fallback).
 
 ## Matrix
 

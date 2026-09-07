@@ -1,0 +1,5 @@
+# Pin fork + image/install before lab.
+# Primary: AghayeCoder/tx-ui install.sh
+# Docker: ghcr.io/incognitocoder/tx-ui:latest (Incognito-Coder)
+# Example image digest or :latest → replace with digest after pull
+ghcr.io/incognitocoder/tx-ui:unpinned-set-before-lab

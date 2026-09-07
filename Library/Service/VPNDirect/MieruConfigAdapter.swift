@@ -2,8 +2,8 @@ import Foundation
 
 /// Parses Mieru client JSON / profile payloads into NormalizedSubscription.
 /// Capability-gated: outbound build fails closed until Core registers mieru.
-enum MieruConfigAdapter {
-    static func parse(_ text: String) throws -> NormalizedSubscription {
+public enum MieruConfigAdapter {
+    public static func parse(_ text: String) throws -> NormalizedSubscription {
         guard let data = text.data(using: .utf8),
               let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {

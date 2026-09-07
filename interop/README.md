@@ -1,27 +1,28 @@
 # Interop lab
 
-Runnable templates for battle-key qualification. Fixtures under `tests/fixtures/regression/` stay secret-free.
+Canonical **protocol** reference labs: [`protocols/`](protocols/).
 
-**Never** commit real battle keys. Inject via env (see each family `run.sh`).
+Panel labs remain under [`panels/`](panels/). Fixtures under `tests/fixtures/regression/` stay secret-free.
 
-| Family | Path | Status |
+**Never** commit real battle keys. Inject via env (see each family `run.sh` / `.env.example`).
+
+| Family | Canonical path | Status |
 | --- | --- | --- |
-| Xray | [`xray/`](xray/) | runnable template |
-| Hysteria | [`hysteria/`](hysteria/) | runnable template |
-| Amnezia | [`amnezia/`](amnezia/) | runnable template |
-| Mieru | [`mieru/`](mieru/) | runnable template (Core `with_mieru`) |
-| TUIC / AnyTLS / MASQUE | scaffolds | README-only until needed |
+| Xray | [`protocols/xray/`](protocols/xray/) | scaffold |
+| Hysteria | [`protocols/hysteria/`](protocols/hysteria/) | scaffold |
+| TUIC | [`protocols/tuic/`](protocols/tuic/) | scaffold |
+| AnyTLS | [`protocols/anytls/`](protocols/anytls/) | scaffold |
+| ShadowTLS | [`protocols/shadowtls/`](protocols/shadowtls/) | scaffold |
+| Naive | [`protocols/naive/`](protocols/naive/) | scaffold |
+| WireGuard | [`protocols/wireguard/`](protocols/wireguard/) | scaffold |
+| AmneziaWG | [`protocols/amneziawg/`](protocols/amneziawg/) | scaffold |
+| MASQUE | [`protocols/masque/`](protocols/masque/) | scaffold |
+| Mieru | [`protocols/mieru/`](protocols/mieru/) | scaffold |
+| SOCKS / HTTP / SSH | [`protocols/socks/`](protocols/socks/) … | scaffold |
 
-Attach evidence under each `evidence/` directory before flipping PROTOCOL_MATRIX Interop / Status to `tested`.
+Legacy directories [`xray/`](xray/), [`hysteria/`](hysteria/), [`mieru/`](mieru/), [`amnezia/`](amnezia/)
+point at `protocols/<name>` (amnezia → `amneziawg`).
+
+Attach evidence under each `evidence/` before flipping PROTOCOL_MATRIX Interop / Status to `tested`.
 
 Device checklist: [`docs/device/IPHONE_QUALIFICATION.md`](../docs/device/IPHONE_QUALIFICATION.md).
-
-## Quick start
-
-```bash
-cd interop/xray
-export BATTLE_UUID=... BATTLE_PBK=... BATTLE_SID=... BATTLE_SNI=... BATTLE_HOST=...
-./run.sh
-```
-
-Interop=`planned` in the matrix is intentional until you commit evidence files after a live run.

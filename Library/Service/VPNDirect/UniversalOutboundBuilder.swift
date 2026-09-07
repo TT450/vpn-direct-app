@@ -1,8 +1,8 @@
 import Foundation
 
 /// Builds sing-box outbound dictionaries from NormalizedNode fields (no pre-built outbound required).
-enum UniversalOutboundBuilder {
-    static func build(from node: NormalizedNode) throws -> [String: Any] {
+public enum UniversalOutboundBuilder {
+    public static func build(from node: NormalizedNode) throws -> [String: Any] {
         // LEGACY outbound already encodes mapped Core JSON — do not re-fail on preserved Xray stream dumps.
         // Attributes-only path: refuse connection-critical unknowns that builders do not consume.
         if node.outbound == nil || node.outbound?.isEmpty == true {

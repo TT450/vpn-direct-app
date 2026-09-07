@@ -1,0 +1,13 @@
+{
+  "log": { "loglevel": "warning" },
+  "inbounds": [{
+    "port": 443, "protocol": "vmess",
+    "settings": { "clients": [{ "id": "11111111-1111-1111-1111-111111111111", "alterId": 0 }] },
+    "streamSettings": {
+      "network": "ws", "security": "tls",
+      "tlsSettings": { "certificates": [{ "certificateFile": "/etc/xray/server.crt", "keyFile": "/etc/xray/server.key" }] },
+      "wsSettings": { "path": "/" }
+    }
+  }],
+  "outbounds": [{ "protocol": "freedom" }]
+}

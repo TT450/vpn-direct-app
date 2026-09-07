@@ -8,6 +8,10 @@ OVERLAY="${ROOT}/core/overlays/libbox"
 
 fail=0
 
+# Ensure mieru overlays before probing Core sources.
+bash "${ROOT}/scripts/prepare_core.sh" || fail=1
+
+
 assert_mieru_tag_on() {
   local f="$1"
   if [[ ! -f "${f}" ]]; then

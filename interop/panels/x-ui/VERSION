@@ -1,0 +1,4 @@
+# Pin alireza0/x-ui release tag before lab.
+# Image: ghcr.io/alireza0/x-ui (also docker.io/alireza7/x-ui)
+# Example: v1.10.2
+ghcr.io/alireza0/x-ui:unpinned-set-before-lab

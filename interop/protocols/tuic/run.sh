@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+OUT_DIR="${ROOT}/tests/fixtures/battle"
+mkdir -p "${OUT_DIR}"
+: "${BATTLE_HOST:?}"
+: "${BATTLE_UUID:?}"
+: "${BATTLE_PASSWORD:?}"
+PORT="${BATTLE_PORT:-443}"
+SNI="${BATTLE_SNI:-www.example.com}"
+CC="${BATTLE_CONGESTION:-bbr}"
+UDP="${BATTLE_UDP_RELAY:-native}"
+URI="tuic://${BATTLE_UUID}:${BATTLE_PASSWORD}@${BATTLE_HOST}:${PORT}?sni=${SNI}&congestion_control=${CC}&udp_relay_mode=${UDP}&alpn=h3#battle-tuic-v5"
+echo "${URI}" > "${OUT_DIR}/tuic.generated.uri"
+echo "wrote ${OUT_DIR}/tuic.generated.uri"

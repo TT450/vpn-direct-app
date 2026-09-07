@@ -1,3 +1,5 @@
+> **Canonical lab:** [`../protocols/anytls/`](../protocols/anytls/)
+
 # Interop — anytls
 
 ## Case template

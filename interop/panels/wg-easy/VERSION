@@ -1,0 +1,3 @@
+# Pin wg-easy image tag before lab (v15+ recommended).
+# Image: ghcr.io/wg-easy/wg-easy:15
+ghcr.io/wg-easy/wg-easy:15

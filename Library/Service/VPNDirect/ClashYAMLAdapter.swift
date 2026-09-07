@@ -1,16 +1,22 @@
 import Foundation
+#if canImport(Yams)
+import Yams
+#endif
 
-/// Minimal Clash / Mihomo YAML proxy importer (proxies only — no rule engine).
+/// Clash / Mihomo YAML proxy importer (proxies only — no rule engine).
 ///
-/// No Yams SPM dependency in Library (Xcode package refs only). This parser hardens quoted
-/// values, inline arrays, booleans, and nested opts lists without a full YAML library.
-enum ClashYAMLAdapter {
+/// Prefers Yams when linked; falls back to a hardened subset parser for quoted
+/// values, inline arrays, booleans, and nested opts lists.
+public enum ClashYAMLAdapter {
     private static let nestRoots: Set<String> = [
         "ws-opts", "grpc-opts", "reality-opts", "plugin-opts", "headers", "h2-opts", "http-opts",
     ]
 
-    static func parse(_ text: String) throws -> NormalizedSubscription {
-        let proxies = extractProxyMaps(from: text)
+    public static func parse(_ text: String) throws -> NormalizedSubscription {
+        var proxies = extractProxyMapsViaYams(from: text)
+        if proxies.isEmpty {
+            proxies = extractProxyMaps(from: text)
+        }
         guard !proxies.isEmpty else {
             throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks
         }
@@ -158,7 +164,70 @@ enum ClashYAMLAdapter {
         return proxy["plugin-opts"]
     }
 
+    // MARK: - Yams preferred path
+
+    private static func extractProxyMapsViaYams(from text: String) -> [[String: String]] {
+        #if canImport(Yams)
+        guard let root = try? Yams.compose(yaml: text),
+              let mapping = root.mapping,
+              let proxiesNode = mapping["proxies"],
+              let sequence = proxiesNode.sequence
+        else {
+            return []
+        }
+        var proxies: [[String: String]] = []
+        for item in sequence {
+            guard let proxyMapping = item.mapping else { continue }
+            let flat = flattenYamsMapping(proxyMapping)
+            if flat["type"] != nil, flat["server"] != nil {
+                proxies.append(flat)
+            }
+        }
+        return proxies
+        #else
+        return []
+        #endif
+    }
+
+    #if canImport(Yams)
+    private static func flattenYamsMapping(_ mapping: Node.Mapping, prefix: String = "") -> [String: String] {
+        var result: [String: String] = [:]
+        for (keyNode, valueNode) in mapping {
+            let keyLeaf = (keyNode.string ?? "").lowercased()
+            guard !keyLeaf.isEmpty else { continue }
+            let fullKey = prefix.isEmpty ? keyLeaf : "\(prefix).\(keyLeaf)"
+            if let nested = valueNode.mapping {
+                result.merge(flattenYamsMapping(nested, prefix: fullKey)) { _, new in new }
+            } else if let seq = valueNode.sequence {
+                let joined = seq.compactMap { yamsScalarString($0) }.joined(separator: ",")
+                result[fullKey] = joined
+                if prefix.isEmpty {
+                    result[keyLeaf] = joined
+                }
+            } else if let scalar = yamsScalarString(valueNode) {
+                let normalized = normalizeBoolString(scalar)
+                result[fullKey] = normalized
+                if prefix.isEmpty {
+                    result[keyLeaf] = normalized
+                }
+            }
+        }
+        return result
+    }
+
+    private static func yamsScalarString(_ node: Node) -> String? {
+        if let s = node.string { return s }
+        if let b = node.bool { return b ? "true" : "false" }
+        if let i = node.int { return String(i) }
+        if case let .scalar(scalar) = node {
+            return scalar.string
+        }
+        return nil
+    }
+    #endif
+
     /// Very small YAML subset parser for Clash `proxies:` list of maps, including nested opts.
+    /// Used when Yams is unavailable or returns an empty proxy list.
     private static func extractProxyMaps(from text: String) -> [[String: String]] {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         var inProxies = false

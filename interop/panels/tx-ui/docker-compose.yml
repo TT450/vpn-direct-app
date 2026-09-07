@@ -1,0 +1,15 @@
+# AghayeCoder install.sh is primary for VPS labs.
+# Compose uses Incognito-Coder community image for containerized export.
+services:
+  tx-ui:
+    image: ghcr.io/incognitocoder/tx-ui:latest
+    container_name: vpn-direct-tx-ui
+    profiles: ["lab"]
+    volumes:
+      - txui_db:/etc/x-ui
+      - txui_cert:/root/cert
+    network_mode: host
+    restart: unless-stopped
+volumes:
+  txui_db:
+  txui_cert:

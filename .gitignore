@@ -24,6 +24,7 @@ AGENTS.md
 .env
 .env.*
 /tests/fixtures/battle/
+/artifacts/battle/
 *.generated.uri
 *.generated.json
 *.generated.conf
@@ -32,4 +33,4 @@ AGENTS.md
 tests/VPNDirectParserPackage/.build/
 
 # Swift package test build
-tests/VPNDirectParserPackage/.build/
+/tests/fixtures/battle/cache/

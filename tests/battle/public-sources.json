@@ -1,0 +1,372 @@
+{
+  "schema_version": 1,
+  "updated": "2026-09-07",
+  "policy": {
+    "volatile": true,
+    "intentional_public_required": true,
+    "ssr_excluded": true,
+    "notes": "Dead public endpoints must not fail required CI. Use scripts/battle/check_public_sources_catalog.sh for offline validation."
+  },
+  "sources": [
+    {
+      "id": "morpheusadam-vless",
+      "protocol": "vless",
+      "variants": [
+        "tcp",
+        "tls",
+        "ws",
+        "grpc",
+        "reality",
+        "vision"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/morpheusadam/v2ray-config/main/subs/bundles/vless.txt",
+      "repository": "https://github.com/morpheusadam/v2ray-config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "Intentional free bundle; volatile."
+    },
+    {
+      "id": "morpheusadam-reality",
+      "protocol": "vless",
+      "variants": [
+        "reality"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/morpheusadam/v2ray-config/main/subs/bundles/reality.txt",
+      "repository": "https://github.com/morpheusadam/v2ray-config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "Reality-focused bundle."
+    },
+    {
+      "id": "morpheusadam-vmess",
+      "protocol": "vmess",
+      "variants": [
+        "tcp",
+        "ws",
+        "tls"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/morpheusadam/v2ray-config/main/subs/bundles/vmess.txt",
+      "repository": "https://github.com/morpheusadam/v2ray-config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "morpheusadam-trojan",
+      "protocol": "trojan",
+      "variants": [
+        "tls",
+        "ws"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/morpheusadam/v2ray-config/main/subs/bundles/trojan.txt",
+      "repository": "https://github.com/morpheusadam/v2ray-config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "morpheusadam-shadowsocks",
+      "protocol": "shadowsocks",
+      "variants": [
+        "classic",
+        "2022"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/morpheusadam/v2ray-config/main/subs/bundles/shadowsocks.txt",
+      "repository": "https://github.com/morpheusadam/v2ray-config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "morpheusadam-hysteria2",
+      "protocol": "hysteria2",
+      "variants": [
+        "plain",
+        "salamander"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/morpheusadam/v2ray-config/main/subs/bundles/hysteria2.txt",
+      "repository": "https://github.com/morpheusadam/v2ray-config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "morpheusadam-tuic",
+      "protocol": "tuic",
+      "variants": [
+        "v5"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/morpheusadam/v2ray-config/main/subs/bundles/tuic.txt",
+      "repository": "https://github.com/morpheusadam/v2ray-config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "morpheusadam-wireguard",
+      "protocol": "wireguard",
+      "variants": [
+        "udp"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/morpheusadam/v2ray-config/main/subs/bundles/wireguard.txt",
+      "repository": "https://github.com/morpheusadam/v2ray-config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "morpheusadam-mini",
+      "protocol": "mixed",
+      "variants": [
+        "mixed"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/morpheusadam/v2ray-config/main/subs/bundles/mini.txt",
+      "repository": "https://github.com/morpheusadam/v2ray-config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "Small mixed bundle for smoke."
+    },
+    {
+      "id": "morpheusadam-best",
+      "protocol": "mixed",
+      "variants": [
+        "mixed"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/morpheusadam/v2ray-config/main/subs/bundles/best.txt",
+      "repository": "https://github.com/morpheusadam/v2ray-config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "Curated mixed; volatile."
+    },
+    {
+      "id": "0xradikal-vless",
+      "protocol": "vless",
+      "variants": [
+        "tcp",
+        "tls",
+        "ws",
+        "grpc",
+        "reality",
+        "vision"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/protocols/vless.txt",
+      "repository": "https://github.com/0xRadikal/Free-v2ray-Configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "Discovered via index.json protocol_files; intentional free aggregator."
+    },
+    {
+      "id": "0xradikal-vmess",
+      "protocol": "vmess",
+      "variants": [
+        "tcp",
+        "ws",
+        "tls"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/protocols/vmess.txt",
+      "repository": "https://github.com/0xRadikal/Free-v2ray-Configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "0xradikal-trojan",
+      "protocol": "trojan",
+      "variants": [
+        "tls",
+        "ws"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/protocols/trojan.txt",
+      "repository": "https://github.com/0xRadikal/Free-v2ray-Configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "0xradikal-shadowsocks",
+      "protocol": "shadowsocks",
+      "variants": [
+        "classic",
+        "2022"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/protocols/shadowsocks.txt",
+      "repository": "https://github.com/0xRadikal/Free-v2ray-Configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "SSR protocol file excluded from catalog."
+    },
+    {
+      "id": "0xradikal-hysteria2",
+      "protocol": "hysteria2",
+      "variants": [
+        "plain",
+        "salamander"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/protocols/hysteria2.txt",
+      "repository": "https://github.com/0xRadikal/Free-v2ray-Configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "0xradikal-tuic",
+      "protocol": "tuic",
+      "variants": [
+        "v5"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/protocols/tuic.txt",
+      "repository": "https://github.com/0xRadikal/Free-v2ray-Configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "0xradikal-anytls",
+      "protocol": "anytls",
+      "variants": [
+        "current"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/protocols/anytls.txt",
+      "repository": "https://github.com/0xRadikal/Free-v2ray-Configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "0xradikal-light",
+      "protocol": "mixed",
+      "variants": [
+        "mixed"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/light/configs.txt",
+      "repository": "https://github.com/0xRadikal/Free-v2ray-Configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "Smaller mixed set for CI-scheduled smoke."
+    },
+    {
+      "id": "0xradikal-verified",
+      "protocol": "mixed",
+      "variants": [
+        "mixed"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/verified/configs.txt",
+      "repository": "https://github.com/0xRadikal/Free-v2ray-Configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "Aggregator-verified slice; still volatile for us."
+    },
+    {
+      "id": "0xradikal-index",
+      "protocol": "mixed",
+      "variants": [
+        "index"
+      ],
+      "source_type": "api",
+      "url": "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/index.json",
+      "repository": "https://github.com/0xRadikal/Free-v2ray-Configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "Discovery index only — not parsed as share links."
+    },
+    {
+      "id": "epodonios-all",
+      "protocol": "mixed",
+      "variants": [
+        "mixed"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/All_Configs_Sub.txt",
+      "repository": "https://github.com/Epodonios/v2ray-configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "README advertises free auto-updated configs (MIT)."
+    },
+    {
+      "id": "epodonios-vless",
+      "protocol": "vless",
+      "variants": [
+        "tcp",
+        "tls",
+        "ws",
+        "reality"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/vless.txt",
+      "repository": "https://github.com/Epodonios/v2ray-configs",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": ""
+    },
+    {
+      "id": "delta-kronecker-warp-all",
+      "protocol": "warp",
+      "variants": [
+        "masque",
+        "wireguard"
+      ],
+      "source_type": "subscription",
+      "url": "https://raw.githubusercontent.com/Delta-Kronecker/WARP-Config/main/ALL.txt",
+      "repository": "https://github.com/Delta-Kronecker/WARP-Config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "Intentional public WARP configs for parser stress; live Cloudflare = external."
+    },
+    {
+      "id": "delta-kronecker-warp-clash",
+      "protocol": "warp",
+      "variants": [
+        "clash"
+      ],
+      "source_type": "clash",
+      "url": "https://raw.githubusercontent.com/Delta-Kronecker/WARP-Config/main/ALL.yaml",
+      "repository": "https://github.com/Delta-Kronecker/WARP-Config",
+      "volatile": true,
+      "intentional_public": true,
+      "last_verified": "2026-09-07",
+      "notes": "Clash subscription of WARP profiles."
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+> **Canonical lab:** [`../protocols/hysteria/`](../protocols/hysteria/)
+
 # Interop — Hysteria / Hysteria2
 
 ## Inject battle keys

@@ -1,0 +1,8 @@
+# Prefer host danted/tinyproxy/sshd for real auth variants; compose is optional.
+services:
+  socks-lab:
+    image: alpine:3.20
+    profiles: ["lab"]
+    command: ["sh", "-c", "echo 'Install local socks per README'; sleep infinity"]
+    ports:
+      - "1080:1080"

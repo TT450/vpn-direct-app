@@ -15,7 +15,7 @@ Status legend: `DONE` | `PARTIAL` | `MISSING` | `UNPROVEN`
 | TheTochka harvest P0 | DONE | locations, HY2, Auto, dedupe, dialerProxy→detour |
 | Content detector | DONE | JSON / YAML / conf / URI / base64; SSR not false-uriList |
 | Universal URI parsers | DONE | multi-scheme + Swift XCTest golden |
-| Clash YAML import | PARTIAL | nested Reality/WS/gRPC hardened; no Yams SPM |
+| Clash YAML import | DONE | Yams SPM preferred; hardened subset fallback |
 | Xray JSON adapter | DONE | attributes-only flatten; leaf transports; convert-miss fail-closed |
 | Compatibility field policy | DONE | fail-closed critical unknowns (incl. stream dumps) |
 | Subscription HTTP metadata | DONE | announce / support / routing / ETag / 304 |
@@ -23,7 +23,7 @@ Status legend: `DONE` | `PARTIAL` | `MISSING` | `UNPROVEN`
 | Panel dossiers (12) | DONE | remnawave … amnezia |
 | Panel fixtures corpus | DONE | sanitized shapes under `tests/fixtures/panels/*` |
 | `core/panel-compatibility.json` | DONE | researched + `fixtures:true` |
-| Panel interop scaffolds | PARTIAL | `interop/panels/{8}/`; no live evidence |
+| Panel interop scaffolds | DONE | `interop/panels/` all 12 |
 | Protocol matrix sync | DONE | JSON SoT + `check_matrix_sync` (20 protocols) |
 | Device qualification | UNPROVEN | schema + RSS hint; checklist empty until battle |
 | Release gate scripts | DONE | prepare_core + panel + matrix + Swift tests |
@@ -34,15 +34,15 @@ Status legend: `DONE` | `PARTIAL` | `MISSING` | `UNPROVEN`
 | --- | --- | --- | --- | --- |
 | remnawave | deep | rich (JSON/base64/clash/HWID/unknown) | yes | researched |
 | 3x-ui | deep | raw/base64/xray/clash/Routing | yes | researched |
-| x-ui / tx-ui | deep | twin raw_links + headers | no | researched |
+| x-ui / tx-ui | deep | twin raw_links + headers | yes | researched |
 | marzban | deep | uri/clash/singbox | yes | researched |
 | marzneshin | deep | mixed vless+hy2 | yes | researched |
 | pasarguard | deep | vless+wireguard | yes | researched |
 | hiddify | deep | base64/clash/userinfo | yes | researched |
 | libertea | deep | groups Clash | yes | researched |
 | s-ui | deep | sing-box JSON | yes | researched |
-| wg-easy | deep | peer.conf | no | researched |
-| amnezia | deep | awg2 Jc/Jmin/Jmax | no | researched (AWG partial in Core) |
+| wg-easy | deep | peer.conf | yes | researched |
+| amnezia | deep | awg2 Jc/Jmin/Jmax | yes | researched (AWG partial in Core) |
 
 ## Truth rules (unchanged)
 

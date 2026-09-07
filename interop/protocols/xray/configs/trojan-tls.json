@@ -1,0 +1,12 @@
+{
+  "log": { "loglevel": "warning" },
+  "inbounds": [{
+    "port": 443, "protocol": "trojan",
+    "settings": { "clients": [{ "password": "lab-trojan-password" }] },
+    "streamSettings": {
+      "network": "tcp", "security": "tls",
+      "tlsSettings": { "certificates": [{ "certificateFile": "/etc/xray/server.crt", "keyFile": "/etc/xray/server.key" }] }
+    }
+  }],
+  "outbounds": [{ "protocol": "freedom" }]
+}

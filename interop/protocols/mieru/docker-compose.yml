@@ -1,0 +1,8 @@
+services:
+  mita:
+    image: enfein/mieru:latest
+    profiles: ["lab"]
+    ports:
+      - "8964:8964"
+    volumes:
+      - ./configs/server-tcp.json:/etc/mieru/server.json:ro

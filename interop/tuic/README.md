@@ -1,3 +1,5 @@
+> **Canonical lab:** [`../protocols/tuic/`](../protocols/tuic/)
+
 # Interop — tuic
 
 ## Case template

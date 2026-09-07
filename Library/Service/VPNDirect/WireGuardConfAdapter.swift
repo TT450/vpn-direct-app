@@ -1,8 +1,8 @@
 import Foundation
 
 /// Imports WireGuard / AmneziaWG `.conf` into NormalizedSubscription.
-enum WireGuardConfAdapter {
-    static func parse(_ text: String, amneziaVersion: String? = nil) throws -> NormalizedSubscription {
+public enum WireGuardConfAdapter {
+    public static func parse(_ text: String, amneziaVersion: String? = nil) throws -> NormalizedSubscription {
         let version = amneziaVersion ?? (text.lowercased().contains("jc") || text.lowercased().contains("h1") ? "2" : "2")
         let options = try AmneziaWGEndpointOptions.parseConf(text, amneziaVersion: version)
         guard let peer = options.peers.first, let endpoint = peer.endpoint, !endpoint.isEmpty else {

@@ -68,7 +68,7 @@
       },
       "evidence": {
         "fixtures": true,
-        "interop": false,
+        "interop": true,
         "device": false
       },
       "dossier": "docs/compatibility/panels/x-ui.md"
@@ -94,7 +94,7 @@
       },
       "evidence": {
         "fixtures": true,
-        "interop": false,
+        "interop": true,
         "device": false
       },
       "dossier": "docs/compatibility/panels/tx-ui.md"
@@ -253,7 +253,7 @@
       },
       "evidence": {
         "fixtures": true,
-        "interop": false,
+        "interop": true,
         "device": false
       },
       "dossier": "docs/compatibility/panels/wg-easy.md"
@@ -276,7 +276,7 @@
       },
       "evidence": {
         "fixtures": true,
-        "interop": false,
+        "interop": true,
         "device": false
       },
       "dossier": "docs/compatibility/panels/amnezia.md"

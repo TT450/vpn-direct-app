@@ -6,7 +6,7 @@ INSTALLER_SIGN_IDENTITY := 16480CA444F481F8DEAF9421FAD2CCE590FC54E4
 XCODEBUILD_FLAGS ?=
 ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
-.PHONY: core-bootstrap prepare-core libbox libbox-backup-stock libbox-restore-stock libbox-install check-fixtures check-abi check-capability-proofs check-production-ready check-parser-execution check-matrix-sync check-swift-parser-tests
+.PHONY: core-bootstrap prepare-core libbox libbox-backup-stock libbox-restore-stock libbox-install check-fixtures check-battle-catalog check-abi check-capability-proofs check-production-ready check-parser-execution check-matrix-sync check-swift-parser-tests
 
 core-bootstrap:
 	"$(ROOT)/scripts/bootstrap_core.sh"
@@ -44,6 +44,9 @@ libbox-restore-stock:
 	ditto "$(ROOT)/Libbox.xcframework.stock" "$(ROOT)/Libbox.xcframework"
 	@echo "Restored stock Libbox.xcframework"
 
+check-battle-catalog:
+	"$(ROOT)/scripts/battle/check_public_sources_catalog.sh"
+
 check-fixtures:
 	"$(ROOT)/scripts/prepare_core.sh"
 	"$(ROOT)/scripts/check_fixtures.sh"
@@ -53,6 +56,7 @@ check-fixtures:
 	"$(ROOT)/scripts/check_panel_compatibility.sh"
 	"$(ROOT)/scripts/check_matrix_sync.sh"
 	"$(ROOT)/scripts/check_swift_parser_tests.sh"
+	"$(ROOT)/scripts/battle/check_public_sources_catalog.sh"
 
 check-parser-execution:
 	"$(ROOT)/scripts/check_parser_execution.sh"

@@ -1,0 +1,8 @@
+services:
+  xray:
+    image: teddysun/xray:latest
+    profiles: ["lab"]
+    volumes:
+      - ./configs/vless-reality-ws.json:/etc/xray/config.json:ro
+    ports:
+      - "10443:443"

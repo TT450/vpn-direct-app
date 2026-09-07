@@ -1,3 +1,5 @@
+> **Canonical lab:** [`../protocols/masque/`](../protocols/masque/)
+
 # Interop — masque
 
 ## Case template

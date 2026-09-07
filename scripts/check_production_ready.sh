@@ -84,4 +84,4 @@ if [[ "${fail}" -ne 0 ]]; then
   echo "check_production_ready FAILED" >&2
   exit 1
 fi
-echo "check_production_ready OK (qualification_ready; interop/device still required for tested)"
+echo "check_production_ready OK (qualification_ready / implementation_ready; interop/device still required for tested)"

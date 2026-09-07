@@ -1,0 +1,5 @@
+{
+  "listen": "0.0.0.0:443",
+  "password": "lab-anytls-password",
+  "padding_scheme": []
+}

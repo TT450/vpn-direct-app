@@ -1,3 +1,5 @@
+> **Canonical lab:** [`../protocols/amneziawg/`](../protocols/amneziawg/)
+
 # Interop — AmneziaWG
 
 ## Inject battle keys

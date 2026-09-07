@@ -1,3 +1,5 @@
+> **Canonical lab:** [`../protocols/mieru/`](../protocols/mieru/)
+
 # Interop — Mieru (mita)
 
 Requires Core built with `with_mieru` (enabled in `scripts/tags/vpn_direct_*.tags` as of v1.0.6).

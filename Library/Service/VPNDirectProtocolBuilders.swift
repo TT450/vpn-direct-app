@@ -371,6 +371,32 @@ public struct MasqueOutboundOptions: Equatable, Sendable {
     }
 }
 
+/// Structured import failure metadata for UI / diagnostics (does not replace enum cases).
+public struct VPNDirectImportFailure: Equatable, Sendable {
+    public var ecosystem: String?
+    public var format: String?
+    public var protocolID: String?
+    public var field: String?
+    public var retryable: Bool
+    public var detail: String
+
+    public init(
+        ecosystem: String? = nil,
+        format: String? = nil,
+        protocolID: String? = nil,
+        field: String? = nil,
+        retryable: Bool,
+        detail: String
+    ) {
+        self.ecosystem = ecosystem
+        self.format = format
+        self.protocolID = protocolID
+        self.field = field
+        self.retryable = retryable
+        self.detail = detail
+    }
+}
+
 /// Normalized Core-facing errors for UI (v2).
 public enum VPNDirectCoreError: LocalizedError {
     case unsupportedFeature(component: String, detail: String)
@@ -396,21 +422,94 @@ public enum VPNDirectCoreError: LocalizedError {
     }
 
     public var debugDescription: String {
+        let failure = asImportFailure()
+        let head: String
+        switch self {
+        case let .unsupportedFeature(component, _):
+            head = "unsupportedFeature(\(component))"
+        case let .malformedConfig(component, _):
+            head = "malformedConfig(\(component))"
+        case .coreError:
+            head = "coreError"
+        case let .coreRejected(ecosystem, protocolID, _):
+            head = "coreRejected ecosystem=\(ecosystem ?? "-") protocol=\(protocolID ?? "-")"
+        case let .unsupportedTransport(transport, _):
+            head = "unsupportedTransport(\(transport))"
+        case let .unsupportedSecurity(security, _):
+            head = "unsupportedSecurity(\(security))"
+        }
+        if let field = failure.field, !field.isEmpty {
+            return VPNDirectRedactor.redact("\(head) field=\(field): \(failure.detail)")
+        }
+        return VPNDirectRedactor.redact("\(head): \(failure.detail)")
+    }
+
+    /// Map this error into structured import failure metadata without changing throw sites.
+    public func asImportFailure(
+        ecosystem: String? = nil,
+        format: String? = nil,
+        protocolID: String? = nil,
+        field: String? = nil
+    ) -> VPNDirectImportFailure {
         switch self {
         case let .unsupportedFeature(component, detail):
-            return VPNDirectRedactor.redact("unsupportedFeature(\(component)): \(detail)")
+            return VPNDirectImportFailure(
+                ecosystem: ecosystem,
+                format: format ?? component,
+                protocolID: protocolID ?? component,
+                field: field,
+                retryable: false,
+                detail: detail
+            )
         case let .malformedConfig(component, detail):
-            return VPNDirectRedactor.redact("malformedConfig(\(component)): \(detail)")
+            return VPNDirectImportFailure(
+                ecosystem: ecosystem,
+                format: format ?? component,
+                protocolID: protocolID,
+                field: field,
+                retryable: false,
+                detail: detail
+            )
         case let .coreError(detail):
-            return VPNDirectRedactor.redact("coreError: \(detail)")
-        case let .coreRejected(ecosystem, protocolID, detail):
-            return VPNDirectRedactor.redact(
-                "coreRejected ecosystem=\(ecosystem ?? "-") protocol=\(protocolID ?? "-"): \(detail)"
+            return VPNDirectImportFailure(
+                ecosystem: ecosystem,
+                format: format,
+                protocolID: protocolID,
+                field: field,
+                retryable: true,
+                detail: detail
+            )
+        case let .coreRejected(eco, proto, detail):
+            return VPNDirectImportFailure(
+                ecosystem: ecosystem ?? eco,
+                format: format,
+                protocolID: protocolID ?? proto,
+                field: field,
+                retryable: false,
+                detail: detail
             )
         case let .unsupportedTransport(transport, detail):
-            return VPNDirectRedactor.redact("unsupportedTransport(\(transport)): \(detail)")
+            return VPNDirectImportFailure(
+                ecosystem: ecosystem,
+                format: format,
+                protocolID: protocolID,
+                field: field ?? "transport",
+                retryable: false,
+                detail: "\(transport): \(detail)"
+            )
         case let .unsupportedSecurity(security, detail):
-            return VPNDirectRedactor.redact("unsupportedSecurity(\(security)): \(detail)")
+            return VPNDirectImportFailure(
+                ecosystem: ecosystem,
+                format: format,
+                protocolID: protocolID,
+                field: field ?? "security",
+                retryable: false,
+                detail: "\(security): \(detail)"
+            )
         }
+    }
+
+    public var importFailure: VPNDirectImportFailure {
+        asImportFailure()
     }
 }

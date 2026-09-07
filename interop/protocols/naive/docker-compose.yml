@@ -1,0 +1,6 @@
+# NaiveProxy typically needs Caddy with forwardproxy — image varies; use install notes.
+services:
+  naive-notes:
+    image: alpine:3.20
+    profiles: ["lab"]
+    command: ["sh", "-c", "echo 'See README + configs/Caddyfile.example'; sleep infinity"]

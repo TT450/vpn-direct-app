@@ -1,0 +1,8 @@
+# Prefer host danted/tinyproxy/sshd for real auth variants; compose is optional.
+services:
+  http-lab:
+    image: alpine:3.20
+    profiles: ["lab"]
+    command: ["sh", "-c", "echo 'Install local http per README'; sleep infinity"]
+    ports:
+      - "8080:8080"

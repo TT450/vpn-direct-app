@@ -4,8 +4,8 @@ import Foundation
 ///
 /// Converted leaf outbounds are flattened into `NormalizedNode.attributes` and rebuilt by
 /// `UniversalOutboundBuilder` (no LEGACY `outbound` attachment for new Xray imports).
-enum XrayJSONAdapter {
-    static func parse(_ content: String) throws -> NormalizedSubscription {
+public enum XrayJSONAdapter {
+    public static func parse(_ content: String) throws -> NormalizedSubscription {
         guard let data = content.data(using: .utf8),
               let profiles = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
         else {

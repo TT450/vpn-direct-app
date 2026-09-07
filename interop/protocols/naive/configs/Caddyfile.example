@@ -1,0 +1,13 @@
+# Example only — requires caddy-forwardproxy / naive-compatible build.
+:443, www.example.com {
+  route {
+    forward_proxy {
+      basic_auth lab lab-naive-password
+      hide_ip
+      hide_via
+      probe_resistance
+    }
+    file_server
+  }
+  tls internal
+}
