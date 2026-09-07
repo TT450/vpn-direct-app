@@ -28,8 +28,8 @@ public enum MieruConfigAdapter {
         let location = NormalizedLocation(
             id: "mieru",
             name: "Mieru",
-            kind: .country,
-            strategy: endpoints.count > 1 ? .urltest : .single,
+            kind: .group,
+            strategy: endpoints.count > 1 ? .select : .single,
             endpoints: endpoints
         )
         return NormalizedSubscription(name: "Mieru", locations: [location])

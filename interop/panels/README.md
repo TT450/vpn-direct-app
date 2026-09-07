@@ -8,7 +8,8 @@ interop/panels/<panel>/
   VERSION
   docker-compose.yml   # or install notes when Docker is impractical
   .env.example
-  run.sh               # echoes how to export subscription
+  run.sh                 # echoes how to export subscription
+  export-subscription.sh # thin wrapper → exec run.sh
   evidence/.gitkeep
 ```
 

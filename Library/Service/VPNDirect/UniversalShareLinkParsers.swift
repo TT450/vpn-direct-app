@@ -291,17 +291,44 @@ public struct WireGuardShareLinkParser: VPNDirectParser {
         if let pk = url.user?.removingPercentEncoding ?? url.user, !pk.isEmpty {
             attrs["private_key"] = pk
         }
-        if isAWG, attrs["amnezia_version"] == nil {
-            attrs["amnezia_version"] = "2"
-        }
+        let privateKey = attrs["private_key"] ?? ""
+        let peerKey = attrs["peer_public_key"] ?? attrs["public_key"] ?? attrs["public-key"] ?? ""
+        let local = (attrs["local_address"] ?? attrs["address"] ?? attrs["ip"] ?? "10.0.0.2/32")
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        let forced = attrs["amnezia_version"]
+        let options = try AmneziaWGEndpointOptions.fromFlatAttributes(
+            privateKey: privateKey,
+            peerPublicKey: peerKey,
+            localAddress: Array(local),
+            peerEndpoint: "\(host):\(port)",
+            preSharedKey: attrs["pre_shared_key"] ?? attrs["preshared_key"],
+            mtu: attrs["mtu"].flatMap(Int.init),
+            attributes: attrs,
+            forcedVersion: forced,
+            claimedAWG: isAWG && forced == nil
+        )
+        let inferred = try AmneziaWGEndpointOptions.inferAmneziaVersion(
+            from: options,
+            forced: forced,
+            claimedAWG: isAWG && forced == nil
+        )
+        var finalOptions = options
+        if let inferred { finalOptions.amneziaVersion = inferred }
+        let useAWG = inferred != nil || isAWG
+        if useAWG { attrs["amnezia_version"] = finalOptions.amneziaVersion }
+        attrs["private_key"] = privateKey
+        attrs["peer_public_key"] = peerKey
+        attrs["local_address"] = local.joined(separator: ",")
         return NormalizedNode(
-            name: ShareLinkURI.fragmentName(from: url, fallback: isAWG ? "AmneziaWG" : "WireGuard"),
-            protocolID: isAWG ? .amneziawg : .wireguard,
+            name: ShareLinkURI.fragmentName(from: url, fallback: useAWG ? "AmneziaWG" : "WireGuard"),
+            protocolID: useAWG ? .amneziawg : .wireguard,
             server: host,
             port: port,
             transport: VPNDirectTransportID(rawValue: "udp"),
             attributes: attrs,
-            source: trimmed
+            source: trimmed,
+            wireguardEndpoint: finalOptions
         )
     }
 }

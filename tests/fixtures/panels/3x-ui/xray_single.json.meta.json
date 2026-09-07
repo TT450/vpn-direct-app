@@ -1,0 +1,9 @@
+{
+  "panel": "3x-ui",
+  "upstream": "https://github.com/MHSanaei/3x-ui",
+  "commit": "fixture-legacy",
+  "generator": "xray_single nested vnext",
+  "format": "json",
+  "captured_from_generator": false,
+  "sanitized": true
+}

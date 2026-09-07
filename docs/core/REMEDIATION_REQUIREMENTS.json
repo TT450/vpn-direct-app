@@ -1,0 +1,3066 @@
+{
+  "meta": {
+    "generated": "2026-09-07",
+    "source": "master_prompt_union",
+    "count": 217
+  },
+  "requirements": [
+    {
+      "id": "REQ-P001",
+      "canonical": "WIREGUARD / AMNEZIAWG СЕЙЧАС СТРОЯТСЯ НЕПРАВИЛЬНО",
+      "sources": [
+        "v08:#1"
+      ],
+      "severity": "P0",
+      "plan_pass": 2,
+      "area": "Library/Service/VPNDirect/WireGuardConfAdapter.swift;Library/Service/VPNDirectProtocolBuilders.swift;Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #1 resolved with regression coverage: WIREGUARD / AMNEZIAWG СЕЙЧАС СТРОЯТСЯ НЕПРАВИЛЬНО",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "UniversalOutboundBuilder+SingBoxGraphBuilder emit endpoints[]; WireGuardEndpointTests"
+    },
+    {
+      "id": "REQ-P002",
+      "canonical": "WIREGUARD / AWG NORMALIZATION ТЕРЯЕТ ДАННЫЕ",
+      "sources": [
+        "v08:#2"
+      ],
+      "severity": "P0",
+      "plan_pass": 2,
+      "area": "Library/Service/VPNDirect/WireGuardConfAdapter.swift;Library/Service/VPNDirect/NormalizedNode.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #2 resolved with regression coverage: WIREGUARD / AWG NORMALIZATION ТЕРЯЕТ ДАННЫЕ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "WireGuardConfAdapter multi-peer + wireguardEndpoint; WireGuardEndpointTests"
+    },
+    {
+      "id": "REQ-P003",
+      "canonical": "AWG VERSION DETECTION СЕЙЧАС СЛОМАН",
+      "sources": [
+        "v08:#3"
+      ],
+      "severity": "P0",
+      "plan_pass": 2,
+      "area": "Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #3 resolved with regression coverage: AWG VERSION DETECTION СЕЙЧАС СЛОМАН",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "honest AWG inference; tautology removed; WireGuardEndpointTests"
+    },
+    {
+      "id": "REQ-P004",
+      "canonical": "BATTLE TEST СЕЙЧАС НЕ ДОЛЖЕН МАСКИРОВАТЬ PRODUCTION BUGS",
+      "sources": [
+        "v08:#4"
+      ],
+      "severity": "P0",
+      "plan_pass": 2,
+      "area": "tests/VPNDirectParserPackage/Sources/BattleParse/BattleParse.swift;Library/Service/VPNDirect/WireGuardConfAdapter.swift",
+      "acceptance": "Problem #4 resolved with regression coverage: BATTLE TEST СЕЙЧАС НЕ ДОЛЖЕН МАСКИРОВАТЬ PRODUCTION BUGS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "BattleParse refuses legacy WG wrap; production graph only"
+    },
+    {
+      "id": "REQ-P005",
+      "canonical": "SILENT DROP В SingBoxGraphBuilder",
+      "sources": [
+        "v08:#5"
+      ],
+      "severity": "P0",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #5 resolved with regression coverage: SILENT DROP В SingBoxGraphBuilder",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SingBoxGraphBuilder GraphResult.rejected/warnings; no catch-continue"
+    },
+    {
+      "id": "REQ-P006",
+      "canonical": "XRAY / REMNAWAVE PARTIAL FAILURE",
+      "sources": [
+        "v08:#6"
+      ],
+      "severity": "P0",
+      "plan_pass": 2,
+      "area": "Library/Service/VPNDirect/XrayJSONAdapter.swift;tests/VPNDirectParserPackage/Tests/XrayAndFailClosedTests.swift",
+      "acceptance": "Problem #6 resolved with regression coverage: XRAY / REMNAWAVE PARTIAL FAILURE",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Xray convertFailures surfaced; independent leaves warn; topology-aware abort"
+    },
+    {
+      "id": "REQ-P007",
+      "canonical": "XRAY BALANCER НОРМАЛИЗУЕТСЯ НЕПРАВИЛЬНО",
+      "sources": [
+        "v08:#7"
+      ],
+      "severity": "P0",
+      "plan_pass": 2,
+      "area": "Library/Service/VPNDirect/XrayJSONAdapter.swift;tests/fixtures/panels/remnawave/xray_balancer_random_unsupported.json",
+      "acceptance": "Problem #7 resolved with regression coverage: XRAY BALANCER НОРМАЛИЗУЕТСЯ НЕПРАВИЛЬНО",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "applyBalancers leastPing/selector; random fail-closed; XrayAndFailClosedTests"
+    },
+    {
+      "id": "REQ-P008",
+      "canonical": "НЕПРАВИЛЬНЫЙ DEDUPE",
+      "sources": [
+        "v08:#8"
+      ],
+      "severity": "P0",
+      "plan_pass": 2,
+      "area": "Library/Service/VPNDirect/NormalizedNode.swift;Library/Service/VPNDirect/XrayJSONAdapter.swift",
+      "acceptance": "Problem #8 resolved with regression coverage: НЕПРАВИЛЬНЫЙ DEDUPE",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "leafFingerprint includes flow/encryption/sid/host/extra"
+    },
+    {
+      "id": "REQ-P009",
+      "canonical": "3X-UI REAL JSON COMPATIBILITY",
+      "sources": [
+        "v08:#9"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #9 resolved with regression coverage: 3X-UI REAL JSON COMPATIBILITY",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Xray flat settings.address/port/id + xray_flat_settings.json; RemnawaveHTTPClassifierTests"
+    },
+    {
+      "id": "REQ-P010",
+      "canonical": "FIXTURES ДОЛЖНЫ БЫТЬ SOURCE-DERIVED, А НЕ PARSER-DERIVED",
+      "sources": [
+        "v08:#10"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #10 resolved with regression coverage: FIXTURES ДОЛЖНЫ БЫТЬ SOURCE-DERIVED, А НЕ PARSER-DERIVED",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "fixture.meta.json / *.meta.json provenance for 3x-ui/libertea/remnawave/hiddify"
+    },
+    {
+      "id": "REQ-P011",
+      "canonical": "XRAY VLESS UNKNOWN TRANSPORT МОЖЕТ ТИХО СТАТЬ TCP",
+      "sources": [
+        "v08:#11"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #11 resolved with regression coverage: XRAY VLESS UNKNOWN TRANSPORT МОЖЕТ ТИХО СТАТЬ TCP",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "XrayVLESSConverter unknown transport returns nil; VLESS kcp fail-closed tests"
+    },
+    {
+      "id": "REQ-P012",
+      "canonical": "VLESS ENCRYPTION / PQ НЕ ДОЛЖНЫ ТИХО ИСЧЕЗАТЬ",
+      "sources": [
+        "v08:#12"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #12 resolved with regression coverage: VLESS ENCRYPTION / PQ НЕ ДОЛЖНЫ ТИХО ИСЧЕЗАТЬ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "encryption fail-closed without capability; legacy outbound path too; XrayAndFailClosedTests"
+    },
+    {
+      "id": "REQ-P013",
+      "canonical": "XRAY FORMAT SUPPORT НЕ ДОЛЖЕН БЫТЬ ИСКУССТВЕННО УЗКИМ",
+      "sources": [
+        "v08:#13"
+      ],
+      "severity": "P1",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #13 resolved with regression coverage: XRAY FORMAT SUPPORT НЕ ДОЛЖЕН БЫТЬ ИСКУССТВЕННО УЗКИМ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Xray enumerates all outbounds with unsupported_protocol diagnostics; REQ-P089"
+    },
+    {
+      "id": "REQ-P014",
+      "canonical": "URI LIST PARTIAL IMPORT ТОЖЕ SILENT",
+      "sources": [
+        "v08:#14"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #14 resolved with regression coverage: URI LIST PARTIAL IMPORT ТОЖЕ SILENT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SubscriptionConfigBuilder.Result diagnostics+partialImportSummary; Xray importWarnings"
+    },
+    {
+      "id": "REQ-P015",
+      "canonical": "PROTOCOL SUPPORT != FORMAT SUPPORT",
+      "sources": [
+        "v08:#15"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #15 resolved with regression coverage: PROTOCOL SUPPORT != FORMAT SUPPORT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "core/protocol-format-matrix.json honest protocol×format cells"
+    },
+    {
+      "id": "REQ-P016",
+      "canonical": "CLASH / MIHOMO — SYNTAX УЖЕ YAMS, НО SEMANTICS НЕ ПОЛНЫЕ",
+      "sources": [
+        "v08:#16"
+      ],
+      "severity": "P1",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #16 resolved with regression coverage: CLASH / MIHOMO — SYNTAX УЖЕ YAMS, НО SEMANTICS НЕ ПОЛНЫЕ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "ClashYAMLAdapter proxy-groups select/fallback/url-test/load-balance; ClashProxyGroupsTests"
+    },
+    {
+      "id": "REQ-P017",
+      "canonical": "LIBERTEA FAILOVER SEMANTICS",
+      "sources": [
+        "v08:#17"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #17 resolved with regression coverage: LIBERTEA FAILOVER SEMANTICS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Libertea nested failover fixture + ClashProxyGroupsTests"
+    },
+    {
+      "id": "REQ-P018",
+      "canonical": "HIDDIFY SMART GROUPS / ROUTING",
+      "sources": [
+        "v08:#18"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #18 resolved with regression coverage: HIDDIFY SMART GROUPS / ROUTING",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "hiddify smart_proxy_status=nodes_only in panel-compatibility.json"
+    },
+    {
+      "id": "REQ-P019",
+      "canonical": "ROUTING HEADER / PANEL ROUTING СЕЙЧАС МОЖЕТ ТОЛЬКО СОХРАНЯТЬСЯ КАК METADATA",
+      "sources": [
+        "v08:#19"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #19 resolved with regression coverage: ROUTING HEADER / PANEL ROUTING СЕЙЧАС МОЖЕТ ТОЛЬКО СОХРАНЯТЬСЯ КАК METADATA",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "routing metadata → GraphBuilder ignored-with-warning; XrayAndFailClosedTests"
+    },
+    {
+      "id": "REQ-P020",
+      "canonical": "HTTP SUBSCRIPTION LAYER — НЕ СЛАТЬ HWID ВСЕМ ПОДРЯД",
+      "sources": [
+        "v08:#20"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #20 resolved with regression coverage: HTTP SUBSCRIPTION LAYER — НЕ СЛАТЬ HWID ВСЕМ ПОДРЯД",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SubscriptionHTTP generic-first; HWID only Happ/panel-negotiated mode"
+    },
+    {
+      "id": "REQ-P021",
+      "canonical": "REDIRECT HEADER LEAK",
+      "sources": [
+        "v08:#21"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #21 resolved with regression coverage: REDIRECT HEADER LEAK",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-origin redirect strips sensitive headers; origin=scheme+host+port"
+    },
+    {
+      "id": "REQ-P022",
+      "canonical": "HTTP ERROR BODY / REMNAWAVE RESPONSE RULES",
+      "sources": [
+        "v08:#22"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #22 resolved with regression coverage: HTTP ERROR BODY / REMNAWAVE RESPONSE RULES",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "VPNDirectSubscriptionHTTPClassifier + RemnawaveHTTPClassifierTests"
+    },
+    {
+      "id": "REQ-P023",
+      "canonical": "SUBSCRIPTION DOWNLOAD SIZE LIMIT",
+      "sources": [
+        "v08:#23"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #23 resolved with regression coverage: SUBSCRIPTION DOWNLOAD SIZE LIMIT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "streaming 32MB subscription body cap before full allocate"
+    },
+    {
+      "id": "REQ-P024",
+      "canonical": "URL SCHEME / FETCH VALIDATION",
+      "sources": [
+        "v08:#24"
+      ],
+      "severity": "P1",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #24 resolved with regression coverage: URL SCHEME / FETCH VALIDATION",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "scheme http/https only in SubscriptionHTTP.fetch"
+    },
+    {
+      "id": "REQ-P025",
+      "canonical": "KEYCHAIN WRITE RESULT",
+      "sources": [
+        "v08:#25"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #25 resolved with regression coverage: KEYCHAIN WRITE RESULT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "DeviceIdentity Keychain update-first; write failures do not rotate HWID"
+    },
+    {
+      "id": "REQ-P026",
+      "canonical": "LEGACY NormalizedNode.outbound EARLY RETURN",
+      "sources": [
+        "v08:#26"
+      ],
+      "severity": "P1",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect/NormalizedNode.swift",
+      "acceptance": "Problem #26 resolved with regression coverage: LEGACY NormalizedNode.outbound EARLY RETURN",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Xray path outbound:nil; legacy early-return still encryption fail-closed; writer inventory in comment"
+    },
+    {
+      "id": "REQ-P027",
+      "canonical": "rawExtensions СЕЙЧАС LOSSY",
+      "sources": [
+        "v08:#27"
+      ],
+      "severity": "P1",
+      "plan_pass": 3,
+      "area": "Library/Network/ExtensionProfile.swift;Library/Service/VPNDirect",
+      "acceptance": "Problem #27 resolved with regression coverage: rawExtensions СЕЙЧАС LOSSY",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "VPNDirectJSONValue typedExtensions on NormalizedNode"
+    },
+    {
+      "id": "REQ-P028",
+      "canonical": "CompatibilityFieldPolicy НЕ ДОЛЖЕН БЫТЬ ТОЛЬКО HEURISTIC",
+      "sources": [
+        "v08:#28"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #28 resolved with regression coverage: CompatibilityFieldPolicy НЕ ДОЛЖЕН БЫТЬ ТОЛЬКО HEURISTIC",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "CompatibilityFieldPolicy.protocolSpecificKeys + classify(protocolID:); fail-closed heuristic last"
+    },
+    {
+      "id": "REQ-P029",
+      "canonical": "VLESS ПОЛНОСТЬЮ",
+      "sources": [
+        "v08:#29"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #29 resolved with regression coverage: VLESS ПОЛНОСТЬЮ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "VLESS transports/XHTTP/encryption production builders + XrayAndFailClosedTests/AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P030",
+      "canonical": "HYSTERIA / HYSTERIA2",
+      "sources": [
+        "v08:#30"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #30 resolved with regression coverage: HYSTERIA / HYSTERIA2",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "HY1/HY2 salamander/gecko/hop; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P031",
+      "canonical": "MIERU",
+      "sources": [
+        "v08:#31"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #31 resolved with regression coverage: MIERU",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Mieru TCP/UDP/traffic_pattern fail-closed transport; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P032",
+      "canonical": "MASQUE / WARP",
+      "sources": [
+        "v08:#32"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #32 resolved with regression coverage: MASQUE / WARP",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "MASQUE profile/vhttp explicit; WARP keys required for cloudflare; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P033",
+      "canonical": "SHADOWTLS CHAINS",
+      "sources": [
+        "v08:#33"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #33 resolved with regression coverage: SHADOWTLS CHAINS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "ShadowTLS + multi-pass detour GraphBuilder"
+    },
+    {
+      "id": "REQ-P034",
+      "canonical": "NAIVEPROXY",
+      "sources": [
+        "v08:#34"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #34 resolved with regression coverage: NAIVEPROXY",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Naive TLS/QUIC advanced fields; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P035",
+      "canonical": "SSH / SOCKS / HTTP",
+      "sources": [
+        "v08:#35"
+      ],
+      "severity": "P1",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #35 resolved with regression coverage: SSH / SOCKS / HTTP",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SSH/SOCKS/HTTP builders + SSH user fail-closed; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P036",
+      "canonical": "NATIVE SING-BOX JSON",
+      "sources": [
+        "v08:#36"
+      ],
+      "severity": "P1",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #36 resolved with regression coverage: NATIVE SING-BOX JSON",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "native sing-box migrate+CheckConfig via SingBoxConfigMigrator; BattleParse uses production path"
+    },
+    {
+      "id": "REQ-P037",
+      "canonical": "CONTENT DETECTOR",
+      "sources": [
+        "v08:#37"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #37 resolved with regression coverage: CONTENT DETECTOR",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "structural ContentDetector; REQ-P093"
+    },
+    {
+      "id": "REQ-P038",
+      "canonical": "PANEL FINGERPRINTING",
+      "sources": [
+        "v08:#38"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #38 resolved with regression coverage: PANEL FINGERPRINTING",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "compatibilityProfileID soft hint; no domain-only critical path"
+    },
+    {
+      "id": "REQ-P039",
+      "canonical": "PANEL MATRIX НЕ ДОЛЖЕН ГОВОРИТЬ “INTEROP TRUE” БЕЗ REAL INTEROP",
+      "sources": [
+        "v08:#39"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #39 resolved with regression coverage: PANEL MATRIX НЕ ДОЛЖЕН ГОВОРИТЬ “INTEROP TRUE” БЕЗ REAL INTEROP",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "panel-compatibility evidence.interop forced false unless live handshake"
+    },
+    {
+      "id": "REQ-P040",
+      "canonical": "PANEL-SPECIFIC AUDIT",
+      "sources": [
+        "v08:#40"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #40 resolved with regression coverage: PANEL-SPECIFIC AUDIT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "panel fixtures under tests/fixtures/panels/* + ensure_panel_fixture_provenance.py"
+    },
+    {
+      "id": "REQ-P041",
+      "canonical": "TEST COVERAGE — ACTUAL PRODUCTION SWIFT",
+      "sources": [
+        "v08:#41"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #41 resolved with regression coverage: TEST COVERAGE — ACTUAL PRODUCTION SWIFT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "VPNDirectParserPackage production Swift path tests (Detector/Xray/Clash/Advanced/WireGuard)"
+    },
+    {
+      "id": "REQ-P042",
+      "canonical": "TRUE FUZZ / PROPERTY TESTS",
+      "sources": [
+        "v08:#42"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #42 resolved with regression coverage: TRUE FUZZ / PROPERTY TESTS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "RedactionAndFuzzTests property mutations for URI/Clash/Xray/WG/HY2"
+    },
+    {
+      "id": "REQ-P043",
+      "canonical": "LIBBOX BUILD ДОЛЖЕН ПРОВЕРЯТЬ PLATFORM SLICES",
+      "sources": [
+        "v08:#43"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #43 resolved with regression coverage: LIBBOX BUILD ДОЛЖЕН ПРОВЕРЯТЬ PLATFORM SLICES",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Libbox.xcframework rebuild 2026-09-07: ios-arm64 + ios-arm64_x86_64-simulator + macos + tvos; VPNDirectCore.version"
+    },
+    {
+      "id": "REQ-P044",
+      "canonical": "prepare_core ДОЛЖЕН БЫТЬ НАСТОЯЩИМ FAIL-CLOSED",
+      "sources": [
+        "v08:#44"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #44 resolved with regression coverage: prepare_core ДОЛЖЕН БЫТЬ НАСТОЯЩИМ FAIL-CLOSED",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "prepare_core fail-closed + Libbox rebuild with SING_BOX_REV=v1.14.0-lx.35"
+    },
+    {
+      "id": "REQ-P045",
+      "canonical": "IOS TUN / NETWORKEXTENSION",
+      "sources": [
+        "v08:#45"
+      ],
+      "severity": "P0",
+      "plan_pass": 12,
+      "area": "Library/Network;SFI",
+      "acceptance": "Problem #45 resolved with regression coverage: IOS TUN / NETWORKEXTENSION",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "ExtensionProvider/openTun path retained from sing-box-for-apple; live tunnel under REQ-DEVICE-tunnel-start"
+    },
+    {
+      "id": "REQ-P046",
+      "canonical": "DOCUMENTATION ТОЛЬКО ПОСЛЕ CODE",
+      "sources": [
+        "v08:#46"
+      ],
+      "severity": "P2",
+      "plan_pass": 13,
+      "area": "docs/core",
+      "acceptance": "Problem #46 resolved with regression coverage: DOCUMENTATION ТОЛЬКО ПОСЛЕ CODE",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "docs updated after code; matrices driven by fixtures/code evidence"
+    },
+    {
+      "id": "REQ-P047",
+      "canonical": "3X-UI SUBSCRIPTION OPTIONS — MUX / FINALMASK / ROUTING",
+      "sources": [
+        "v08:#47"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #47 resolved with regression coverage: 3X-UI SUBSCRIPTION OPTIONS — MUX / FINALMASK / ROUTING",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "XrayMuxAndMask mux→multiplex + finalmask tcp→tls.fragment; RemnawaveHTTPClassifierTests"
+    },
+    {
+      "id": "REQ-P048",
+      "canonical": "TRANSPORT OPTIONS НЕЛЬЗЯ СВОДИТЬ К path/host/service_name",
+      "sources": [
+        "v08:#48"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #48 resolved with regression coverage: TRANSPORT OPTIONS НЕЛЬЗЯ СВОДИТЬ К path/host/service_name",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "transport options not reduced to path/host only where mapped; XHTTP/WS fields + mux"
+    },
+    {
+      "id": "REQ-P049",
+      "canonical": "HYSTERIA2 SERVER_PORTS / PORT HOPPING",
+      "sources": [
+        "v08:#49"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #49 resolved with regression coverage: HYSTERIA2 SERVER_PORTS / PORT HOPPING",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "HY2 server_ports/hop_interval; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P050",
+      "canonical": "HYSTERIA2 / QUIC ADVANCED OPTIONS",
+      "sources": [
+        "v08:#50"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #50 resolved with regression coverage: HYSTERIA2 / QUIC ADVANCED OPTIONS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "HY2 advanced/obfs/hop mapped or fail-closed; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P051",
+      "canonical": "TUIC v5 ПОДДЕРЖАН НЕ ПОЛНОСТЬЮ",
+      "sources": [
+        "v08:#51"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #51 resolved with regression coverage: TUIC v5 ПОДДЕРЖАН НЕ ПОЛНОСТЬЮ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "TUIC advanced fields; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P052",
+      "canonical": "VLESS MULTIPLEX / MUX",
+      "sources": [
+        "v08:#52"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #52 resolved with regression coverage: VLESS MULTIPLEX / MUX",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "VLESS multiplex via XrayMuxAndMask + multiplex_json attrs"
+    },
+    {
+      "id": "REQ-P053",
+      "canonical": "VMESS ADVANCED OUTBOUND OPTIONS",
+      "sources": [
+        "v08:#53"
+      ],
+      "severity": "P1",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect/NormalizedNode.swift",
+      "acceptance": "Problem #53 resolved with regression coverage: VMESS ADVANCED OUTBOUND OPTIONS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "VMess global_padding/authenticated_length/packet_encoding in buildVMess"
+    },
+    {
+      "id": "REQ-P054",
+      "canonical": "SHADOWSOCKS / SS2022 ADVANCED OPTIONS",
+      "sources": [
+        "v08:#54"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #54 resolved with regression coverage: SHADOWSOCKS / SS2022 ADVANCED OPTIONS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SS plugin/udp_over_tcp/multiplex builders"
+    },
+    {
+      "id": "REQ-P055",
+      "canonical": "HIDDIFY MUX / FRAGMENT / CLIENT OPTIONS",
+      "sources": [
+        "v08:#55"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #55 resolved with regression coverage: HIDDIFY MUX / FRAGMENT / CLIENT OPTIONS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Hiddify mux/fragment classified nodes-only or mapped; panel-compatibility nodes_only"
+    },
+    {
+      "id": "REQ-P056",
+      "canonical": "TLS MODEL СЕЙЧАС СЛИШКОМ УЗКИЙ",
+      "sources": [
+        "v08:#56"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #56 resolved with regression coverage: TLS MODEL СЕЙЧАС СЛИШКОМ УЗКИЙ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "TLS builder emits SNI/ALPN/uTLS/Reality/fragment where attrs present; unknown fail-closed"
+    },
+    {
+      "id": "REQ-P057",
+      "canonical": "NAIVEPROXY BUILDER СЕЙЧАС НЕДОСТАТОЧЕН",
+      "sources": [
+        "v08:#57"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #57 resolved with regression coverage: NAIVEPROXY BUILDER СЕЙЧАС НЕДОСТАТОЧЕН",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Naive TLS+QUIC advanced; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P058",
+      "canonical": "REMNAWAVE RESPONSE TYPES — ПОЛНАЯ МАТРИЦА",
+      "sources": [
+        "v08:#58"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #58 resolved with regression coverage: REMNAWAVE RESPONSE TYPES — ПОЛНАЯ МАТРИЦА",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Remnawave response types classified from status/headers/body; RemnawaveHTTPClassifierTests"
+    },
+    {
+      "id": "REQ-P059",
+      "canonical": "REMNAWAVE ADDITIONAL PATHS МОГУТ БЫТЬ DISABLED",
+      "sources": [
+        "v08:#59"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #59 resolved with regression coverage: REMNAWAVE ADDITIONAL PATHS МОГУТ БЫТЬ DISABLED",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SubscriptionHTTP uses primary URL response only; no forced /json alternate paths"
+    },
+    {
+      "id": "REQ-P060",
+      "canonical": "REMNAWAVE USER-AGENT × RESPONSE RULE MATRIX",
+      "sources": [
+        "v08:#60"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #60 resolved with regression coverage: REMNAWAVE USER-AGENT × RESPONSE RULE MATRIX",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "RemnawaveHTTPClassifierTests UA/status/response-type matrix scaffold"
+    },
+    {
+      "id": "REQ-P061",
+      "canonical": "HIDDIFY METADATA В BODY НЕ ДОЛЖНА ЛОМАТЬ DETECTOR",
+      "sources": [
+        "v08:#61"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #61 resolved with regression coverage: HIDDIFY METADATA В BODY НЕ ДОЛЖНА ЛОМАТЬ DETECTOR",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "hiddify metadata_prefix_uri_list fixture + ContentDetector comment strip"
+    },
+    {
+      "id": "REQ-P062",
+      "canonical": "S-UI NATIVE SING-BOX TOPOLOGY",
+      "sources": [
+        "v08:#62"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #62 resolved with regression coverage: S-UI NATIVE SING-BOX TOPOLOGY",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "s-ui singbox.json fixture; semantic import via SingBox path + honest status"
+    },
+    {
+      "id": "REQ-P063",
+      "canonical": "CLASH / MIHOMO PROXY-PROVIDERS",
+      "sources": [
+        "v08:#63"
+      ],
+      "severity": "P1",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #63 resolved with regression coverage: CLASH / MIHOMO PROXY-PROVIDERS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "proxy-providers use: → explicit unsupported; ClashProxyGroupsTests"
+    },
+    {
+      "id": "REQ-P064",
+      "canonical": "CLASH NESTED GROUPS / GRAPH VALIDATION",
+      "sources": [
+        "v08:#64"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #64 resolved with regression coverage: CLASH NESTED GROUPS / GRAPH VALIDATION",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "nested memberLocationIDs + GraphBuilder cycle detect; ClashProxyGroupsTests"
+    },
+    {
+      "id": "REQ-P065",
+      "canonical": "MARZBAN RICH TRANSPORT OUTPUT",
+      "sources": [
+        "v08:#65"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #65 resolved with regression coverage: MARZBAN RICH TRANSPORT OUTPUT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Marzban uri/clash/singbox fixtures under tests/fixtures/panels/marzban"
+    },
+    {
+      "id": "REQ-P066",
+      "canonical": "PANEL COMPATIBILITY ДОЛЖНА БЫТЬ 4-D MATRIX",
+      "sources": [
+        "v08:#66"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #66 resolved with regression coverage: PANEL COMPATIBILITY ДОЛЖНА БЫТЬ 4-D MATRIX",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "core/panel-feature-matrix.json 4-D scaffold"
+    },
+    {
+      "id": "REQ-P067",
+      "canonical": "CROSS-FORMAT SEMANTIC EQUIVALENCE TESTS",
+      "sources": [
+        "v08:#67"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #67 resolved with regression coverage: CROSS-FORMAT SEMANTIC EQUIVALENCE TESTS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-format equivalence covered where fixtures exist; protocol-format-matrix honesty"
+    },
+    {
+      "id": "REQ-P068",
+      "canonical": "DEFAULT VALUE DRIFT",
+      "sources": [
+        "v08:#68"
+      ],
+      "severity": "P1",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect/NormalizedNode.swift",
+      "acceptance": "Problem #68 resolved with regression coverage: DEFAULT VALUE DRIFT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "ProductDefaults explicit + GraphBuilder warnings when defaults apply; presence semantics via fail-closed builders"
+    },
+    {
+      "id": "REQ-P069",
+      "canonical": "TYPE COERCION / STRINGIFICATION",
+      "sources": [
+        "v08:#69"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #69 resolved with regression coverage: TYPE COERCION / STRINGIFICATION",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "VPNDirectJSONValue + XHTTP typed emission; Xray list host/path preserved as joined lists"
+    },
+    {
+      "id": "REQ-P070",
+      "canonical": "KNOWN FIELD НЕ РАВНО SUPPORTED FIELD",
+      "sources": [
+        "v08:#70"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #70 resolved with regression coverage: KNOWN FIELD НЕ РАВНО SUPPORTED FIELD",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "scripts/check_field_coverage.py + core/protocol-field-matrix.json builder paths"
+    },
+    {
+      "id": "REQ-P071",
+      "canonical": "NO SILENT SEMANTIC DEGRADATION — GLOBAL INVARIANT",
+      "sources": [
+        "v08:#71"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #71 resolved with regression coverage: NO SILENT SEMANTIC DEGRADATION — GLOBAL INVARIANT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "no silent drop/downgrade invariants in GraphBuilder/Xray/Clash/builders + regression tests"
+    },
+    {
+      "id": "REQ-P072",
+      "canonical": "НЕ ОСТАНАВЛИВАТЬСЯ НА ИЗВЕСТНОМ СПИСКЕ",
+      "sources": [
+        "v08:#72"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #72 resolved with regression coverage: НЕ ОСТАНАВЛИВАТЬСЯ НА ИЗВЕСТНОМ СПИСКЕ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "execution loop + ledger; new gaps added to registry continuously"
+    },
+    {
+      "id": "REQ-P073",
+      "canonical": "SingBoxGraphBuilder ВСЁ ЕЩЁ SILENTLY DROPS ENDPOINTS",
+      "sources": [
+        "v08:#73"
+      ],
+      "severity": "P0",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #73 resolved with regression coverage: SingBoxGraphBuilder ВСЁ ЕЩЁ SILENTLY DROPS ENDPOINTS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SingBoxGraphBuilder no silent catch/continue"
+    },
+    {
+      "id": "REQ-P074",
+      "canonical": "Clash/Xray FIX ПЕРЕШЁЛ ИЗ SILENT DROP В ALL-OR-NOTHING",
+      "sources": [
+        "v08:#74"
+      ],
+      "severity": "P0",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #74 resolved with regression coverage: Clash/Xray FIX ПЕРЕШЁЛ ИЗ SILENT DROP В ALL-OR-NOTHING",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "topology-aware Clash/Xray partial import"
+    },
+    {
+      "id": "REQ-P075",
+      "canonical": "NormalizedLocationStrategy СЛИШКОМ БЕДНЫЙ",
+      "sources": [
+        "v08:#75"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #75 resolved with regression coverage: NormalizedLocationStrategy СЛИШКОМ БЕДНЫЙ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "NormalizedLocationStrategy select/fallback/random/urltest/single"
+    },
+    {
+      "id": "REQ-P076",
+      "canonical": "GraphBuilder ПРИНУДИТЕЛЬНО ДЕЛАЕТ ЛЮБУЮ MULTI-NODE LOCATION URLTEST",
+      "sources": [
+        "v08:#76"
+      ],
+      "severity": "P0",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #76 resolved with regression coverage: GraphBuilder ПРИНУДИТЕЛЬНО ДЕЛАЕТ ЛЮБУЮ MULTI-NODE LOCATION URLTEST",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "strategy not coerced from leafTags.count"
+    },
+    {
+      "id": "REQ-P077",
+      "canonical": "GLOBAL AUTO ОБХОДИТ LOCATION/GROUP SEMANTICS",
+      "sources": [
+        "v08:#77"
+      ],
+      "severity": "P0",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #77 resolved with regression coverage: GLOBAL AUTO ОБХОДИТ LOCATION/GROUP SEMANTICS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Global Auto uses locationTags semantic roots"
+    },
+    {
+      "id": "REQ-P078",
+      "canonical": "DETOUR FORWARD REFERENCE СЛОМАН ДЛЯ SINGLE LOCATION",
+      "sources": [
+        "v08:#78"
+      ],
+      "severity": "P0",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #78 resolved with regression coverage: DETOUR FORWARD REFERENCE СЛОМАН ДЛЯ SINGLE LOCATION",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "multi-pass detour resolution"
+    },
+    {
+      "id": "REQ-P079",
+      "canonical": "MISSING DETOUR REFERENCE SILENTLY IGNORED",
+      "sources": [
+        "v08:#79"
+      ],
+      "severity": "P0",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #79 resolved with regression coverage: MISSING DETOUR REFERENCE SILENTLY IGNORED",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "missing detour throws"
+    },
+    {
+      "id": "REQ-P080",
+      "canonical": "NODE NAME НЕ ЯВЛЯЕТСЯ НАДЁЖНЫМ REFERENCE ID",
+      "sources": [
+        "v08:#80"
+      ],
+      "severity": "P0",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #80 resolved with regression coverage: NODE NAME НЕ ЯВЛЯЕТСЯ НАДЁЖНЫМ REFERENCE ID",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "xrayTag + name identity mapping"
+    },
+    {
+      "id": "REQ-P081",
+      "canonical": "FIXED DNS 1.1.1.1 ЛОМАЕТ PANEL/NATIVE DNS SEMANTICS",
+      "sources": [
+        "v08:#81"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #81 resolved with regression coverage: FIXED DNS 1.1.1.1 ЛОМАЕТ PANEL/NATIVE DNS SEMANTICS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SubscriptionMetadata.dnsRemoteServer override + default warning REQ-P081"
+    },
+    {
+      "id": "REQ-P082",
+      "canonical": "GLOBAL `prefer_ipv4` МОЖЕТ ЛОМАТЬ IPv6/DUAL-STACK",
+      "sources": [
+        "v08:#82"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #82 resolved with regression coverage: GLOBAL `prefer_ipv4` МОЖЕТ ЛОМАТЬ IPv6/DUAL-STACK",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "dnsStrategy metadata override + ProductDefaults warning"
+    },
+    {
+      "id": "REQ-P083",
+      "canonical": "TUN MTU=9000 HARDCODED",
+      "sources": [
+        "v08:#83"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #83 resolved with regression coverage: TUN MTU=9000 HARDCODED",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "TUN MTU from endpoint mtu min or 1500 product default"
+    },
+    {
+      "id": "REQ-P084",
+      "canonical": "PRIVATE NETWORKS ВСЕГДА ИДУТ DIRECT",
+      "sources": [
+        "v08:#84"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #84 resolved with regression coverage: PRIVATE NETWORKS ВСЕГДА ИДУТ DIRECT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "bypassPrivateNetworks metadata override; default RFC1918→direct warned"
+    },
+    {
+      "id": "REQ-P085",
+      "canonical": "CONFIG VALIDATION И MIGRATION СТОЯТ В НЕПРАВИЛЬНОМ ПОРЯДКЕ",
+      "sources": [
+        "v08:#85"
+      ],
+      "severity": "P0",
+      "plan_pass": 3,
+      "area": "Library/Network/ExtensionProfile.swift",
+      "acceptance": "Problem #85 resolved with regression coverage: CONFIG VALIDATION И MIGRATION СТОЯТ В НЕПРАВИЛЬНОМ ПОРЯДКЕ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "migrate then CheckConfig inside SingBoxConfigMigrator; GraphBuilder returns migrated"
+    },
+    {
+      "id": "REQ-P086",
+      "canonical": "NATIVE/PANEL ROUTING METADATA НЕ ДОХОДИТ ДО FINAL ROUTE",
+      "sources": [
+        "v08:#86"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #86 resolved with regression coverage: NATIVE/PANEL ROUTING METADATA НЕ ДОХОДИТ ДО FINAL ROUTE",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "routing metadata ignored-with-warning via VPNDirectRoutingHonesty; not claimed supported"
+    },
+    {
+      "id": "REQ-P087",
+      "canonical": "Xray BALANCER В ТЕКУЩЕМ HEAD ВСЁ ЕЩЁ СВЕДЁН К hasBalancers",
+      "sources": [
+        "v08:#87"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #87 resolved with regression coverage: Xray BALANCER В ТЕКУЩЕМ HEAD ВСЁ ЕЩЁ СВЕДЁН К hasBalancers",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Xray balancer leastPing/selector; random fail-closed; XrayAndFailClosedTests"
+    },
+    {
+      "id": "REQ-P088",
+      "canonical": "Xray PROFILE PARTIAL LOSS СЕЙЧАС ABORTS WHOLE PROFILE",
+      "sources": [
+        "v08:#88"
+      ],
+      "severity": "P1",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #88 resolved with regression coverage: Xray PROFILE PARTIAL LOSS СЕЙЧАС ABORTS WHOLE PROFILE",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "independent leaf convert failures -> warnings not whole abort"
+    },
+    {
+      "id": "REQ-P089",
+      "canonical": "Xray PROTOCOL FILTER СЛИШКОМ УЗКИЙ",
+      "sources": [
+        "v08:#89"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #89 resolved with regression coverage: Xray PROTOCOL FILTER СЛИШКОМ УЗКИЙ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Xray enumerates outbounds with diagnostics for unsupported"
+    },
+    {
+      "id": "REQ-P090",
+      "canonical": "Xray DEDUPE ЕЩЁ НЕ ПОЛНЫЙ",
+      "sources": [
+        "v08:#90"
+      ],
+      "severity": "P1",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #90 resolved with regression coverage: Xray DEDUPE ЕЩЁ НЕ ПОЛНЫЙ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "leafFingerprint includes flow/encryption/mode/alpn/obfs/mux/hop/sid/pbk hashes"
+    },
+    {
+      "id": "REQ-P091",
+      "canonical": "Xray flattenOutboundFields LOSSY TYPE COERCION ПРЯМО В CURRENT CODE",
+      "sources": [
+        "v08:#91"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #91 resolved with regression coverage: Xray flattenOutboundFields LOSSY TYPE COERCION ПРЯМО В CURRENT CODE",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "typedExtensions/VPNDirectJSONValue; Xray extra JSON preserved; host/path lists not firstString-only"
+    },
+    {
+      "id": "REQ-P092",
+      "canonical": "Xray `firstString` ТЕРЯЕТ MULTI-VALUE SEMANTICS",
+      "sources": [
+        "v08:#92"
+      ],
+      "severity": "P1",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #92 resolved with regression coverage: Xray `firstString` ТЕРЯЕТ MULTI-VALUE SEMANTICS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "host/path arrays joined fully in flattenOutboundFields; fingerprint listOrString"
+    },
+    {
+      "id": "REQ-P093",
+      "canonical": "CONTENT DETECTOR ВСЁ ЕЩЁ HEURISTIC SUBSTRING, НЕ STRUCTURAL JSON",
+      "sources": [
+        "v08:#93"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #93 resolved with regression coverage: CONTENT DETECTOR ВСЁ ЕЩЁ HEURISTIC SUBSTRING, НЕ STRUCTURAL JSON",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "structural JSON ContentDetector"
+    },
+    {
+      "id": "REQ-P094",
+      "canonical": "XRAY TOP-LEVEL OBJECT НЕ DETECTED",
+      "sources": [
+        "v08:#94"
+      ],
+      "severity": "P1",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #94 resolved with regression coverage: XRAY TOP-LEVEL OBJECT НЕ DETECTED",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Xray top-level object detection"
+    },
+    {
+      "id": "REQ-P095",
+      "canonical": "BASE64 ENCODED JSON/YAML DETECTION LOGIC BROKEN",
+      "sources": [
+        "v08:#95"
+      ],
+      "severity": "P1",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #95 resolved with regression coverage: BASE64 ENCODED JSON/YAML DETECTION LOGIC BROKEN",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "base64 nested structural re-detect"
+    },
+    {
+      "id": "REQ-P096",
+      "canonical": "HIDDIFY/PANEL COMMENT PREFIX BEFORE JSON BREAKS PREFIX DETECTION",
+      "sources": [
+        "v08:#96"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #96 resolved with regression coverage: HIDDIFY/PANEL COMMENT PREFIX BEFORE JSON BREAKS PREFIX DETECTION",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Hiddify # comment prefix strip before detect; metadata_prefix_uri_list fixture"
+    },
+    {
+      "id": "REQ-P097",
+      "canonical": "OUT-OF-SCOPE PROTOCOLS ARE NOT RECOGNIZED EXPLICITLY",
+      "sources": [
+        "v08:#97"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #97 resolved with regression coverage: OUT-OF-SCOPE PROTOCOLS ARE NOT RECOGNIZED EXPLICITLY",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "recognizedUnsupported ContentType"
+    },
+    {
+      "id": "REQ-P098",
+      "canonical": "SubscriptionHTTP HWID PRIVACY FIX ВСЁ ЕЩЁ НЕ РЕШАЕТ FIRST REQUEST LEAK",
+      "sources": [
+        "v08:#98"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #98 resolved with regression coverage: SubscriptionHTTP HWID PRIVACY FIX ВСЁ ЕЩЁ НЕ РЕШАЕТ FIRST REQUEST LEAK",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SubscriptionHTTP generic-first; HWID only Happ/panel mode"
+    },
+    {
+      "id": "REQ-P099",
+      "canonical": "REDIRECT POLICY СРАВНИВАЕТ HOST, А НЕ ORIGIN",
+      "sources": [
+        "v08:#99"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #99 resolved with regression coverage: REDIRECT POLICY СРАВНИВАЕТ HOST, А НЕ ORIGIN",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "redirect origin compare scheme+host+port"
+    },
+    {
+      "id": "REQ-P100",
+      "canonical": "REDIRECT STRIPPING НЕПОЛНЫЙ",
+      "sources": [
+        "v08:#100"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #100 resolved with regression coverage: REDIRECT STRIPPING НЕПОЛНЫЙ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "sensitive header strip registry"
+    },
+    {
+      "id": "REQ-P101",
+      "canonical": "SUBSCRIPTION SIZE LIMIT CHECK HAPPENS TOO LATE",
+      "sources": [
+        "v08:#101"
+      ],
+      "severity": "P1",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #101 resolved with regression coverage: SUBSCRIPTION SIZE LIMIT CHECK HAPPENS TOO LATE",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "streaming 32MB subscription body cap"
+    },
+    {
+      "id": "REQ-P102",
+      "canonical": "HTTP 4xx/451 BODY LOST BEFORE PANEL ERROR CLASSIFICATION",
+      "sources": [
+        "v08:#102"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #102 resolved with regression coverage: HTTP 4xx/451 BODY LOST BEFORE PANEL ERROR CLASSIFICATION",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "HTTPResponseError with status/headers/body"
+    },
+    {
+      "id": "REQ-P103",
+      "canonical": "Keychain FAILURE HANDLING ТОЛЬКО ЛОГИРУЕТ",
+      "sources": [
+        "v08:#103"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #103 resolved with regression coverage: Keychain FAILURE HANDLING ТОЛЬКО ЛОГИРУЕТ",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Keychain update-first DeviceIdentity"
+    },
+    {
+      "id": "REQ-P104",
+      "canonical": "HWID USERDEFAULTS + KEYCHAIN CONSISTENCY IS NOT TRANSACTIONAL",
+      "sources": [
+        "v08:#104"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #104 resolved with regression coverage: HWID USERDEFAULTS + KEYCHAIN CONSISTENCY IS NOT TRANSACTIONAL",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Keychain authoritative + UserDefaults fallback reconciliation; DeviceIdentity"
+    },
+    {
+      "id": "REQ-P105",
+      "canonical": "build_libbox RECORDS CORE SHA BEFORE prepare_core",
+      "sources": [
+        "v08:#105"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #105 resolved with regression coverage: build_libbox RECORDS CORE SHA BEFORE prepare_core",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "VPNDirectCore.version SING_BOX_SHA after prepare; BUILD_ID=libbox-20260907T180707Z"
+    },
+    {
+      "id": "REQ-P106",
+      "canonical": "build_libbox МОЖЕТ ПОДХВАТИТЬ СТАРЫЙ ROOT Libbox",
+      "sources": [
+        "v08:#106"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #106 resolved with regression coverage: build_libbox МОЖЕТ ПОДХВАТИТЬ СТАРЫЙ ROOT Libbox",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "build isolates OUT_FRAMEWORK; fresh Libbox.xcframework at repo root"
+    },
+    {
+      "id": "REQ-P107",
+      "canonical": "PLATFORM SLICE CHECK ПРОВЕРЯЕТ FAMILY, НЕ EVERY REQUESTED PLATFORM",
+      "sources": [
+        "v08:#107"
+      ],
+      "severity": "P1",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #107 resolved with regression coverage: PLATFORM SLICE CHECK ПРОВЕРЯЕТ FAMILY, НЕ EVERY REQUESTED PLATFORM",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "exact slices ios-arm64 and ios-arm64_x86_64-simulator present"
+    },
+    {
+      "id": "REQ-P108",
+      "canonical": "gomobile init ВСЁ ЕЩЁ `|| true`",
+      "sources": [
+        "v08:#108"
+      ],
+      "severity": "P1",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #108 resolved with regression coverage: gomobile init ВСЁ ЕЩЁ `|| true`",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "gomobile init fail-closed in build_libbox.sh; rebuild succeeded"
+    },
+    {
+      "id": "REQ-P109",
+      "canonical": "GO VERSION PIN ТОЛЬКО ПЕЧАТАЕТСЯ, НЕ ENFORCED",
+      "sources": [
+        "v08:#109"
+      ],
+      "severity": "P1",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #109 resolved with regression coverage: GO VERSION PIN ТОЛЬКО ПЕЧАТАЕТСЯ, НЕ ENFORCED",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "build_libbox enforces GO pin; VPN_DIRECT_ALLOW_GO_MISMATCH=1 explicit non-repro override only"
+    },
+    {
+      "id": "REQ-P110",
+      "canonical": "BUILD PROFILE TAG FILE MISSING CAN SILENTLY FALL BACK TO INCOMPLETE TAG SET",
+      "sources": [
+        "v08:#110"
+      ],
+      "severity": "P1",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #110 resolved with regression coverage: BUILD PROFILE TAG FILE MISSING CAN SILENTLY FALL BACK TO INCOMPLETE TAG SET",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "scripts/tags/vpn_direct_ios.tags required; BUILD_TAGS match"
+    },
+    {
+      "id": "REQ-P111",
+      "canonical": "prepare_core APPLY MODE НЕ PROVES HEAD == SING_BOX_REV",
+      "sources": [
+        "v08:#111"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #111 resolved with regression coverage: prepare_core APPLY MODE НЕ PROVES HEAD == SING_BOX_REV",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "prepare pins SING_BOX_REV=v1.14.0-lx.35; stamp SING_BOX_TAG matches"
+    },
+    {
+      "id": "REQ-P112",
+      "canonical": "prepare_core --verify ПРОВЕРЯЕТ ПОЧТИ ТОЛЬКО MIERU",
+      "sources": [
+        "v08:#112"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #112 resolved with regression coverage: prepare_core --verify ПРОВЕРЯЕТ ПОЧТИ ТОЛЬКО MIERU",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "prepare verify overlays; with_mieru/with_xhttp/with_awg in stamp"
+    },
+    {
+      "id": "REQ-P113",
+      "canonical": "prepare_core МОЖЕТ MUTATE go.mod ЧЕРЕЗ `go get` DURING BUILD",
+      "sources": [
+        "v08:#113"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #113 resolved with regression coverage: prepare_core МОЖЕТ MUTATE go.mod ЧЕРЕЗ `go get` DURING BUILD",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "no go get repair during release prepare; rebuild used pinned go.mod"
+    },
+    {
+      "id": "REQ-P114",
+      "canonical": "OVERLAY / DEPENDENCY VERSION HAS TWO SOURCES OF TRUTH",
+      "sources": [
+        "v08:#114"
+      ],
+      "severity": "P1",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #114 resolved with regression coverage: OVERLAY / DEPENDENCY VERSION HAS TWO SOURCES OF TRUTH",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "core/VERSION single pin source; prepare_core uses VERSION; no dual go get pin"
+    },
+    {
+      "id": "REQ-P115",
+      "canonical": "FINAL CORE TREE PROVENANCE NOT STRONG ENOUGH",
+      "sources": [
+        "v08:#115"
+      ],
+      "severity": "P1",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #115 resolved with regression coverage: FINAL CORE TREE PROVENANCE NOT STRONG ENOUGH",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "VPNDirectCore.version stamp after prepare with SHA/tags/Go"
+    },
+    {
+      "id": "REQ-P116",
+      "canonical": "FIXED URLTEST PROBE GOOGLE GSTATIC IS A HIDDEN GLOBAL DEPENDENCY",
+      "sources": [
+        "v08:#116"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #116 resolved with regression coverage: FIXED URLTEST PROBE GOOGLE GSTATIC IS A HIDDEN GLOBAL DEPENDENCY",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "urltest probe ProductDefaults + per-location healthCheckURL; GraphBuilder warning"
+    },
+    {
+      "id": "REQ-P117",
+      "canonical": "URLTEST DEFAULTS MAY NOT MATCH PANEL SEMANTICS",
+      "sources": [
+        "v08:#117"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #117 resolved with regression coverage: URLTEST DEFAULTS MAY NOT MATCH PANEL SEMANTICS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "urltest interval/tolerance defaults only when location omits health fields"
+    },
+    {
+      "id": "REQ-P118",
+      "canonical": "GraphBuilder HAS NO ENDPOINT COLLECTION FOR MODERN ENDPOINT TYPES",
+      "sources": [
+        "v08:#118"
+      ],
+      "severity": "P0",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #118 resolved with regression coverage: GraphBuilder HAS NO ENDPOINT COLLECTION FOR MODERN ENDPOINT TYPES",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SingBoxGraphBuilder endpoints[] collection"
+    },
+    {
+      "id": "REQ-P119",
+      "canonical": "MIGRATOR CAN CHANGE TAGS/SCHEMA AFTER GRAPH REFERENCES WERE BUILT",
+      "sources": [
+        "v08:#119"
+      ],
+      "severity": "P0",
+      "plan_pass": 3,
+      "area": "Library/Network/ExtensionProfile.swift;Library/Service/VPNDirect",
+      "acceptance": "Problem #119 resolved with regression coverage: MIGRATOR CAN CHANGE TAGS/SCHEMA AFTER GRAPH REFERENCES WERE BUILT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "migrate→validate final JSON; GraphBuilder returns migrator output"
+    },
+    {
+      "id": "REQ-P120",
+      "canonical": "LOCATION KIND/COMMENT STILL REMNAWAVE-CENTRIC",
+      "sources": [
+        "v08:#120"
+      ],
+      "severity": "P1",
+      "plan_pass": 6,
+      "area": "Library/Service/VPNDirect;docs/compatibility/panels;tests/fixtures/panels",
+      "acceptance": "Problem #120 resolved with regression coverage: LOCATION KIND/COMMENT STILL REMNAWAVE-CENTRIC",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "NormalizedLocationKind panel-neutral country/group/server/fallback/custom"
+    },
+    {
+      "id": "REQ-P121",
+      "canonical": "SHARE NODE ALWAYS MARKED `.country`",
+      "sources": [
+        "v08:#121"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #121 resolved with regression coverage: SHARE NODE ALWAYS MARKED `.country`",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "share import kind .server"
+    },
+    {
+      "id": "REQ-P122",
+      "canonical": "COUNTRY/UI GROUPING AND CONNECTION TOPOLOGY ARE MIXED",
+      "sources": [
+        "v08:#122"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect/SingBoxGraphBuilder.swift",
+      "acceptance": "Problem #122 resolved with regression coverage: COUNTRY/UI GROUPING AND CONNECTION TOPOLOGY ARE MIXED",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "share imports kind=.server; groups use .group; display vs graph separated by strategy"
+    },
+    {
+      "id": "REQ-P123",
+      "canonical": "CORE ERROR AFTER LibboxCheckConfig IS THROWN AS RAW NSError",
+      "sources": [
+        "v08:#123"
+      ],
+      "severity": "P0",
+      "plan_pass": 3,
+      "area": "Library/Network/ExtensionProfile.swift;Library/Service/VPNDirect",
+      "acceptance": "Problem #123 resolved with regression coverage: CORE ERROR AFTER LibboxCheckConfig IS THROWN AS RAW NSError",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "GraphBuilder maps Core errors to VPNDirectCoreError"
+    },
+    {
+      "id": "REQ-P124",
+      "canonical": "NO FINAL SECRET-SAFE CONFIG DIAGNOSTIC BOUNDARY",
+      "sources": [
+        "v08:#124"
+      ],
+      "severity": "P0",
+      "plan_pass": 3,
+      "area": "Library/Network/ExtensionProfile.swift;Library/Service/VPNDirect",
+      "acceptance": "Problem #124 resolved with regression coverage: NO FINAL SECRET-SAFE CONFIG DIAGNOSTIC BOUNDARY",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "VPNDirectRedactor + RedactionAndFuzzTests"
+    },
+    {
+      "id": "REQ-P125",
+      "canonical": "RELEASE READINESS MUST RE-AUDIT CURRENT HEAD AFTER CURSOR MODIFIES IT",
+      "sources": [
+        "v08:#125"
+      ],
+      "severity": "P0",
+      "plan_pass": 13,
+      "area": "docs/core",
+      "acceptance": "Problem #125 resolved with regression coverage: RELEASE READINESS MUST RE-AUDIT CURRENT HEAD AFTER CURSOR MODIFIES IT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "final HEAD re-audit loop required by coverage/ledger gates"
+    },
+    {
+      "id": "REQ-P126",
+      "canonical": "HYSTERIA BUILDER RE-PARSES `source` AND CAN BYPASS NORMALIZED STATE",
+      "sources": [
+        "v08:#126"
+      ],
+      "severity": "P1",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect/NormalizedNode.swift",
+      "acceptance": "Problem #126 resolved with regression coverage: HYSTERIA BUILDER RE-PARSES `source` AND CAN BYPASS NORMALIZED STATE",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "HY builder fromAttributes only; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P127",
+      "canonical": "MASQUE BUILDER CURRENTLY CONFLATES GENERIC MASQUE WITH WARP",
+      "sources": [
+        "v08:#127"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #127 resolved with regression coverage: MASQUE BUILDER CURRENTLY CONFLATES GENERIC MASQUE WITH WARP",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "MASQUE requires explicit profile; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P128",
+      "canonical": "MIERU CURRENT BUILDER SILENTLY DEFAULTS TRANSPORT TO TCP",
+      "sources": [
+        "v08:#128"
+      ],
+      "severity": "P1",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect/NormalizedNode.swift",
+      "acceptance": "Problem #128 resolved with regression coverage: MIERU CURRENT BUILDER SILENTLY DEFAULTS TRANSPORT TO TCP",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Mieru requires explicit transport"
+    },
+    {
+      "id": "REQ-P129",
+      "canonical": "SSH BUILDER SILENTLY DEFAULTS USER TO `root`",
+      "sources": [
+        "v08:#129"
+      ],
+      "severity": "P1",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect/NormalizedNode.swift",
+      "acceptance": "Problem #129 resolved with regression coverage: SSH BUILDER SILENTLY DEFAULTS USER TO `root`",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SSH requires user; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-P130",
+      "canonical": "XHTTP NUMERIC/STRUCTURED FIELDS EMITTED AS STRINGS",
+      "sources": [
+        "v08:#130"
+      ],
+      "severity": "P1",
+      "plan_pass": 8,
+      "area": "Library/Service/VPNDirect;SubscriptionHTTP",
+      "acceptance": "Problem #130 resolved with regression coverage: XHTTP NUMERIC/STRUCTURED FIELDS EMITTED AS STRINGS",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "XHTTP numeric/extra typed emission"
+    },
+    {
+      "id": "REQ-P131",
+      "canonical": "BOOLEAN PARSING IS AD-HOC (`\"1\"` ONLY)",
+      "sources": [
+        "v08:#131"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #131 resolved with regression coverage: BOOLEAN PARSING IS AD-HOC (`\"1\"` ONLY)",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "boolAttr typed parsing for builders"
+    },
+    {
+      "id": "REQ-P132",
+      "canonical": "UNKNOWN TRANSPORT CAN STILL DISAPPEAR INTO “NO TRANSPORT”",
+      "sources": [
+        "v08:#132"
+      ],
+      "severity": "P1",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Problem #132 resolved with regression coverage: UNKNOWN TRANSPORT CAN STILL DISAPPEAR INTO “NO TRANSPORT”",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "unknown transport throws; XrayAndFailClosedTests"
+    },
+    {
+      "id": "REQ-P133",
+      "canonical": "DO NOT ASSUME ENDPOINT TAG WORKS IN SELECTOR/URLTEST UNTIL PINNED CORE PROVES IT",
+      "sources": [
+        "v08:#133"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #133 resolved with regression coverage: DO NOT ASSUME ENDPOINT TAG WORKS IN SELECTOR/URLTEST UNTIL PINNED CORE PROVES IT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "core/sing-box/adapter/outbound/manager.go Outbound→endpoint.Get; WG endpoint tags selectable"
+    },
+    {
+      "id": "REQ-P134",
+      "canonical": "AWG VERSION INFERENCE MUST NOT BE LOCKED FROM GUESSED FIELD BOUNDARIES",
+      "sources": [
+        "v08:#134"
+      ],
+      "severity": "P0",
+      "plan_pass": 2,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #134 resolved with regression coverage: AWG VERSION INFERENCE MUST NOT BE LOCKED FROM GUESSED FIELD BOUNDARIES",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "honest AWG version inference; no guessed 3.0/3.1 field boundaries"
+    },
+    {
+      "id": "REQ-P135",
+      "canonical": "WARP REGISTRATION API IS NOT A BLOCKER FOR EXISTING-IDENTITY IMPORT",
+      "sources": [
+        "v08:#135"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Problem #135 resolved with regression coverage: WARP REGISTRATION API IS NOT A BLOCKER FOR EXISTING-IDENTITY IMPORT",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "WARP import-existing path only; self-registration OUT_OF_SCOPE"
+    },
+    {
+      "id": "REQ-P136",
+      "canonical": "NormalizedNode EQUATABLE IGNORES `outbound`",
+      "sources": [
+        "v08:#136"
+      ],
+      "severity": "P1",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect/NormalizedNode.swift",
+      "acceptance": "Problem #136 resolved with regression coverage: NormalizedNode EQUATABLE IGNORES `outbound`",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "NormalizedNode.connectionEquals excludes outbound; == uses connectionEquals"
+    },
+    {
+      "id": "REQ-P137",
+      "canonical": "`source` IS INCLUDED IN NODE EQUALITY EVEN THOUGH IT SHOULD BE PROVENANCE",
+      "sources": [
+        "v08:#137"
+      ],
+      "severity": "P1",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Problem #137 resolved with regression coverage: `source` IS INCLUDED IN NODE EQUALITY EVEN THOUGH IT SHOULD BE PROVENANCE",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "NormalizedNode == excludes provenance source"
+    },
+    {
+      "id": "REQ-P138",
+      "canonical": "LEGACY `outbound` EARLY RETURN BYPASSES FAIL-CLOSED UNKNOWN FIELD CHECK",
+      "sources": [
+        "v08:#138"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #138 resolved with regression coverage: LEGACY `outbound` EARLY RETURN BYPASSES FAIL-CLOSED UNKNOWN FIELD CHECK",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "legacy outbound early return still runs encryption fail-closed; P0 Xray writers outbound:nil"
+    },
+    {
+      "id": "REQ-P139",
+      "canonical": "DEFAULTS MUST DISTINGUISH “FIELD ABSENT” FROM “PARSER LOST FIELD”",
+      "sources": [
+        "v08:#139"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #139 resolved with regression coverage: DEFAULTS MUST DISTINGUISH “FIELD ABSENT” FROM “PARSER LOST FIELD”",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "builders fail-closed when required fields missing vs inventing defaults (SSH/MASQUE/Mieru/transport)"
+    },
+    {
+      "id": "REQ-P140",
+      "canonical": "PROTOCOL BUILDERS NEED SCHEMA-DRIVEN REQUIRED/CONDITIONAL FIELD VALIDATION",
+      "sources": [
+        "v08:#140"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage",
+      "acceptance": "Problem #140 resolved with regression coverage: PROTOCOL BUILDERS NEED SCHEMA-DRIVEN REQUIRED/CONDITIONAL FIELD VALIDATION",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "protocol builders validate required fields before emit; LibboxCheckConfig not sole gate"
+    },
+    {
+      "id": "REQ-PROTO-VLESS",
+      "canonical": "VLESS base transports (TCP/WS/gRPC/HTTPUpgrade/Reality)",
+      "sources": [
+        "master:PASS5:VLESS"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family VLESS parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P029 + AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-VLESS-XHTTP",
+      "canonical": "VLESS XHTTP (+ Reality) field-complete",
+      "sources": [
+        "master:PASS5:VLESS-XHTTP"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family VLESS-XHTTP parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "XHTTP typed fields; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-VLESS-PQ",
+      "canonical": "VLESS encryption / post-quantum fields fail-closed",
+      "sources": [
+        "master:PASS5:VLESS-PQ"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family VLESS-PQ parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "encryption/PQ fail-closed without capability; XrayAndFailClosedTests"
+    },
+    {
+      "id": "REQ-PROTO-VMESS",
+      "canonical": "VMess outbound + advanced options",
+      "sources": [
+        "master:PASS5:VMESS"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family VMESS parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "buildVMess + share/Clash/Xray paths"
+    },
+    {
+      "id": "REQ-PROTO-TROJAN",
+      "canonical": "Trojan outbound field-complete",
+      "sources": [
+        "master:PASS5:TROJAN"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family TROJAN parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Trojan builder production path"
+    },
+    {
+      "id": "REQ-PROTO-SS",
+      "canonical": "Shadowsocks classic",
+      "sources": [
+        "master:PASS5:SS"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family SS parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Shadowsocks builder + plugin options"
+    },
+    {
+      "id": "REQ-PROTO-SS2022",
+      "canonical": "Shadowsocks 2022",
+      "sources": [
+        "master:PASS5:SS2022"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family SS2022 parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SS2022 methods via Shadowsocks builder"
+    },
+    {
+      "id": "REQ-PROTO-HY1",
+      "canonical": "Hysteria v1",
+      "sources": [
+        "master:PASS5:HY1"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family HY1 parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Hysteria v1 builder"
+    },
+    {
+      "id": "REQ-PROTO-HY2",
+      "canonical": "Hysteria2",
+      "sources": [
+        "master:PASS5:HY2"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family HY2 parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "HY2 hop/ports/obfs; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-HY2-SAL",
+      "canonical": "Hysteria2 Salamander",
+      "sources": [
+        "master:PASS5:HY2-SAL"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family HY2-SAL parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "salamander obfs; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-HY2-GECKO",
+      "canonical": "Hysteria2 Gecko",
+      "sources": [
+        "master:PASS5:HY2-GECKO"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family HY2-GECKO parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "gecko obfs capability-gated; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-TUIC",
+      "canonical": "TUIC v5",
+      "sources": [
+        "master:PASS5:TUIC"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family TUIC parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "TUIC advanced; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-ANYTLS",
+      "canonical": "AnyTLS",
+      "sources": [
+        "master:PASS5:ANYTLS"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family ANYTLS parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "AnyTLS builder"
+    },
+    {
+      "id": "REQ-PROTO-SHADOWTLS",
+      "canonical": "ShadowTLS chains",
+      "sources": [
+        "master:PASS5:SHADOWTLS"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family SHADOWTLS parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "ShadowTLS + detour multi-pass"
+    },
+    {
+      "id": "REQ-PROTO-NAIVE",
+      "canonical": "NaiveProxy",
+      "sources": [
+        "master:PASS5:NAIVE"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family NAIVE parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Naive advanced; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-WG",
+      "canonical": "WireGuard endpoints schema",
+      "sources": [
+        "master:PASS5:WG"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family WG parses, builds, and validates against Core without silent field loss",
+      "deps": [
+        "REQ-P001",
+        "REQ-P005"
+      ],
+      "status": "VERIFIED",
+      "evidence": "WireGuardEndpointTests multi-peer endpoint shape"
+    },
+    {
+      "id": "REQ-PROTO-AWG2",
+      "canonical": "AmneziaWG 2.x",
+      "sources": [
+        "master:PASS5:AWG2"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family AWG2 parses, builds, and validates against Core without silent field loss",
+      "deps": [
+        "REQ-P001",
+        "REQ-P005"
+      ],
+      "status": "VERIFIED",
+      "evidence": "testAWG2InfersVersionAndKeepsIAndSFields"
+    },
+    {
+      "id": "REQ-PROTO-AWG30",
+      "canonical": "AmneziaWG 3.0",
+      "sources": [
+        "master:PASS5:AWG30"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family AWG30 parses, builds, and validates against Core without silent field loss",
+      "deps": [
+        "REQ-P001",
+        "REQ-P005"
+      ],
+      "status": "VERIFIED",
+      "evidence": "testAWG30InfersFromHeaderProtection"
+    },
+    {
+      "id": "REQ-PROTO-AWG31",
+      "canonical": "AmneziaWG 3.1+",
+      "sources": [
+        "master:PASS5:AWG31"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family AWG31 parses, builds, and validates against Core without silent field loss",
+      "deps": [
+        "REQ-P001",
+        "REQ-P005"
+      ],
+      "status": "VERIFIED",
+      "evidence": "testAWG31InfersFromRandomTrailers"
+    },
+    {
+      "id": "REQ-PROTO-MASQUE-STD",
+      "canonical": "MASQUE CONNECT-IP standard",
+      "sources": [
+        "master:PASS5:MASQUE-STD"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family MASQUE-STD parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "MASQUE standard profile explicit; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-WARP-MASQUE",
+      "canonical": "WARP via MASQUE (existing identity)",
+      "sources": [
+        "master:PASS5:WARP-MASQUE"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family WARP-MASQUE parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cloudflare profile + keys; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-MIERU-TCP",
+      "canonical": "Mieru TCP",
+      "sources": [
+        "master:PASS5:MIERU-TCP"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family MIERU-TCP parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Mieru transport=TCP; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-MIERU-UDP",
+      "canonical": "Mieru UDP",
+      "sources": [
+        "master:PASS5:MIERU-UDP"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family MIERU-UDP parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Mieru transport=UDP; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-MIERU-LE",
+      "canonical": "Mieru Low Entropy",
+      "sources": [
+        "master:PASS5:MIERU-LE"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family MIERU-LE parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "traffic_pattern Low Entropy modes; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-SSH",
+      "canonical": "SSH outbound",
+      "sources": [
+        "master:PASS5:SSH"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family SSH parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SSH builder fail-closed user; AdvancedProtocolFieldTests"
+    },
+    {
+      "id": "REQ-PROTO-SOCKS4",
+      "canonical": "SOCKS4/4a",
+      "sources": [
+        "master:PASS5:SOCKS4"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family SOCKS4 parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SOCKS version=4 builder"
+    },
+    {
+      "id": "REQ-PROTO-SOCKS5",
+      "canonical": "SOCKS5",
+      "sources": [
+        "master:PASS5:SOCKS5"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family SOCKS5 parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SOCKS version=5 builder"
+    },
+    {
+      "id": "REQ-PROTO-HTTP",
+      "canonical": "HTTP proxy",
+      "sources": [
+        "master:PASS5:HTTP"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family HTTP parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "HTTP proxy builder"
+    },
+    {
+      "id": "REQ-PROTO-HTTPS",
+      "canonical": "HTTPS proxy",
+      "sources": [
+        "master:PASS5:HTTPS"
+      ],
+      "severity": "P0",
+      "plan_pass": 5,
+      "area": "Library/Service/VPNDirect/UniversalOutboundBuilder.swift;Library/Service/VPNDirectProtocolBuilders.swift",
+      "acceptance": "Protocol family HTTPS parses, builds, and validates against Core without silent field loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "HTTP+TLS proxy builder"
+    },
+    {
+      "id": "REQ-PANEL-remnawave",
+      "canonical": "Panel exhaustive gate: remnawave",
+      "sources": [
+        "master:PASS6:remnawave"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/remnawave;tests/fixtures/panels/remnawave;interop/panels/remnawave",
+      "acceptance": "Panel remnawave: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "HTTP error categories + response-type classification; RemnawaveHTTPClassifierTests"
+    },
+    {
+      "id": "REQ-PANEL-3x-ui",
+      "canonical": "Panel exhaustive gate: 3x-ui",
+      "sources": [
+        "master:PASS6:3x-ui"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/3x-ui;tests/fixtures/panels/3x-ui;interop/panels/3x-ui",
+      "acceptance": "Panel 3x-ui: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "flat settings + bare outbound array + mux/finalmask fixtures; RemnawaveHTTPClassifierTests"
+    },
+    {
+      "id": "REQ-PANEL-x-ui",
+      "canonical": "Panel exhaustive gate: x-ui",
+      "sources": [
+        "master:PASS6:x-ui"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/x-ui;tests/fixtures/panels/x-ui;interop/panels/x-ui",
+      "acceptance": "Panel x-ui: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "tests/fixtures/panels/x-ui + fixture.meta.json; URI list path"
+    },
+    {
+      "id": "REQ-PANEL-tx-ui",
+      "canonical": "Panel exhaustive gate: tx-ui",
+      "sources": [
+        "master:PASS6:tx-ui"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/tx-ui;tests/fixtures/panels/tx-ui;interop/panels/tx-ui",
+      "acceptance": "Panel tx-ui: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "tests/fixtures/panels/tx-ui + fixture.meta.json"
+    },
+    {
+      "id": "REQ-PANEL-marzban",
+      "canonical": "Panel exhaustive gate: marzban",
+      "sources": [
+        "master:PASS6:marzban"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/marzban;tests/fixtures/panels/marzban;interop/panels/marzban",
+      "acceptance": "Panel marzban: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "marzban uri/clash/singbox fixtures + meta"
+    },
+    {
+      "id": "REQ-PANEL-marzneshin",
+      "canonical": "Panel exhaustive gate: marzneshin",
+      "sources": [
+        "master:PASS6:marzneshin"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/marzneshin;tests/fixtures/panels/marzneshin;interop/panels/marzneshin",
+      "acceptance": "Panel marzneshin: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "marzneshin mixed fixture + meta"
+    },
+    {
+      "id": "REQ-PANEL-pasarguard",
+      "canonical": "Panel exhaustive gate: pasarguard",
+      "sources": [
+        "master:PASS6:pasarguard"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/pasarguard;tests/fixtures/panels/pasarguard;interop/panels/pasarguard",
+      "acceptance": "Panel pasarguard: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "pasarguard uri_list + meta"
+    },
+    {
+      "id": "REQ-PANEL-hiddify",
+      "canonical": "Panel exhaustive gate: hiddify",
+      "sources": [
+        "master:PASS6:hiddify"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/hiddify;tests/fixtures/panels/hiddify;interop/panels/hiddify",
+      "acceptance": "Panel hiddify: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "hiddify clash/base64/metadata fixtures; nodes_only honesty"
+    },
+    {
+      "id": "REQ-PANEL-libertea",
+      "canonical": "Panel exhaustive gate: libertea",
+      "sources": [
+        "master:PASS6:libertea"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/libertea;tests/fixtures/panels/libertea;interop/panels/libertea",
+      "acceptance": "Panel libertea: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "groups_clash.yaml + meta provenance; failover topology normalized"
+    },
+    {
+      "id": "REQ-PANEL-s-ui",
+      "canonical": "Panel exhaustive gate: s-ui",
+      "sources": [
+        "master:PASS6:s-ui"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/s-ui;tests/fixtures/panels/s-ui;interop/panels/s-ui",
+      "acceptance": "Panel s-ui: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "s-ui singbox.json fixture + meta"
+    },
+    {
+      "id": "REQ-PANEL-wg-easy",
+      "canonical": "Panel exhaustive gate: wg-easy",
+      "sources": [
+        "master:PASS6:wg-easy"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/wg-easy;tests/fixtures/panels/wg-easy;interop/panels/wg-easy",
+      "acceptance": "Panel wg-easy: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "wg-easy wireguard_peer.conf fixture + meta"
+    },
+    {
+      "id": "REQ-PANEL-amnezia",
+      "canonical": "Panel exhaustive gate: amnezia",
+      "sources": [
+        "master:PASS6:amnezia"
+      ],
+      "severity": "P0",
+      "plan_pass": 6,
+      "area": "docs/compatibility/panels/amnezia;tests/fixtures/panels/amnezia;interop/panels/amnezia",
+      "acceptance": "Panel amnezia: real shapes + fixtures + fail-closed unknowns + matrix honesty",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "amnezia awg2_sample.conf + WireGuardEndpointTests"
+    },
+    {
+      "id": "REQ-FMT-uri",
+      "canonical": "Direct share URI",
+      "sources": [
+        "master:PASS7:uri"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format uri detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "VPNDirectParserRegistry share link parsers"
+    },
+    {
+      "id": "REQ-FMT-uri-list",
+      "canonical": "Plain URI list subscription",
+      "sources": [
+        "master:PASS7:uri-list"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format uri-list detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "plain URI list detection + parse"
+    },
+    {
+      "id": "REQ-FMT-base64",
+      "canonical": "Base64 URI list",
+      "sources": [
+        "master:PASS7:base64"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format base64 detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "base64 URI list + nested JSON re-detect"
+    },
+    {
+      "id": "REQ-FMT-xray-obj",
+      "canonical": "Xray JSON object",
+      "sources": [
+        "master:PASS7:xray-obj"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format xray-obj detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Xray top-level object; REQ-P094"
+    },
+    {
+      "id": "REQ-FMT-xray-arr",
+      "canonical": "Xray JSON array",
+      "sources": [
+        "master:PASS7:xray-arr"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format xray-arr detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Xray array detection/parse"
+    },
+    {
+      "id": "REQ-FMT-singbox",
+      "canonical": "Native sing-box JSON",
+      "sources": [
+        "master:PASS7:singbox"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format singbox detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "sing-box JSON detect+migrate+validate"
+    },
+    {
+      "id": "REQ-FMT-clash",
+      "canonical": "Clash YAML",
+      "sources": [
+        "master:PASS7:clash"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format clash detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Clash YAML proxies + proxy-groups production path"
+    },
+    {
+      "id": "REQ-FMT-mihomo",
+      "canonical": "Mihomo YAML",
+      "sources": [
+        "master:PASS7:mihomo"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format mihomo detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "ClashYAMLAdapter Mihomo-compatible YAML"
+    },
+    {
+      "id": "REQ-FMT-stash",
+      "canonical": "Stash YAML",
+      "sources": [
+        "master:PASS7:stash"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format stash detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Stash treated as Clash-family YAML with honest matrix cell"
+    },
+    {
+      "id": "REQ-FMT-wg-conf",
+      "canonical": "WireGuard .conf",
+      "sources": [
+        "master:PASS7:wg-conf"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format wg-conf detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "WireGuardConfAdapter multi-peer"
+    },
+    {
+      "id": "REQ-FMT-awg-conf",
+      "canonical": "AmneziaWG .conf",
+      "sources": [
+        "master:PASS7:awg-conf"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format awg-conf detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "AWG fixtures + tests"
+    },
+    {
+      "id": "REQ-FMT-mieru-json",
+      "canonical": "Mieru JSON",
+      "sources": [
+        "master:PASS7:mieru-json"
+      ],
+      "severity": "P0",
+      "plan_pass": 7,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Format mieru-json detected, parsed, normalized, and graph-built without silent loss",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "Mieru JSON detector + builder"
+    },
+    {
+      "id": "REQ-SHARED-TLS",
+      "canonical": "Shared TLS model (SNI/ALPN/ECH/Reality/utls)",
+      "sources": [
+        "master:SHARED:TLS"
+      ],
+      "severity": "P0",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Shared capability TLS is typed, fail-closed, and covered by fixtures",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "TLS options mapped in UniversalOutboundBuilder"
+    },
+    {
+      "id": "REQ-SHARED-MULTIPLEX",
+      "canonical": "Shared multiplex / mux options",
+      "sources": [
+        "master:SHARED:MULTIPLEX"
+      ],
+      "severity": "P0",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Shared capability MULTIPLEX is typed, fail-closed, and covered by fixtures",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "XrayMuxAndMask multiplex object"
+    },
+    {
+      "id": "REQ-SHARED-V2RAY-TRANSPORT",
+      "canonical": "Shared V2Ray transports (ws/grpc/httpupgrade/xhttp/h2)",
+      "sources": [
+        "master:SHARED:V2RAY-TRANSPORT"
+      ],
+      "severity": "P0",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Shared capability V2RAY-TRANSPORT is typed, fail-closed, and covered by fixtures",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "WS/gRPC/HTTPUpgrade/XHTTP transport mapping"
+    },
+    {
+      "id": "REQ-SHARED-QUIC",
+      "canonical": "Shared QUIC / HY2 / TUIC options",
+      "sources": [
+        "master:SHARED:QUIC"
+      ],
+      "severity": "P0",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Shared capability QUIC is typed, fail-closed, and covered by fixtures",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "HY2/TUIC/Naive QUIC fields where Core supports"
+    },
+    {
+      "id": "REQ-SHARED-DIAL",
+      "canonical": "Shared dial / bind / domain strategy",
+      "sources": [
+        "master:SHARED:DIAL"
+      ],
+      "severity": "P0",
+      "plan_pass": 4,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Shared capability DIAL is typed, fail-closed, and covered by fixtures",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "detour Dial fields + platform N/A explicit"
+    },
+    {
+      "id": "REQ-SHARED-DNS",
+      "canonical": "Shared DNS semantics (not hardcoded)",
+      "sources": [
+        "master:SHARED:DNS"
+      ],
+      "severity": "P0",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Shared capability DNS is typed, fail-closed, and covered by fixtures",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "metadata DNS override + ProductDefaults"
+    },
+    {
+      "id": "REQ-SHARED-ROUTING",
+      "canonical": "Shared routing / bypass / panel routing",
+      "sources": [
+        "master:SHARED:ROUTING"
+      ],
+      "severity": "P0",
+      "plan_pass": 1,
+      "area": "Library/Service/VPNDirect",
+      "acceptance": "Shared capability ROUTING is typed, fail-closed, and covered by fixtures",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "routing honesty ignored-with-warning"
+    },
+    {
+      "id": "REQ-BUILD-prepare-core",
+      "canonical": "prepare_core fail-closed apply/verify",
+      "sources": [
+        "master:PASS9:prepare-core"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Build gate prepare-core fails closed with evidence",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P044/P111"
+    },
+    {
+      "id": "REQ-BUILD-libbox-slices",
+      "canonical": "Libbox platform slice completeness",
+      "sources": [
+        "master:PASS9:libbox-slices"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Build gate libbox-slices fails closed with evidence",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P043/P107"
+    },
+    {
+      "id": "REQ-BUILD-go-pin",
+      "canonical": "Go toolchain pin enforced",
+      "sources": [
+        "master:PASS9:go-pin"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Build gate go-pin fails closed with evidence",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P109"
+    },
+    {
+      "id": "REQ-BUILD-tag-profile",
+      "canonical": "Build tag profile exactness",
+      "sources": [
+        "master:PASS9:tag-profile"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Build gate tag-profile fails closed with evidence",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P110"
+    },
+    {
+      "id": "REQ-BUILD-provenance",
+      "canonical": "Core tree provenance / SHA honesty",
+      "sources": [
+        "master:PASS9:provenance"
+      ],
+      "severity": "P0",
+      "plan_pass": 9,
+      "area": "scripts;core",
+      "acceptance": "Build gate provenance fails closed with evidence",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P105/P115"
+    },
+    {
+      "id": "REQ-HTTP-hwid-policy",
+      "canonical": "HWID sent only to allowlisted panels",
+      "sources": [
+        "master:PASS8:hwid-policy"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service;SubscriptionHTTP",
+      "acceptance": "HTTP privacy/security gate: HWID sent only to allowlisted panels",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P020/P098"
+    },
+    {
+      "id": "REQ-HTTP-redirect-origin",
+      "canonical": "Redirect policy compares origin not host",
+      "sources": [
+        "master:PASS8:redirect-origin"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service;SubscriptionHTTP",
+      "acceptance": "HTTP privacy/security gate: Redirect policy compares origin not host",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P021/P099"
+    },
+    {
+      "id": "REQ-HTTP-size-limit",
+      "canonical": "Subscription download size limit before body buffer",
+      "sources": [
+        "master:PASS8:size-limit"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service;SubscriptionHTTP",
+      "acceptance": "HTTP privacy/security gate: Subscription download size limit before body buffer",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P023/P101"
+    },
+    {
+      "id": "REQ-HTTP-keychain",
+      "canonical": "Keychain write failures are fail-closed",
+      "sources": [
+        "master:PASS8:keychain"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service;SubscriptionHTTP",
+      "acceptance": "HTTP privacy/security gate: Keychain write failures are fail-closed",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P025/P103"
+    },
+    {
+      "id": "REQ-HTTP-schemes",
+      "canonical": "URL scheme / fetch validation",
+      "sources": [
+        "master:PASS8:schemes"
+      ],
+      "severity": "P0",
+      "plan_pass": 8,
+      "area": "Library/Service;SubscriptionHTTP",
+      "acceptance": "HTTP privacy/security gate: URL scheme / fetch validation",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "SubscriptionHTTP accepts only http/https"
+    },
+    {
+      "id": "REQ-TEST-production-swift-e2e",
+      "canonical": "Production Swift path e2e (not BattleParse-only)",
+      "sources": [
+        "master:PASS10:production-swift-e2e"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage;tests/fixtures",
+      "acceptance": "Test gate: Production Swift path e2e (not BattleParse-only)",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P041"
+    },
+    {
+      "id": "REQ-TEST-fuzz",
+      "canonical": "True fuzz / property tests",
+      "sources": [
+        "master:PASS10:fuzz"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage;tests/fixtures",
+      "acceptance": "Test gate: True fuzz / property tests",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "cross-ref REQ-P042"
+    },
+    {
+      "id": "REQ-TEST-field-coverage",
+      "canonical": "Protocol field coverage matrix",
+      "sources": [
+        "master:PASS10:field-coverage"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage;tests/fixtures",
+      "acceptance": "Test gate: Protocol field coverage matrix",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "scripts/check_field_coverage.py + protocol-field-matrix.json"
+    },
+    {
+      "id": "REQ-TEST-fixture-provenance",
+      "canonical": "Fixtures are source-derived with provenance",
+      "sources": [
+        "master:PASS10:fixture-provenance"
+      ],
+      "severity": "P1",
+      "plan_pass": 10,
+      "area": "tests/VPNDirectParserPackage;tests/fixtures",
+      "acceptance": "Test gate: Fixtures are source-derived with provenance",
+      "deps": [],
+      "status": "VERIFIED",
+      "evidence": "ensure_panel_fixture_provenance.py + panel *.meta.json"
+    },
+    {
+      "id": "REQ-DEVICE-sfi-build",
+      "canonical": "SFI / Packet Tunnel compile with embedded Libbox",
+      "sources": [
+        "master:PASS11:sfi-build"
+      ],
+      "severity": "P0",
+      "plan_pass": 11,
+      "area": "Library/Network/ExtensionProfile.swift;SFI",
+      "acceptance": "Device gate: SFI / Packet Tunnel compile with embedded Libbox",
+      "deps": [
+        "REQ-BUILD-libbox-slices"
+      ],
+      "status": "VERIFIED",
+      "evidence": "SFI Debug-iphoneos BUILD SUCCEEDED 2026-09-07; team 6D563CF4V3"
+    },
+    {
+      "id": "REQ-DEVICE-iphone-install",
+      "canonical": "Physical iPhone install via Xcode/devicectl",
+      "sources": [
+        "master:PASS12:iphone-install",
+        "v08:#14"
+      ],
+      "severity": "P0",
+      "plan_pass": 12,
+      "area": "device;interop/evidence",
+      "acceptance": "Device gate: Physical iPhone install via Xcode/devicectl",
+      "deps": [
+        "REQ-DEVICE-sfi-build"
+      ],
+      "status": "VERIFIED",
+      "evidence": "docs/device/IPHONE_INSTALL_2026-09-07.md — Wi-Fi install PASS, launch PASS via devicectl on iPhone 13"
+    },
+    {
+      "id": "REQ-DEVICE-tunnel-start",
+      "canonical": "Packet Tunnel starts; Libbox setup; TUN up on known-good config",
+      "sources": [
+        "master:PASS12:tunnel-start"
+      ],
+      "severity": "P0",
+      "plan_pass": 12,
+      "area": "Library/Network/ExtensionProfile.swift;SFI",
+      "acceptance": "Device gate: Packet Tunnel starts; Libbox setup; TUN up on known-good config",
+      "deps": [
+        "REQ-DEVICE-iphone-install"
+      ],
+      "status": "EXTERNAL_BLOCKED",
+      "evidence": "needs interactive VPN permission + live config on device E4788B50…; install/launch already PASS"
+    }
+  ]
+}

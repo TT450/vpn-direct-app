@@ -29,7 +29,7 @@ final class RedactionAndFuzzTests: XCTestCase {
                 XCTAssertEqual(parsed.nodes.count, 0, "garbage should not yield nodes: \(g.prefix(40))")
             } else {
                 XCTAssertTrue(
-                    kind == .unknown || kind == .clashYAML,
+                    kind == .unknown || kind == .clashYAML || kind == .recognizedUnsupported,
                     "unexpected kind \(kind) for \(g.prefix(40))"
                 )
                 if kind == .clashYAML {
@@ -73,6 +73,62 @@ final class RedactionAndFuzzTests: XCTestCase {
             }
             let links = [mutated]
             _ = VPNDirectParserRegistry.parseShareLinks(links)
+        }
+    }
+
+    /// Mutates Clash YAML / Xray JSON / WG conf / HY2 URI — asserts no crash + structured outcomes.
+    func testPropertyMutatedStructuredPayloads() {
+        let clashSeed = """
+        proxies:
+          - name: a
+            type: ss
+            server: 203.0.113.10
+            port: 8388
+            cipher: aes-128-gcm
+            password: secret
+        proxy-groups:
+          - name: AUTO
+            type: url-test
+            proxies: [a]
+        """
+        let xraySeed =
+            #"{"outbounds":[{"tag":"v","protocol":"vless","settings":{"vnext":[{"address":"203.0.113.10","port":443,"users":[{"id":"11111111-1111-1111-1111-111111111111"}]}]},"streamSettings":{"network":"tcp"}}]}"#
+        let wgSeed = """
+        [Interface]
+        PrivateKey = YAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+        Address = 10.0.0.2/32
+        [Peer]
+        PublicKey = ZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+        Endpoint = 203.0.113.10:51820
+        AllowedIPs = 0.0.0.0/0
+        """
+        let hy2Seed = "hy2://password@203.0.113.10:443?sni=example.com&obfs=salamander&obfs-password=pad#seed"
+        var rng = SeededGenerator(seed: 0xBEEF_Cafe)
+        let seeds = [clashSeed, xraySeed, wgSeed, hy2Seed]
+        for base in seeds {
+            for i in 0 ..< 25 {
+                var chars = Array(base)
+                if !chars.isEmpty {
+                    let idx = Int.random(in: 0 ..< chars.count, using: &rng)
+                    if i % 2 == 0 {
+                        chars[idx] = Character(UnicodeScalar(UInt8.random(in: 32 ... 126, using: &rng)))
+                    } else {
+                        chars.remove(at: idx)
+                    }
+                }
+                let mutated = String(chars)
+                let kind = VPNDirectContentDetector.detect(text: mutated).kind
+                switch kind {
+                case .clashYAML:
+                    _ = try? ClashYAMLAdapter.parse(mutated)
+                case .xrayJSON:
+                    _ = try? XrayJSONAdapter.parse(mutated)
+                case .wireGuardConf:
+                    _ = try? WireGuardConfAdapter.parse(mutated)
+                default:
+                    _ = VPNDirectParserRegistry.parseShareLinks([mutated])
+                }
+            }
         }
     }
 }

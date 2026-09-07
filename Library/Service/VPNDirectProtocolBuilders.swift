@@ -34,7 +34,7 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
 
     // AWG 3.x
     public var headerProtectionKey: String?
-    public var contentPaddingAddition: Int?
+    public var contentPaddingAddition: String?
     public var randomTrailers: Bool?
     public var disableCookies: Bool?
     public var rekeyAfterTime: String?
@@ -80,10 +80,157 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
         self.amneziaVersion = amneziaVersion
     }
 
+    /// True only when no Amnezia-specific fields are set (plain WireGuard).
+    public var hasNoObfuscation: Bool {
+        jc == nil && jmin == nil && jmax == nil
+            && s1 == nil && s2 == nil && s3 == nil && s4 == nil
+            && h1 == nil && h2 == nil && h3 == nil && h4 == nil
+            && i1 == nil && i2 == nil && i3 == nil && i4 == nil && i5 == nil
+            && id == nil && ip == nil && ib == nil
+            && headerProtectionKey == nil
+            && contentPaddingAddition == nil
+            && randomTrailers == nil
+            && disableCookies == nil
+            && rekeyAfterTime == nil
+            && rekeyTimeout == nil
+            && rejectAfterTime == nil
+            && keepaliveTimeout == nil
+            && maxHandshakeAttempts == nil
+            && persistentKeepaliveInterval == nil
+    }
+
+    /// Infer AWG version from fields. Returns nil for plain WireGuard.
+    /// Forced override wins when provided; ambiguous AWG claim without fields fails closed.
+    public static func inferAmneziaVersion(
+        from options: AmneziaWGEndpointOptions,
+        forced: String? = nil,
+        claimedAWG: Bool = false
+    ) throws -> String? {
+        if let forced, !forced.isEmpty {
+            return forced
+        }
+        if options.hasNoObfuscation {
+            if claimedAWG {
+                throw VPNDirectCoreError.malformedConfig(
+                    component: "amneziawg",
+                    detail: "AWG claimed but no Amnezia fields present; refusing invented version"
+                )
+            }
+            return nil
+        }
+        if options.randomTrailers == true || options.disableCookies == true {
+            return "3.1"
+        }
+        if options.headerProtectionKey != nil
+            || options.contentPaddingAddition != nil
+            || options.rekeyAfterTime != nil
+            || options.rekeyTimeout != nil
+            || options.rejectAfterTime != nil
+            || options.keepaliveTimeout != nil
+            || options.maxHandshakeAttempts != nil
+        {
+            return "3.0"
+        }
+        // Classic junk / magic headers / CPS / masquerade sugar → AWG 2
+        return "2"
+    }
+
+    /// Build options from flat share-link / Clash attributes (single peer).
+    public static func fromFlatAttributes(
+        privateKey: String,
+        peerPublicKey: String,
+        localAddress: [String],
+        peerEndpoint: String,
+        preSharedKey: String? = nil,
+        mtu: Int? = nil,
+        attributes: [String: String],
+        forcedVersion: String? = nil,
+        claimedAWG: Bool = false
+    ) throws -> AmneziaWGEndpointOptions {
+        var options = AmneziaWGEndpointOptions(
+            privateKey: privateKey,
+            address: localAddress.isEmpty ? ["10.0.0.2/32"] : localAddress,
+            peers: [
+                Peer(
+                    publicKey: peerPublicKey,
+                    preSharedKey: preSharedKey,
+                    allowedIPs: Self.parseAllowedIPs(attributes["allowed_ips"] ?? attributes["allowedips"]),
+                    endpoint: peerEndpoint,
+                    persistentKeepaliveInterval: (attributes["persistent_keepalive"] ?? attributes["keepalive"])
+                        .flatMap(Int.init)
+                ),
+            ],
+            mtu: mtu,
+            amneziaVersion: forcedVersion ?? "2"
+        )
+        options.jc = attributes["jc"].flatMap(Int.init)
+        options.jmin = attributes["jmin"].flatMap(Int.init)
+        options.jmax = attributes["jmax"].flatMap(Int.init)
+        options.s1 = attributes["s1"].flatMap(Int.init)
+        options.s2 = attributes["s2"].flatMap(Int.init)
+        options.s3 = attributes["s3"].flatMap(Int.init)
+        options.s4 = attributes["s4"].flatMap(Int.init)
+        options.h1 = attributes["h1"]
+        options.h2 = attributes["h2"]
+        options.h3 = attributes["h3"]
+        options.h4 = attributes["h4"]
+        options.i1 = attributes["i1"]
+        options.i2 = attributes["i2"]
+        options.i3 = attributes["i3"]
+        options.i4 = attributes["i4"]
+        options.i5 = attributes["i5"]
+        // Masquerade sugar — never confuse with WG interface address (`ip` / `local_address`).
+        options.id = attributes["id"] ?? attributes["awg_id"]
+        options.ip = attributes["awg_ip"] ?? attributes["masquerade_ip"]
+        options.ib = attributes["ib"] ?? attributes["awg_ib"]
+        options.headerProtectionKey = attributes["header_protection_key"] ?? attributes["headerprotectionkey"]
+        options.contentPaddingAddition = attributes["content_padding_addition"] ?? attributes["contentpaddingaddition"]
+        if let rt = attributes["random_trailers"] ?? attributes["randomtrailers"] {
+            options.randomTrailers = (rt == "true" || rt == "1")
+        }
+        if let dc = attributes["disable_cookies"] ?? attributes["disablecookies"] {
+            options.disableCookies = (dc == "true" || dc == "1")
+        }
+        options.rekeyAfterTime = attributes["rekey_after_time"] ?? attributes["rekeyaftertime"]
+        options.rekeyTimeout = attributes["rekey_timeout"] ?? attributes["rekeytimeout"]
+        options.rejectAfterTime = attributes["reject_after_time"] ?? attributes["rejectaftertime"]
+        options.keepaliveTimeout = attributes["keepalive_timeout"] ?? attributes["keepalivetimeout"]
+        options.maxHandshakeAttempts = attributes["max_handshake_attempts"] ?? attributes["maxhandshakeattempts"]
+        options.persistentKeepaliveInterval = attributes["persistent_keepalive_interval"]
+            ?? attributes["persistentkeepaliveinterval"]
+        let version = try inferAmneziaVersion(from: options, forced: forcedVersion, claimedAWG: claimedAWG)
+        options.amneziaVersion = version ?? options.amneziaVersion
+        return options
+    }
+
+    private static func parseAllowedIPs(_ raw: String?) -> [String] {
+        guard let raw, !raw.isEmpty else { return ["0.0.0.0/0", "::/0"] }
+        return raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    /// Split host:port or [IPv6]:port into Core WireGuardPeer address + port fields.
+    public static func splitPeerHostPort(_ endpoint: String, defaultPort: UInt16 = 51820) -> (String, UInt16) {
+        if endpoint.hasPrefix("["), let close = endpoint.firstIndex(of: "]") {
+            let host = String(endpoint[endpoint.index(after: endpoint.startIndex)..<close])
+            let rest = endpoint[endpoint.index(after: close)...]
+            let port = UInt16(rest.dropFirst()) ?? defaultPort
+            return (host, port)
+        }
+        if let idx = endpoint.lastIndex(of: ":"),
+           let port = UInt16(endpoint[endpoint.index(after: idx)...])
+        {
+            return (String(endpoint[..<idx]), port)
+        }
+        return (endpoint, defaultPort)
+    }
+
     /// sing-box / lx endpoint JSON object (`type: wireguard` + AWG fields).
     public func endpointJSON(tag: String = "wg-out") throws -> [String: Any] {
         guard VPNDirectCoreCapabilities.current.supportsAWG || hasNoObfuscation else {
             throw VPNDirectCoreError.unsupportedFeature(component: "amneziawg", detail: "Current Libbox build lacks with_awg")
+        }
+        guard !peers.isEmpty else {
+            throw VPNDirectCoreError.malformedConfig(component: "wireguard", detail: "Missing peers")
         }
 
         var endpoint: [String: Any] = [
@@ -97,7 +244,11 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
                     "allowed_ips": peer.allowedIPs,
                 ]
                 if let preSharedKey = peer.preSharedKey { p["pre_shared_key"] = preSharedKey }
-                if let endpoint = peer.endpoint { p["address"] = endpoint }
+                if let ep = peer.endpoint, !ep.isEmpty {
+                    let (host, port) = Self.splitPeerHostPort(ep)
+                    p["address"] = host
+                    p["port"] = Int(port)
+                }
                 if let keepalive = peer.persistentKeepaliveInterval {
                     p["persistent_keepalive_interval"] = keepalive
                 }
@@ -106,7 +257,7 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
         ]
         if let mtu { endpoint["mtu"] = mtu }
 
-        // Obfuscation / AWG fields (only emit when set)
+        // Obfuscation / AWG fields (only emit when set) — match donor AmneziaWGOptions JSON keys.
         if let jc { endpoint["jc"] = jc }
         if let jmin { endpoint["jmin"] = jmin }
         if let jmax { endpoint["jmax"] = jmax }
@@ -141,25 +292,6 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
         return endpoint
     }
 
-    /// True only when no Amnezia-specific fields are set (plain WireGuard).
-    private var hasNoObfuscation: Bool {
-        jc == nil && jmin == nil && jmax == nil
-            && s1 == nil && s2 == nil && s3 == nil && s4 == nil
-            && h1 == nil && h2 == nil && h3 == nil && h4 == nil
-            && i1 == nil && i2 == nil && i3 == nil && i4 == nil && i5 == nil
-            && id == nil && ip == nil && ib == nil
-            && headerProtectionKey == nil
-            && contentPaddingAddition == nil
-            && randomTrailers == nil
-            && disableCookies == nil
-            && rekeyAfterTime == nil
-            && rekeyTimeout == nil
-            && rejectAfterTime == nil
-            && keepaliveTimeout == nil
-            && maxHandshakeAttempts == nil
-            && persistentKeepaliveInterval == nil
-    }
-
     /// Parse Amnezia / wg-quick style `.conf` text into options (multi-peer aware).
     public static func parseConf(_ text: String, amneziaVersion: String = "2") throws -> AmneziaWGEndpointOptions {
         var privateKey = ""
@@ -173,7 +305,7 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
         var i1: String?; var i2: String?; var i3: String?; var i4: String?; var i5: String?
         var id: String?; var ip: String?; var ib: String?
         var headerProtectionKey: String?
-        var contentPaddingAddition: Int?
+        var contentPaddingAddition: String?
         var randomTrailers: Bool?
         var disableCookies: Bool?
         var rekeyAfterTime: String?
@@ -243,7 +375,7 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
             case ("[interface]", "ip"): ip = value
             case ("[interface]", "ib"): ib = value
             case ("[interface]", "headerprotectionkey"): headerProtectionKey = value
-            case ("[interface]", "contentpaddingaddition"): contentPaddingAddition = Int(value)
+            case ("[interface]", "contentpaddingaddition"): contentPaddingAddition = value
             case ("[interface]", "randomtrailers"): randomTrailers = (value == "true" || value == "1")
             case ("[interface]", "disablecookies"), ("[interface]", "disablecookie"):
                 disableCookies = (value == "true" || value == "1")

@@ -9,6 +9,40 @@ public enum SubscriptionConfigBuilder {
         public let json: String
         public let nodeCount: Int
         public let metadata: SubscriptionMetadata
+        /// Partial-import diagnostics (URI lists, etc.). Never silent when parsed < total.
+        public let diagnostics: VPNDirectParseDiagnostics?
+        public let warnings: [String]
+
+        public init(
+            name: String?,
+            json: String,
+            nodeCount: Int,
+            metadata: SubscriptionMetadata,
+            diagnostics: VPNDirectParseDiagnostics? = nil,
+            warnings: [String] = []
+        ) {
+            self.name = name
+            self.json = json
+            self.nodeCount = nodeCount
+            self.metadata = metadata
+            self.diagnostics = diagnostics
+            self.warnings = warnings
+        }
+
+        /// User-facing summary when some links failed but others imported.
+        public var partialImportSummary: String? {
+            guard let d = diagnostics, d.parsed > 0, (d.unsupported + d.malformed) > 0 else {
+                return nil
+            }
+            let failed = d.unsupported + d.malformed
+            var parts = [
+                "Imported \(d.parsed) of \(d.total). \(failed) configuration(s) were not supported or malformed.",
+            ]
+            if !d.unsupportedComponents.isEmpty {
+                parts.append("Components: \(d.unsupportedComponents.prefix(8).joined(separator: ", "))")
+            }
+            return parts.joined(separator: " ")
+        }
     }
 
     public static func isHTTPURL(_ raw: String) -> Bool {
@@ -83,8 +117,9 @@ public enum SubscriptionConfigBuilder {
     ) async throws -> Result {
         let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
         var lastError: Error = SubscriptionError.empty
-        // Always Happ first (SubscriptionClientIdentity.userAgents[0]); brand UAs only as fallback.
-        precondition(SubscriptionClientIdentity.userAgents.first == SubscriptionClientIdentity.primaryUserAgent)
+        // Generic-first (no HWID); Happ UA is last and alone sends device identity.
+        precondition(SubscriptionClientIdentity.userAgents.first == SubscriptionClientIdentity.genericUserAgent)
+        precondition(SubscriptionClientIdentity.userAgents.contains(SubscriptionClientIdentity.primaryUserAgent))
 
         for agent in SubscriptionClientIdentity.userAgents {
             do {
@@ -118,6 +153,30 @@ public enum SubscriptionConfigBuilder {
                 }
             } catch is SubscriptionHTTP.ConditionalNotModified {
                 throw SubscriptionHTTP.ConditionalNotModified()
+            } catch let httpError as SubscriptionHTTP.HTTPResponseError {
+                let classified = VPNDirectSubscriptionHTTPClassifier.classifyHTTPError(
+                    statusCode: httpError.statusCode,
+                    headers: httpError.headers,
+                    body: httpError.body,
+                    userAgent: httpError.userAgent
+                )
+                // Panel identity errors / blocks: do not rotate UA blindly — surface typed failure.
+                switch classified.category {
+                case .deviceLimitReached, .hwidRejected, .subscriptionExpired,
+                     .subscriptionDisabled, .panelBlocked, .unavailableForLegalReasons,
+                     .notFound, .unauthorized:
+                    throw SubscriptionError.panelRejected(classified.userSafeMessage)
+                case .browserPayload:
+                    // Try next UA — Happ vs generic can change response type.
+                    lastError = SubscriptionError.panelRejected(classified.userSafeMessage)
+                    continue
+                case .socketDrop:
+                    lastError = SubscriptionError.panelRejected(classified.userSafeMessage)
+                    continue
+                case .httpError, .networkError, .malformedResponse, .unsupportedFormat, .ok:
+                    lastError = httpError
+                    continue
+                }
             } catch {
                 lastError = error
             }
@@ -138,6 +197,10 @@ public enum SubscriptionConfigBuilder {
         }
 
         switch detection.kind {
+        case .recognizedUnsupported:
+            let id = detection.unsupportedProtocolID ?? "unknown"
+            throw SubscriptionError.unsupportedFeatures(["recognized_unsupported.\(id)"])
+
         case .singBoxJSON:
             let migrated = try SingBoxConfigMigrator.migrate(detection.text)
             let validated = try VPNDirectConfigValidator.validateSingBoxJSON(migrated)
@@ -228,11 +291,23 @@ public enum SubscriptionConfigBuilder {
             throw SubscriptionError.noSupportedLinks
         }
         let graph = try SingBoxGraphBuilder.build(fromShareNodes: parsed.nodes)
+        var warnings: [String] = []
+        if let summary = Result(
+            name: nil,
+            json: "",
+            nodeCount: 0,
+            metadata: SubscriptionMetadata(),
+            diagnostics: parsed.diagnostics
+        ).partialImportSummary {
+            warnings.append(summary)
+        }
         return Result(
             name: graph.firstName,
             json: graph.json,
             nodeCount: graph.leafCount,
-            metadata: SubscriptionMetadata()
+            metadata: SubscriptionMetadata(),
+            diagnostics: parsed.diagnostics,
+            warnings: warnings
         )
     }
 

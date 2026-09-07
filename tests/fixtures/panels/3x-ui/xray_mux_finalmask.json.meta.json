@@ -1,0 +1,10 @@
+{
+  "panel": "3x-ui",
+  "upstream": "https://github.com/MHSanaei/3x-ui",
+  "commit": "subJsonMux+subJsonFinalMask (modern JSON subscription)",
+  "generator": "SubJsonService mux + applyGlobalFinalMask → outbound.mux + streamSettings.finalmask",
+  "format": "xray_json_array",
+  "captured_from_generator": false,
+  "sanitized": true,
+  "notes": "Synthetic shape matching 3x-ui SubJsonService outbound mux injection and stream finalmask tcp tlshello."
+}

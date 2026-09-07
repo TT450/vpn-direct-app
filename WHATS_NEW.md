@@ -1,26 +1,19 @@
-# What's New — VPN Direct 1.0.6
+# What's New — VPN Direct 1.0.9
 
 Release date: 2026-09-07  
-Git tag: `v1.0.6`
+Git tag: `v1.0.9`
 
 ## App Store / short What's New
 
-- Battle-key qualification ready: detectors, parsers, and Core cover declared protocols
-- Mieru runtime registered behind `with_mieru` (TCP/UDP + traffic pattern)
-- Clash nested Reality/WS/gRPC/plugin opts import
-- Executable parser→`sing-box check` regression + interop lab templates (env battle keys)
-- Honest matrix: Interop stays `planned` until you attach live evidence
+- WireGuard and AmneziaWG now use the modern Core endpoint model (multi-peer, AWG 2 / 3.x)
+- Safer subscription import: no silent node drops; clearer unsupported/malformed diagnostics
+- Privacy-minded subscription fetch (no HWID blast to arbitrary hosts; safer redirects)
+- Broader panel/format fixtures and production Swift parser regression coverage
+- Physical iPhone install/launch verified; connect still requires your VPN permission on device
 
 ## Engineering detail
 
-- Ported `protocol/mieru` from enfein/mbox into `core/overlays/sing-box` (applied on stock pin); tags in `vpn_direct_*.tags`
-- Content detector schemes: shadowtls / naive / http-proxy family
-- ClashYAMLAdapter nest flatten; VLESS/HY share links attributes-only (legacy outbound marked)
-- `scripts/check_parser_execution.sh` + `docs/core/PANIC_BOUNDARY.md`
-- Interop runnable templates: xray / hysteria / amnezia / mieru
-
-### Still not `tested` / production-wide
-
-Do not flip matrix rows to `tested` without `evidence.interop` + `evidence.device`. CONNECT-UDP / Tailscale / OpenVPN remain `out_of_scope`.
-
-See also: `docs/core/PROTOCOL_MATRIX.md`, `ROADMAP.md`, `CHANGELOG.md`.
+- `SingBoxGraphBuilder` emits `endpoints` for WG/AWG; migrate→validate final JSON
+- Xray/Clash topology honesty; Remnawave HTTP classification; 3x-ui mux/finalmask
+- `scripts/prepare_core.sh` / `build_libbox.sh` fail-closed; field/plan coverage gates
+- See `docs/core/RELEASE_BLOCKER_LEDGER.md` and `docs/device/IPHONE_INSTALL_2026-09-07.md`

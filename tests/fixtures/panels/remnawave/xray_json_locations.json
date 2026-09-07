@@ -109,7 +109,7 @@
         {
           "tag": "balancer-nl",
           "selector": ["nl-leaf-"],
-          "strategy": { "type": "random" }
+          "strategy": { "type": "leastPing" }
         }
       ]
     }

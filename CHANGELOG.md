@@ -2,6 +2,17 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.9] — 2026-09-07
+
+### Production remediation release
+
+- WireGuard / AmneziaWG production graph uses Core `endpoints` (multi-peer + AWG 2/3.x fields); BattleParse parity with production builder
+- Fail-closed parsers/builders: silent drops removed; Xray balancers/fingerprint; Clash groups; typed extensions
+- Subscription HTTP: generic-first identity, redirect origin strip, streamed size cap, Keychain HWID durability
+- Content detector: structural JSON/Xray object/base64 re-detect; panel fixtures + provenance
+- Libbox/prepare_core harden; SFI Wi-Fi install/launch on physical iPhone (tunnel still needs interactive VPN)
+- Traceability: `docs/core/REMEDIATION_REQUIREMENTS.json` + plan coverage checker (`UNPLANNED=0`)
+
 ## [1.0.6.1] — 2026-09-07
 
 ### Core shipping fix

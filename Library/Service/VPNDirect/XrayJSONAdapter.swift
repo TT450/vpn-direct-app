@@ -7,14 +7,43 @@ import Foundation
 /// `UniversalOutboundBuilder` (no LEGACY `outbound` attachment for new Xray imports).
 public enum XrayJSONAdapter {
     public static func parse(_ content: String) throws -> NormalizedSubscription {
-        guard let data = content.data(using: .utf8),
-              let profiles = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
-        else {
+        guard let data = content.data(using: .utf8) else {
+            throw SubscriptionConfigBuilder.SubscriptionError.xrayJSONUnsupported
+        }
+        let root: Any
+        do {
+            root = try JSONSerialization.jsonObject(with: data)
+        } catch {
+            throw SubscriptionConfigBuilder.SubscriptionError.xrayJSONUnsupported
+        }
+
+        let profiles: [[String: Any]]
+        if let arr = root as? [[String: Any]] {
+            // Distinguish profile wrappers (`outbounds`/`remarks`) from a bare outbound list
+            // (3x-ui one-client JSON array of proxy objects with top-level `protocol`).
+            let looksLikeOutboundList = !arr.isEmpty && arr.allSatisfy { item in
+                let proto = ((item["protocol"] as? String) ?? "").lowercased()
+                return !proto.isEmpty && item["outbounds"] == nil
+            }
+            if looksLikeOutboundList {
+                profiles = [["remarks": "Server 1", "outbounds": arr]]
+            } else {
+                profiles = arr
+            }
+        } else if let obj = root as? [String: Any] {
+            // Top-level Xray / 3x-ui object (single profile or outbounds wrapper).
+            if obj["outbounds"] != nil || obj["protocol"] != nil || obj["remarks"] != nil {
+                profiles = [obj]
+            } else {
+                throw SubscriptionConfigBuilder.SubscriptionError.xrayJSONUnsupported
+            }
+        } else {
             throw SubscriptionConfigBuilder.SubscriptionError.xrayJSONUnsupported
         }
 
         var locations: [NormalizedLocation] = []
         var firstName: String?
+        var allImportWarnings: [String] = []
 
         for (index, profile) in profiles.enumerated() {
             let remarks = ((profile["remarks"] as? String) ?? "")
@@ -25,21 +54,40 @@ public enum XrayJSONAdapter {
                 continue
             }
 
-            let xrayOutbounds = (profile["outbounds"] as? [[String: Any]]) ?? []
-            let proxyOutbounds = xrayOutbounds.filter { outbound in
+            // Profile may itself be a single flat outbound (`protocol` + settings, no `outbounds`).
+            let xrayOutbounds: [[String: Any]]
+            if let nested = profile["outbounds"] as? [[String: Any]], !nested.isEmpty {
+                xrayOutbounds = nested
+            } else if let proto = profile["protocol"] as? String, !proto.isEmpty {
+                xrayOutbounds = [profile]
+            } else {
+                xrayOutbounds = []
+            }
+            var convertFailures: [String] = []
+            let helperProtocols: Set<String> = [
+                "freedom", "blackhole", "dns", "dokodemo-door", "direct", "block",
+            ]
+            var proxyOutbounds: [[String: Any]] = []
+            for outbound in xrayOutbounds {
                 let proto = ((outbound["protocol"] as? String) ?? "").lowercased()
-                return proto == "vless"
-                    || proto == "hysteria"
-                    || proto == "hysteria2"
-                    || proto == "vmess"
-                    || proto == "trojan"
-                    || proto == "shadowsocks"
-                    || proto == "ss"
+                let tag = ((outbound["tag"] as? String) ?? "").lowercased()
+                if helperProtocols.contains(proto) || tag == "direct" || tag == "block" || tag == "dns" {
+                    continue
+                }
+                let supported: Set<String> = [
+                    "vless", "hysteria", "hysteria2", "vmess", "trojan",
+                    "shadowsocks", "ss", "socks", "http", "wireguard",
+                ]
+                if supported.contains(proto) {
+                    proxyOutbounds.append(outbound)
+                } else if !proto.isEmpty {
+                    let label = (outbound["tag"] as? String) ?? proto
+                    convertFailures.append("unsupported_protocol:\(proto):\(label)")
+                }
             }
 
             let routing = (profile["routing"] as? [String: Any]) ?? [:]
             let balancers = (routing["balancers"] as? [[String: Any]]) ?? []
-            let hasBalancers = !balancers.isEmpty
 
             let ordered = proxyOutbounds.sorted { lhs, rhs in
                 let lt = (lhs["tag"] as? String) ?? ""
@@ -54,7 +102,7 @@ public enum XrayJSONAdapter {
             var pendingDialers: [(endpointIndex: Int, xrayDialer: String)] = []
             // Dedupe only within this profile/location — never globally across countries.
             var seenServersInProfile = Set<String>()
-            var convertFailures: [String] = []
+            // convertFailures may already contain unsupported_protocol diagnostics.
 
             for (entryIndex, xray) in ordered.enumerated() {
                 let xrayTag = ((xray["tag"] as? String) ?? "")
@@ -99,8 +147,21 @@ public enum XrayJSONAdapter {
                 var rawExtensions: [String: String] = [:]
                 if !xrayTag.isEmpty { attributes["xrayTag"] = xrayTag }
                 // Preserve streamSettings keys the converters may not map yet.
+                // Skip finalmask/fragment dumps when already mapped to tls_fragment* / multiplex.
+                let mappedTLSFragment = attributes["tls_fragment"] == "1"
+                let mappedMultiplex = attributes["multiplex"] == "1"
                 if let stream = xray["streamSettings"] as? [String: Any] {
                     for (k, v) in flattenJSON(stream, prefix: "stream") {
+                        let lower = k.lowercased()
+                        if mappedTLSFragment,
+                           lower.hasPrefix("stream.finalmask") || lower == "stream.fragment"
+                            || lower.hasPrefix("stream.fragment.")
+                        {
+                            continue
+                        }
+                        if mappedMultiplex, lower.hasPrefix("stream.mux") {
+                            continue
+                        }
                         if attributes[k] == nil {
                             switch CompatibilityFieldPolicy.classify(key: k, value: v) {
                             case .harmlessMetadata, .panelMetadata, .futureField:
@@ -158,21 +219,32 @@ public enum XrayJSONAdapter {
                 return ah && !bh
             }
 
-            // Refuse silent partial leaf loss — any convert/loopback failure aborts the profile.
-            if !convertFailures.isEmpty {
-                let preview = convertFailures.prefix(8).joined(separator: ",")
-                throw VPNDirectCoreError.unsupportedFeature(
-                    component: "xray.\(displayName)",
-                    detail: "lost \(convertFailures.count) leaf(s): \(preview)"
-                )
-            }
-            guard !endpoints.isEmpty else {
+            // Topology-aware: independent convert failures warn via empty skip; abort only if nothing left.
+            // Balancer-referenced missing leaves are handled inside applyBalancers (selector match).
+            if endpoints.isEmpty {
+                if !convertFailures.isEmpty {
+                    let preview = convertFailures.prefix(8).joined(separator: ",")
+                    throw VPNDirectCoreError.unsupportedFeature(
+                        component: "xray.\(displayName)",
+                        detail: "lost all leaves: \(preview)"
+                    )
+                }
                 continue
+            }
+            if !convertFailures.isEmpty {
+                let preview = convertFailures.prefix(12).joined(separator: ", ")
+                allImportWarnings.append(
+                    "Imported \(endpoints.count) leaf(s) for \(displayName); rejected \(convertFailures.count): \(preview)"
+                )
             }
 
             let kind: NormalizedLocationKind = isGlobalAutoName(displayName) ? .globalAuto : .country
-            let strategy: NormalizedLocationStrategy =
-                (hasBalancers || endpoints.count > 1) ? .urltest : .single
+            let (filtered, strategy) = try applyBalancers(
+                balancers: balancers,
+                endpoints: endpoints,
+                locationName: displayName
+            )
+            endpoints = filtered
 
             locations.append(
                 NormalizedLocation(
@@ -192,7 +264,11 @@ public enum XrayJSONAdapter {
             throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks
         }
 
-        return NormalizedSubscription(name: firstName, locations: locations)
+        return NormalizedSubscription(
+            name: firstName,
+            locations: locations,
+            importWarnings: allImportWarnings
+        )
     }
 
     /// Rich within-profile leaf key (no raw secrets — hashed uuid/password/pbk).
@@ -211,16 +287,128 @@ public enum XrayJSONAdapter {
         }
         let uuidHash = stableHash(outbound["uuid"] as? String)
         let passHash = stableHash(outbound["password"] as? String)
-        let path = firstString(transportDict?["path"]) ?? ""
+        let flow = (outbound["flow"] as? String) ?? ""
+        let encryption = (outbound["encryption"] as? String) ?? ""
+        let path = listOrString(transportDict?["path"])
+        let host = listOrString(transportDict?["host"])
         let serviceName = (transportDict?["service_name"] as? String) ?? ""
+        let mode = (transportDict?["mode"] as? String) ?? ""
+        let extraHash = stableHash(stringifyJSON(transportDict?["extra"]))
         let sni = (tls?["server_name"] as? String) ?? ""
-        let pbk = (tls?["reality"] as? [String: Any])?["public_key"] as? String
-        let pbkHash = stableHash(pbk)
+        let alpn = listOrString(tls?["alpn"])
+        let fpHash = stableHash((tls?["utls"] as? [String: Any])?["fingerprint"] as? String)
+        let reality = tls?["reality"] as? [String: Any]
+        let pbkHash = stableHash(reality?["public_key"] as? String)
+        let sidHash = stableHash(reality?["short_id"] as? String)
+        let packetEncoding = (outbound["packet_encoding"] as? String) ?? ""
+        let alterId = "\(outbound["alter_id"] as? Int ?? -1)"
+        let method = (outbound["method"] as? String) ?? ""
+        let scy = (outbound["security"] as? String) ?? ""
+        let obfs = outbound["obfs"] as? [String: Any]
+        let obfsType = (obfs?["type"] as? String) ?? (outbound["obfs"] as? String) ?? ""
+        let obfsPassHash = stableHash(obfs?["password"] as? String)
+        let hopPorts = listOrString(outbound["server_ports"])
+        let muxHash = stableHash(stringifyJSON(outbound["multiplex"]))
+        let xmuxHash = stableHash(stringifyJSON(transportDict?["xmux"]))
         let detourTag = detour ?? ""
         return [
             type, server, "\(port)", transport, securityFlag,
-            uuidHash, passHash, path, serviceName, sni, pbkHash, detourTag,
+            uuidHash, passHash, flow, encryption, path, host, serviceName, mode, extraHash,
+            sni, alpn, fpHash, pbkHash, sidHash, packetEncoding, alterId, method, scy,
+            obfsType, obfsPassHash, hopPorts, muxHash, xmuxHash, detourTag,
         ].joined(separator: "|")
+    }
+
+    private static func listOrString(_ value: Any?) -> String {
+        if let s = value as? String { return s }
+        if let arr = value as? [Any] {
+            return arr.map { "\($0)" }.joined(separator: ",")
+        }
+        if let arr = value as? [String] {
+            return arr.joined(separator: ",")
+        }
+        return ""
+    }
+
+    private static func stringifyJSON(_ value: Any?) -> String? {
+        guard let value else { return nil }
+        if let s = value as? String { return s }
+        guard JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value),
+              let s = String(data: data, encoding: .utf8)
+        else {
+            return "\(value)"
+        }
+        return s
+    }
+
+    /// Apply Xray `routing.balancers` selector prefixes + strategy.
+    /// - leastPing / leastLoad → location `.urltest`
+    /// - random → fail closed (no silent urltest substitution)
+    private static func applyBalancers(
+        balancers: [[String: Any]],
+        endpoints: [NormalizedNode],
+        locationName: String
+    ) throws -> ([NormalizedNode], NormalizedLocationStrategy) {
+        guard !balancers.isEmpty else {
+            // Multi-leaf without balancers → select, never invent urltest.
+            return (endpoints, endpoints.count > 1 ? .select : .single)
+        }
+
+        // Remnawave typically emits one balancer per profile; honor the first, validate all.
+        var selected = endpoints
+        var strategy: NormalizedLocationStrategy = .urltest
+
+        for (bIndex, balancer) in balancers.enumerated() {
+            let selectors = (balancer["selector"] as? [String]) ?? []
+            let strategyType = balancerStrategyType(balancer)
+            switch strategyType {
+            case "leastping", "leastload", "least_ping", "least_load", "":
+                strategy = .urltest
+            case "random":
+                throw VPNDirectCoreError.unsupportedFeature(
+                    component: "xray.balancer.\(locationName)",
+                    detail: "strategy=random has no silent sing-box equivalent; refusing urltest substitution"
+                )
+            default:
+                throw VPNDirectCoreError.unsupportedFeature(
+                    component: "xray.balancer.\(locationName)",
+                    detail: "unsupported balancer strategy=\(strategyType)"
+                )
+            }
+
+            if !selectors.isEmpty {
+                let filtered = endpoints.filter { node in
+                    let tag = node.attributes["xrayTag"] ?? node.name
+                    return selectors.contains { prefix in
+                        tag == prefix || tag.hasPrefix(prefix)
+                    }
+                }
+                if filtered.isEmpty {
+                    throw VPNDirectCoreError.malformedConfig(
+                        component: "xray.balancer.\(locationName)",
+                        detail: "balancer[\(bIndex)] selector matched zero leaves: \(selectors.joined(separator: ","))"
+                    )
+                }
+                // First balancer defines the location leaf set (Remnawave country profile).
+                if bIndex == 0 {
+                    selected = filtered
+                }
+            }
+        }
+        return (selected, selected.count > 1 ? strategy : .single)
+    }
+
+    private static func balancerStrategyType(_ balancer: [String: Any]) -> String {
+        if let strategy = balancer["strategy"] as? [String: Any],
+           let type = strategy["type"] as? String
+        {
+            return type.lowercased()
+        }
+        if let strategy = balancer["strategy"] as? String {
+            return strategy.lowercased()
+        }
+        return ""
     }
 
     /// First 8 hex chars of SHA256 — presence/identity without storing secrets in fingerprints/logs.
@@ -285,6 +473,12 @@ public enum XrayJSONAdapter {
                 put("pbk", reality["public_key"])
                 put("sid", reality["short_id"])
             }
+            if let fragment = tls["fragment"] as? Bool, fragment {
+                attrs["tls_fragment"] = "1"
+            }
+            if let delay = tls["fragment_fallback_delay"] as? String, !delay.isEmpty {
+                attrs["tls_fragment_fallback_delay"] = delay
+            }
         }
 
         if let transport = outbound["transport"] as? [String: Any] {
@@ -292,10 +486,28 @@ public enum XrayJSONAdapter {
                 attrs["network"] = t
                 attrs["net"] = t
             }
-            put("path", firstString(transport["path"]))
-            put("host", firstString(transport["host"]))
+            // Prefer full list semantics for multi-value transport fields (REQ-P092).
+            if let pathArr = transport["path"] as? [Any], !pathArr.isEmpty {
+                attrs["path"] = pathArr.map { "\($0)" }.joined(separator: ",")
+            } else {
+                put("path", transport["path"])
+            }
+            if let hostArr = transport["host"] as? [Any], !hostArr.isEmpty {
+                attrs["host"] = hostArr.map { "\($0)" }.joined(separator: ",")
+            } else {
+                put("host", transport["host"])
+            }
             put("mode", transport["mode"])
-            put("extra", transport["extra"])
+            if let extra = transport["extra"] {
+                if let s = extra as? String, !s.isEmpty {
+                    attrs["extra"] = s
+                } else if JSONSerialization.isValidJSONObject(extra),
+                          let data = try? JSONSerialization.data(withJSONObject: extra),
+                          let s = String(data: data, encoding: .utf8)
+                {
+                    attrs["extra"] = s
+                }
+            }
             put("service_name", transport["service_name"])
             put("scMaxEachPostBytes", transport["sc_max_each_post_bytes"] ?? transport["scMaxEachPostBytes"])
             put("scMinPostsIntervalMs", transport["sc_min_posts_interval_ms"] ?? transport["scMinPostsIntervalMs"])
@@ -314,6 +526,13 @@ public enum XrayJSONAdapter {
             put("obfs_password", obfs["password"])
         } else {
             put("obfs", outbound["obfs"])
+        }
+
+        if let multiplex = outbound["multiplex"] as? [String: Any],
+           let json = XrayMuxAndMask.multiplexAttrJSON(multiplex)
+        {
+            attrs["multiplex_json"] = json
+            attrs["multiplex"] = "1"
         }
 
         return attrs

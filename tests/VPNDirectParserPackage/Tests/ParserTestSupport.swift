@@ -37,34 +37,18 @@ enum ParserTestSupport {
 
     static func wrapOutbound(_ outbound: [String: Any]) throws -> Data {
         let type = (outbound["type"] as? String)?.lowercased() ?? ""
-        // WireGuard / AmneziaWG are endpoints in modern sing-box (AWG fields embed on the endpoint).
+        // Production builder already emits Core endpoint shape for WireGuard/AWG.
+        // Do not rewrite legacy outbound fields here — that masked production bugs.
         if type == "wireguard" || type == "amneziawg" {
-            var endpoint = outbound
-            if endpoint["peers"] == nil,
-               let server = endpoint["server"] as? String,
-               let port = endpoint["server_port"] as? Int,
-               let peerKey = endpoint["peer_public_key"] as? String
-            {
-                let local = endpoint["local_address"] as? [String] ?? ["10.0.0.2/32"]
-                endpoint["address"] = local
-                var peer: [String: Any] = [
-                    "address": "\(server):\(port)",
-                    "public_key": peerKey,
-                    "allowed_ips": ["0.0.0.0/0", "::/0"],
-                ]
-                if let psk = endpoint["pre_shared_key"] as? String {
-                    peer["pre_shared_key"] = psk
-                    endpoint.removeValue(forKey: "pre_shared_key")
-                }
-                endpoint["peers"] = [peer]
-                endpoint.removeValue(forKey: "server")
-                endpoint.removeValue(forKey: "server_port")
-                endpoint.removeValue(forKey: "peer_public_key")
-                endpoint.removeValue(forKey: "local_address")
+            guard outbound["peers"] != nil, outbound["address"] != nil, outbound["private_key"] != nil else {
+                throw VPNDirectCoreError.malformedConfig(
+                    component: "wireguard",
+                    detail: "Expected endpoint shape (peers/address/private_key); refusing test-only rewrite"
+                )
             }
             let cfg: [String: Any] = [
                 "log": ["level": "warn"],
-                "endpoints": [endpoint],
+                "endpoints": [outbound],
                 "inbounds": [
                     ["type": "socks", "tag": "in", "listen": "127.0.0.1", "listen_port": 0],
                 ],

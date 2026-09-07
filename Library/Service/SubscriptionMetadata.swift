@@ -22,6 +22,10 @@ public struct SubscriptionMetadata: Codable, Equatable {
     public var lastModified: String?
     /// Soft panel fingerprint id (remnawave / 3x-ui / …), never from domain alone.
     public var compatibilityProfileID: String?
+    /// Optional DNS / routing product overrides from normalized import (REQ-P081/P082/P084).
+    public var dnsRemoteServer: String?
+    public var dnsStrategy: String?
+    public var bypassPrivateNetworks: Bool?
 
     public init(
         title: String? = nil,
@@ -42,7 +46,10 @@ public struct SubscriptionMetadata: Codable, Equatable {
         providerID: String? = nil,
         etag: String? = nil,
         lastModified: String? = nil,
-        compatibilityProfileID: String? = nil
+        compatibilityProfileID: String? = nil,
+        dnsRemoteServer: String? = nil,
+        dnsStrategy: String? = nil,
+        bypassPrivateNetworks: Bool? = nil
     ) {
         self.title = title
         self.expireTimestamp = expireTimestamp
@@ -63,6 +70,9 @@ public struct SubscriptionMetadata: Codable, Equatable {
         self.etag = etag
         self.lastModified = lastModified
         self.compatibilityProfileID = compatibilityProfileID
+        self.dnsRemoteServer = dnsRemoteServer
+        self.dnsStrategy = dnsStrategy
+        self.bypassPrivateNetworks = bypassPrivateNetworks
     }
 
     public var expiryLabel: String {

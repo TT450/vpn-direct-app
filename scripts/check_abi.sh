@@ -88,6 +88,39 @@ else
   else
     echo "OK mieru runtime sources present (overlay applied)"
   fi
+
+  # Overlay idempotency smoke: second prepare_core must leave mieru intact.
+  bash "${ROOT}/scripts/prepare_core.sh" || fail=1
+  if [[ ! -f "${CORE}/protocol/mieru/outbound.go" ]] || [[ ! -f "${CORE}/include/mieru.go" ]]; then
+    echo "ERROR mieru runtime missing after second prepare_core (idempotency)" >&2
+    fail=1
+  else
+    echo "OK mieru still present after second prepare_core"
+  fi
+  if command -v go >/dev/null 2>&1 && [[ -d "${CORE}" ]]; then
+    tags_file="${ROOT}/scripts/tags/vpn_direct_full.tags"
+    if [[ -f "${tags_file}" ]]; then
+      build_tags="$(tr -d '\n' < "${tags_file}")"
+    else
+      build_tags='with_gvisor,with_quic,with_wireguard,with_utls,with_xhttp,with_awg,with_mieru'
+    fi
+    set +e
+    (
+      cd "${CORE}"
+      go build -o /dev/null -tags "${build_tags}" ./cmd/sing-box         >/tmp/vpndirect-overlay-idempotency.log 2>&1
+    )
+    overlay_status=$?
+    set -e
+    if [[ "${overlay_status}" -eq 0 ]]; then
+      echo "OK overlay idempotency compile (cmd/sing-box)"
+    else
+      echo "ERROR overlay idempotency compile failed (exit ${overlay_status})" >&2
+      tail -40 /tmp/vpndirect-overlay-idempotency.log || true
+      fail=1
+    fi
+  else
+    echo "note: go missing or core/sing-box absent — skipped overlay idempotency compile"
+  fi
 fi
 for tags_file in "${ROOT}/scripts/tags/vpn_direct_ios.tags" "${ROOT}/scripts/tags/vpn_direct_full.tags"; do
   if [[ ! -f "${tags_file}" ]]; then

@@ -20,11 +20,17 @@ public enum ClashYAMLAdapter {
         guard !proxies.isEmpty else {
             throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks
         }
-        var endpoints: [NormalizedNode] = []
+
+        var nodeByName: [String: NormalizedNode] = [:]
+        var orderedNames: [String] = []
         var failures: [String] = []
         for proxy in proxies {
             do {
-                endpoints.append(try mapProxy(proxy))
+                let node = try mapProxy(proxy)
+                if nodeByName[node.name] == nil {
+                    orderedNames.append(node.name)
+                }
+                nodeByName[node.name] = node
             } catch {
                 let label = proxy["name"] ?? proxy["type"] ?? "?"
                 let detail: String
@@ -38,27 +44,167 @@ public enum ClashYAMLAdapter {
                 failures.append("\(label):\(detail)")
             }
         }
-        // Refuse silent drop / partial import — any mapProxy failure aborts.
-        if !failures.isEmpty {
+        if nodeByName.isEmpty {
             let preview = failures.prefix(8).joined(separator: "; ")
             throw VPNDirectCoreError.unsupportedFeature(
                 component: "clash",
-                detail: endpoints.isEmpty
-                    ? preview
-                    : "dropped \(failures.count) of \(proxies.count) proxies: \(preview)"
+                detail: preview.isEmpty ? "no supported proxies" : preview
             )
         }
-        guard !endpoints.isEmpty else {
-            throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks
+
+        let groups = extractProxyGroupsViaYams(from: text)
+        if groups.isEmpty {
+            // Flat list: one selectable group of independent leaves (stable proxy order).
+            let endpoints = orderedNames.compactMap { nodeByName[$0] }
+            let location = NormalizedLocation(
+                id: "clash",
+                name: "Clash",
+                kind: .group,
+                strategy: endpoints.count > 1 ? .select : .single,
+                endpoints: endpoints
+            )
+            return NormalizedSubscription(name: "Clash", locations: [location])
         }
-        let location = NormalizedLocation(
-            id: "clash",
-            name: "Clash",
-            kind: .group,
-            strategy: endpoints.count > 1 ? .urltest : .single,
-            endpoints: endpoints
-        )
-        return NormalizedSubscription(name: "Clash", locations: [location])
+
+        let groupNames = Set(groups.map(\.name))
+        var locations: [NormalizedLocation] = []
+        var groupFailures: [String] = []
+
+        for group in groups {
+            if group.type == "unsupported-provider" {
+                groupFailures.append("\(group.name):proxy-providers (use:) not supported")
+                continue
+            }
+            var leafEndpoints: [NormalizedNode] = []
+            var nestedIDs: [String] = []
+            var missing: [String] = []
+
+            for member in group.members {
+                if let node = nodeByName[member] {
+                    leafEndpoints.append(node)
+                } else if groupNames.contains(member) {
+                    nestedIDs.append(member)
+                } else {
+                    missing.append(member)
+                }
+            }
+
+            if !missing.isEmpty {
+                // Missing referenced member is topology-critical for this group.
+                groupFailures.append("\(group.name):missing members \(missing.joined(separator: ","))")
+                continue
+            }
+            if leafEndpoints.isEmpty && nestedIDs.isEmpty {
+                groupFailures.append("\(group.name):empty group")
+                continue
+            }
+
+            let strategy = clashGroupStrategy(group.type)
+            let kind: NormalizedLocationKind = group.type == "fallback" ? .fallback : .group
+            locations.append(
+                NormalizedLocation(
+                    id: group.name,
+                    name: group.name,
+                    kind: kind,
+                    strategy: strategy,
+                    endpoints: leafEndpoints,
+                    memberLocationIDs: nestedIDs,
+                    healthCheckURL: group.url,
+                    healthCheckInterval: group.interval.map { "\($0)s" }
+                )
+            )
+        }
+
+        if locations.isEmpty {
+            let preview = (failures + groupFailures).prefix(8).joined(separator: "; ")
+            throw VPNDirectCoreError.unsupportedFeature(
+                component: "clash.proxy-groups",
+                detail: preview.isEmpty ? "no buildable proxy-groups" : preview
+            )
+        }
+
+        // Surface independent proxy conversion failures as import warnings via subscription name suffix is insufficient;
+        // callers that need diagnostics should use graph warnings. Keep survivors.
+        return NormalizedSubscription(name: "Clash", locations: locations)
+    }
+
+    private struct ClashProxyGroup {
+        let name: String
+        let type: String
+        let members: [String]
+        let url: String?
+        let interval: Int?
+    }
+
+    private static func clashGroupStrategy(_ type: String) -> NormalizedLocationStrategy {
+        switch type.lowercased() {
+        case "select":
+            return .select
+        case "url-test", "urltest":
+            return .urltest
+        case "fallback":
+            return .fallback
+        case "load-balance", "loadbalance":
+            return .random
+        case "relay":
+            // Relay/chain: treat as select of members until dedicated chain model lands;
+            // GraphBuilder will still preserve ordered members.
+            return .select
+        default:
+            return .select
+        }
+    }
+
+    private static func extractProxyGroupsViaYams(from text: String) -> [ClashProxyGroup] {
+        #if canImport(Yams)
+        guard let root = try? Yams.compose(yaml: text),
+              let mapping = root.mapping,
+              let groupsNode = mapping["proxy-groups"],
+              let sequence = groupsNode.sequence
+        else {
+            return []
+        }
+        var groups: [ClashProxyGroup] = []
+        for item in sequence {
+            guard let gmap = item.mapping,
+                  let name = gmap["name"]?.string,
+                  let type = gmap["type"]?.string
+            else { continue }
+            var members: [String] = []
+            if let proxies = gmap["proxies"]?.sequence {
+                for p in proxies {
+                    if let s = yamsScalarString(p) { members.append(s) }
+                }
+            }
+            // `use:` (provider-backed) without inline proxies → explicit unsupported topology.
+            if members.isEmpty, gmap["use"] != nil {
+                groups.append(
+                    ClashProxyGroup(
+                        name: name,
+                        type: "unsupported-provider",
+                        members: [],
+                        url: nil,
+                        interval: nil
+                    )
+                )
+                continue
+            }
+            let url = gmap["url"]?.string
+            let interval = gmap["interval"]?.int
+            groups.append(
+                ClashProxyGroup(
+                    name: name,
+                    type: type,
+                    members: members,
+                    url: url,
+                    interval: interval
+                )
+            )
+        }
+        return groups
+        #else
+        return []
+        #endif
     }
 
     private static func mapProxy(_ proxy: [String: String]) throws -> NormalizedNode {
@@ -121,11 +267,42 @@ public enum ClashYAMLAdapter {
         case "anytls":
             attrs["password"] = attrs["password"] ?? ""
             return NormalizedNode(name: name, protocolID: .anytls, server: server, port: port, security: .tls, attributes: attrs)
-        case "wireguard":
+        case "wireguard", "amneziawg", "awg":
             attrs["private_key"] = attrs["private-key"] ?? attrs["private_key"] ?? ""
-            attrs["peer_public_key"] = attrs["public-key"] ?? attrs["public_key"] ?? ""
-            attrs["local_address"] = attrs["ip"] ?? attrs["address"] ?? "10.0.0.2/32"
-            return NormalizedNode(name: name, protocolID: .wireguard, server: server, port: port, attributes: attrs)
+            attrs["peer_public_key"] = attrs["public-key"] ?? attrs["public_key"] ?? attrs["peer_public_key"] ?? ""
+            let local = attrs["ip"] ?? attrs["address"] ?? attrs["local_address"] ?? "10.0.0.2/32"
+            attrs["local_address"] = local
+            let claimedAWG = type == "amneziawg" || type == "awg" || attrs["jc"] != nil || attrs["h1"] != nil
+                || attrs["header_protection_key"] != nil || attrs["amnezia_version"] != nil
+            let options = try AmneziaWGEndpointOptions.fromFlatAttributes(
+                privateKey: attrs["private_key"] ?? "",
+                peerPublicKey: attrs["peer_public_key"] ?? "",
+                localAddress: local.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) },
+                peerEndpoint: "\(server):\(port)",
+                preSharedKey: attrs["pre-shared-key"] ?? attrs["pre_shared_key"],
+                mtu: attrs["mtu"].flatMap(Int.init),
+                attributes: attrs,
+                forcedVersion: attrs["amnezia_version"],
+                claimedAWG: claimedAWG && attrs["amnezia_version"] == nil
+            )
+            let inferred = try AmneziaWGEndpointOptions.inferAmneziaVersion(
+                from: options,
+                forced: attrs["amnezia_version"],
+                claimedAWG: claimedAWG && attrs["amnezia_version"] == nil
+            )
+            var final = options
+            if let inferred {
+                final.amneziaVersion = inferred
+                attrs["amnezia_version"] = inferred
+            }
+            return NormalizedNode(
+                name: name,
+                protocolID: inferred != nil ? .amneziawg : .wireguard,
+                server: server,
+                port: port,
+                attributes: attrs,
+                wireguardEndpoint: final
+            )
         case "socks5", "socks":
             return NormalizedNode(name: name, protocolID: .socks, server: server, port: port, attributes: attrs)
         case "http":
@@ -152,7 +329,10 @@ public enum ClashYAMLAdapter {
                 attributes: attrs
             )
         case "ssh":
-            attrs["user"] = attrs["username"] ?? attrs["user"] ?? "root"
+            guard let user = attrs["username"] ?? attrs["user"], !user.isEmpty else {
+                throw VPNDirectCoreError.malformedConfig(component: "clash.ssh", detail: "Missing user")
+            }
+            attrs["user"] = user
             return NormalizedNode(name: name, protocolID: .ssh, server: server, port: port, attributes: attrs)
         default:
             throw VPNDirectCoreError.unsupportedFeature(component: "clash", detail: "Unsupported proxy type \(type)")

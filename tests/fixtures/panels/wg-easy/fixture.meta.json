@@ -1,0 +1,12 @@
+{
+  "panel": "wg-easy",
+  "upstream": "https://github.com/wg-easy/wg-easy",
+  "commit": "unpinned-fixture-scaffold",
+  "generator": "repo fixture / README-derived",
+  "format": "json",
+  "sample": "headers.json",
+  "captured_from_generator": false,
+  "sanitized": true,
+  "date": "2026-09-07",
+  "note": "Provenance scaffold for REQ-P010; replace with generator-captured output when available."
+}

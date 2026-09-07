@@ -1,0 +1,10 @@
+{
+  "panel": "remnawave",
+  "upstream": "https://github.com/remnawave/backend",
+  "commit": "docs-derived-2026-09-07",
+  "generator": "XRAY_JSON profile templates",
+  "format": "xray_json",
+  "captured_from_generator": false,
+  "sanitized": true,
+  "notes": "Provenance scaffold for remnawave fixtures directory (REQ-P010)."
+}

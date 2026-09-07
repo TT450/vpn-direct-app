@@ -262,7 +262,8 @@ public class ExtensionProfile: ObservableObject {
         }
 
         let rawContent = try await profile.readAsync()
-        let migrated = (try? SingBoxConfigMigrator.migrate(rawContent)) ?? rawContent
+        // Fail closed: do not start the tunnel with an unmigrated / invalid config.
+        let migrated = try SingBoxConfigMigrator.migrate(rawContent)
         let bypassRU = await SharedPreferences.bypassRussianSites.get()
         let configContent = RussianBypassRouting.apply(to: migrated, enabled: bypassRU)
         options["configContent"] = NSString(string: configContent)

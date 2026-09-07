@@ -42,7 +42,9 @@
         "hwid": false,
         "subscription_headers": true,
         "path_based_formats": true,
-        "routing_header": true
+        "routing_header": true,
+        "routing_header_applied": false,
+        "routing_status": "metadata_only_ignored_with_warning"
       },
       "evidence": {
         "fixtures": true,
@@ -68,7 +70,7 @@
       },
       "evidence": {
         "fixtures": true,
-        "interop": true,
+        "interop": false,
         "device": false
       },
       "dossier": "docs/compatibility/panels/x-ui.md"
@@ -94,7 +96,7 @@
       },
       "evidence": {
         "fixtures": true,
-        "interop": true,
+        "interop": false,
         "device": false
       },
       "dossier": "docs/compatibility/panels/tx-ui.md"
@@ -183,6 +185,8 @@
         "xray_and_singbox": true,
         "subscription_userinfo": true,
         "smart_proxy": true,
+        "smart_proxy_status": "nodes_only",
+        "routing_status": "nodes_only_not_full_semantic",
         "multi_protocol": true
       },
       "evidence": {
@@ -253,7 +257,7 @@
       },
       "evidence": {
         "fixtures": true,
-        "interop": true,
+        "interop": false,
         "device": false
       },
       "dossier": "docs/compatibility/panels/wg-easy.md"
@@ -276,7 +280,7 @@
       },
       "evidence": {
         "fixtures": true,
-        "interop": true,
+        "interop": false,
         "device": false
       },
       "dossier": "docs/compatibility/panels/amnezia.md"

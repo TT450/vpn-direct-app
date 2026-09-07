@@ -20,6 +20,8 @@ public struct VPNDirectProtocolID: RawRepresentable, Hashable, Sendable, Codable
     public static let socks = VPNDirectProtocolID(rawValue: "socks")
     public static let http = VPNDirectProtocolID(rawValue: "http")
     public static let ssh = VPNDirectProtocolID(rawValue: "ssh")
+    public static let naive = VPNDirectProtocolID(rawValue: "naive")
+    public static let shadowtls = VPNDirectProtocolID(rawValue: "shadowtls")
 }
 
 /// Extensible transport identity (tcp/ws/xhttp/…).
@@ -65,11 +67,16 @@ public struct NormalizedNode: Equatable {
     /// Protocol-specific fields preserved for builders (share-link query, JSON keys, …).
     public var attributes: [String: String]
     /// Opaque extras: panel metadata, future fields, unclassified keys (never silently dropped).
+    /// Legacy string map — prefer `typedExtensions` for arrays/objects.
     public var rawExtensions: [String: String]
+    /// Typed extensions (lossless arrays/objects). Keys here are also mirrored into rawExtensions as flattened strings for policy scans.
+    public var typedExtensions: [String: VPNDirectJSONValue]
     /// Original share link / fragment when available.
     public var source: String?
     /// Pre-built sing-box outbound when the adapter already constructed one.
     public var outbound: [String: Any]?
+    /// Structured WireGuard / AmneziaWG endpoint (multi-peer + AWG fields). Preferred over flat attrs.
+    public var wireguardEndpoint: AmneziaWGEndpointOptions?
     /// Optional detour / next-hop tag (Xray dialerProxy → sing-box detour).
     public var detour: String?
 
@@ -84,8 +91,10 @@ public struct NormalizedNode: Equatable {
         uuid: String? = nil,
         attributes: [String: String] = [:],
         rawExtensions: [String: String] = [:],
+        typedExtensions: [String: VPNDirectJSONValue] = [:],
         source: String? = nil,
         outbound: [String: Any]? = nil,
+        wireguardEndpoint: AmneziaWGEndpointOptions? = nil,
         detour: String? = nil
     ) {
         self.name = name
@@ -97,24 +106,45 @@ public struct NormalizedNode: Equatable {
         self.obfuscation = obfuscation
         self.uuid = uuid
         self.attributes = attributes
-        self.rawExtensions = rawExtensions
+        var raw = rawExtensions
+        var typed = typedExtensions
+        for (k, v) in typed {
+            if raw[k] == nil {
+                raw[k] = v.flattenedString
+            }
+        }
+        for (k, v) in raw where typed[k] == nil {
+            typed[k] = .string(v)
+        }
+        self.rawExtensions = raw
+        self.typedExtensions = typed
         self.source = source
         self.outbound = outbound
+        self.wireguardEndpoint = wireguardEndpoint
         self.detour = detour
     }
 
+    /// Connection-critical equality (REQ-P136 / REQ-P137).
+    /// Excludes `source` (provenance) and legacy `outbound` prebuilt JSON
+    /// (builders must consume typed model; outbound is not part of semantic identity).
+    public func connectionEquals(_ other: NormalizedNode) -> Bool {
+        name == other.name
+            && protocolID == other.protocolID
+            && server == other.server
+            && port == other.port
+            && transport == other.transport
+            && security == other.security
+            && obfuscation == other.obfuscation
+            && uuid == other.uuid
+            && attributes == other.attributes
+            && rawExtensions == other.rawExtensions
+            && typedExtensions == other.typedExtensions
+            && detour == other.detour
+            && wireguardEndpoint == other.wireguardEndpoint
+    }
+
     public static func == (lhs: NormalizedNode, rhs: NormalizedNode) -> Bool {
-        lhs.name == rhs.name
-            && lhs.protocolID == rhs.protocolID
-            && lhs.server == rhs.server
-            && lhs.port == rhs.port
-            && lhs.transport == rhs.transport
-            && lhs.security == rhs.security
-            && lhs.obfuscation == rhs.obfuscation
-            && lhs.uuid == rhs.uuid
-            && lhs.attributes == rhs.attributes
-            && lhs.rawExtensions == rhs.rawExtensions
-            && lhs.source == rhs.source
-            && lhs.detour == rhs.detour
+        // Semantic connection equality; provenance (`source`) intentionally excluded.
+        lhs.connectionEquals(rhs)
     }
 }

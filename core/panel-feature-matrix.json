@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "updated": "2026-09-07",
+  "dimensions": [
+    "panel",
+    "format",
+    "protocol",
+    "feature"
+  ],
+  "note": "live_tested only with physical handshake evidence",
+  "cells": [
+    {
+      "panel": "remnawave",
+      "format": "xray_json",
+      "protocol": "vless",
+      "feature": "balancers",
+      "status": "config_validated"
+    },
+    {
+      "panel": "remnawave",
+      "format": "xray_json",
+      "protocol": "vless",
+      "feature": "reality",
+      "status": "config_validated"
+    },
+    {
+      "panel": "3x-ui",
+      "format": "xray_json",
+      "protocol": "vless",
+      "feature": "mux",
+      "status": "config_validated"
+    },
+    {
+      "panel": "3x-ui",
+      "format": "xray_json",
+      "protocol": "vless",
+      "feature": "xhttp",
+      "status": "normalized"
+    },
+    {
+      "panel": "libertea",
+      "format": "clash",
+      "protocol": "vless",
+      "feature": "proxy_groups",
+      "status": "normalized"
+    },
+    {
+      "panel": "hiddify",
+      "format": "clash",
+      "protocol": "vless",
+      "feature": "proxy_groups",
+      "status": "parser_only"
+    },
+    {
+      "panel": "wg-easy",
+      "format": "wg_conf",
+      "protocol": "wireguard",
+      "feature": "multi_peer_wg",
+      "status": "normalized"
+    },
+    {
+      "panel": "amnezia",
+      "format": "wg_conf",
+      "protocol": "amneziawg",
+      "feature": "awg",
+      "status": "normalized"
+    },
+    {
+      "panel": "s-ui",
+      "format": "singbox",
+      "protocol": "vless",
+      "feature": "leaf_parse",
+      "status": "normalized"
+    },
+    {
+      "panel": "marzban",
+      "format": "uri",
+      "protocol": "vless",
+      "feature": "reality",
+      "status": "normalized"
+    }
+  ]
+}

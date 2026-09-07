@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "core_pin": "v1.14.0-lx.35",
+  "updated": "2026-09-07",
+  "note": "Connection-critical field inventory. Statuses: SUPPORTED_AND_EMITTED | SUPPORTED_PASSTHROUGH | INTENTIONALLY_NOT_APPLICABLE | EXPLICITLY_UNSUPPORTED. Not live handshake evidence.",
+  "protocols": [
+    {
+      "protocol": "vless",
+      "variant": "base",
+      "fields": [
+        {"path": "server", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder.buildVLESS", "tests": ["DetectorAndShareLinkTests"]},
+        {"path": "server_port", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder.buildVLESS", "tests": ["DetectorAndShareLinkTests"]},
+        {"path": "uuid", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder.buildVLESS", "tests": ["XrayAndFailClosedTests"]},
+        {"path": "flow", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder.buildVLESS", "tests": []},
+        {"path": "encryption", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder.buildVLESS", "tests": ["testVLESSEncryptionFailClosedWithoutCapability"]},
+        {"path": "transport.xhttp", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder", "tests": ["AdvancedProtocolFieldTests"]},
+        {"path": "tls.reality", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder", "tests": ["DetectorAndShareLinkTests"]}
+      ]
+    },
+    {
+      "protocol": "wireguard",
+      "variant": "endpoint",
+      "fields": [
+        {"path": "private_key", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "AmneziaWGEndpointOptions.endpointJSON", "tests": ["WireGuardEndpointTests"]},
+        {"path": "peers[]", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "AmneziaWGEndpointOptions.endpointJSON", "tests": ["WireGuardEndpointTests"]},
+        {"path": "address[]", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "AmneziaWGEndpointOptions.endpointJSON", "tests": ["WireGuardEndpointTests"]}
+      ]
+    },
+    {
+      "protocol": "amneziawg",
+      "variant": "3.x",
+      "fields": [
+        {"path": "jc", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "AmneziaWGEndpointOptions.endpointJSON", "tests": ["WireGuardEndpointTests"]},
+        {"path": "header_protection_key", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "AmneziaWGEndpointOptions.endpointJSON", "tests": ["WireGuardEndpointTests"]},
+        {"path": "random_trailers", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "AmneziaWGEndpointOptions.endpointJSON", "tests": ["WireGuardEndpointTests"]}
+      ]
+    },
+    {
+      "protocol": "hysteria2",
+      "variant": "base",
+      "fields": [
+        {"path": "server_ports", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder", "tests": ["AdvancedProtocolFieldTests"]},
+        {"path": "obfs.salamander", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder", "tests": ["AdvancedProtocolFieldTests"]},
+        {"path": "obfs.gecko", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder", "tests": ["AdvancedProtocolFieldTests"]}
+      ]
+    },
+    {
+      "protocol": "mieru",
+      "variant": "base",
+      "fields": [
+        {"path": "transport", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder", "tests": ["DetectorAndShareLinkTests", "AdvancedProtocolFieldTests"]},
+        {"path": "traffic_pattern", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder", "tests": ["AdvancedProtocolFieldTests"]}
+      ]
+    },
+    {
+      "protocol": "masque",
+      "variant": "connect-ip",
+      "fields": [
+        {"path": "profile", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder", "tests": ["AdvancedProtocolFieldTests"]},
+        {"path": "vhttp", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "UniversalOutboundBuilder", "tests": ["AdvancedProtocolFieldTests"]}
+      ]
+    },
+    {
+      "protocol": "masque",
+      "variant": "connect-udp",
+      "fields": [
+        {"path": "*", "connection_critical": true, "status": "EXPLICITLY_UNSUPPORTED", "builder": "ContentDetector.recognizedUnsupported", "tests": []}
+      ]
+    }
+  ]
+}

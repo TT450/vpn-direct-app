@@ -1,0 +1,10 @@
+{
+  "panel": "hiddify",
+  "upstream": "https://github.com/hiddify/Hiddify-Manager",
+  "commit": "docs-derived-2026-09-07",
+  "generator": "subscription body comment conventions + URI list",
+  "format": "uri_list_with_metadata_comments",
+  "captured_from_generator": false,
+  "sanitized": true,
+  "notes": "Comment metadata before URI list; detector must strip before parse (REQ-P061)."
+}

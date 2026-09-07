@@ -56,7 +56,9 @@ final class DetectorAndShareLinkTests: XCTestCase {
     func testSSRDoesNotClassifyAsURIList() {
         let text = "ssr://YWFhYmJiY2NjZGRkZWVlZg"
         let detection = VPNDirectContentDetector.detect(text: text)
-        XCTAssertEqual(detection.kind, .unknown)
+        // SSR is recognized as intentionally unsupported — never misclassified as URI list.
+        XCTAssertEqual(detection.kind, .recognizedUnsupported)
+        XCTAssertEqual(detection.unsupportedProtocolID, "ssr")
     }
 
     func testBase64URIListFromPanel() throws {
@@ -64,5 +66,19 @@ final class DetectorAndShareLinkTests: XCTestCase {
         let detection = VPNDirectContentDetector.detect(text: b64.trimmingCharacters(in: .whitespacesAndNewlines))
         XCTAssertTrue(detection.kind == .base64URIList || detection.kind == .uriList)
         XCTAssertTrue(detection.wasBase64Decoded || detection.kind == .uriList)
+    }
+
+    /// REQ-P061: Hiddify-style comment metadata before URI list must not break detection.
+    func testHiddifyMetadataPrefixURIList() throws {
+        let raw = try ParserTestSupport.readFixture("panels/hiddify/metadata_prefix_uri_list.txt")
+        let detection = VPNDirectContentDetector.detect(text: raw)
+        XCTAssertEqual(detection.kind, .uriList)
+        let links = raw
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("#") }
+        let parsed = VPNDirectParserRegistry.parseShareLinks(links)
+        XCTAssertEqual(parsed.nodes.count, 1)
+        XCTAssertEqual(parsed.nodes.first?.protocolID, .vless)
     }
 }

@@ -9,20 +9,30 @@ public enum VPNDirectContentKind: String, Equatable, Sendable {
     case mieruJSON
     case uriList
     case base64URIList
+    /// Recognized protocol/format that VPN Direct intentionally does not import.
+    case recognizedUnsupported
     case unknown
 }
 
-/// Ordered content detector: encoding first, then type. Does **not** line-trim before YAML detection.
+/// Ordered content detector: structural JSON first, then YAML/conf/URI.
 public enum VPNDirectContentDetector {
     public struct Detection: Equatable, Sendable {
         public var kind: VPNDirectContentKind
         public var text: String
         public var wasBase64Decoded: Bool
+        /// When kind == .recognizedUnsupported.
+        public var unsupportedProtocolID: String?
 
-        public init(kind: VPNDirectContentKind, text: String, wasBase64Decoded: Bool = false) {
+        public init(
+            kind: VPNDirectContentKind,
+            text: String,
+            wasBase64Decoded: Bool = false,
+            unsupportedProtocolID: String? = nil
+        ) {
             self.kind = kind
             self.text = text
             self.wasBase64Decoded = wasBase64Decoded
+            self.unsupportedProtocolID = unsupportedProtocolID
         }
     }
 
@@ -39,18 +49,28 @@ public enum VPNDirectContentDetector {
 
     public static func detect(text: String) -> Detection {
         let strippedBOM = text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text
-        let leading = strippedBOM.drop(while: { $0.isNewline || $0 == " " || $0 == "\t" })
-        let preview = String(leading.prefix(4096))
 
-        if looksLikeSingBoxJSON(preview) {
-            return Detection(kind: .singBoxJSON, text: strippedBOM)
+        // Strip leading subscription comment / Hiddify-style metadata lines before structural JSON.
+        let (cleanedBody, _) = stripLeadingMetadataComments(from: strippedBOM)
+        let leading = cleanedBody.drop(while: { $0.isNewline || $0 == " " || $0 == "\t" })
+        let bodyForJSON = String(leading)
+
+        if let unsupported = recognizeUnsupported(strippedBOM) {
+            return Detection(
+                kind: .recognizedUnsupported,
+                text: strippedBOM,
+                unsupportedProtocolID: unsupported
+            )
         }
-        if looksLikeXrayJSON(preview) {
-            return Detection(kind: .xrayJSON, text: strippedBOM)
+
+        if let kind = classifyJSON(bodyForJSON) {
+            // Prefer cleaned body for parsers when metadata prefix was present.
+            let payload = cleanedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? strippedBOM
+                : cleanedBody
+            return Detection(kind: kind, text: payload)
         }
-        if looksLikeMieruJSON(preview) {
-            return Detection(kind: .mieruJSON, text: strippedBOM)
-        }
+
         if looksLikeClashYAML(strippedBOM) {
             return Detection(kind: .clashYAML, text: strippedBOM)
         }
@@ -59,13 +79,20 @@ public enum VPNDirectContentDetector {
         }
 
         let compact = strippedBOM.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let decoded = decodeBase64Payload(compact), containsShareScheme(decoded) {
-            // Re-detect decoded payload (may itself be YAML/JSON).
+        if let decoded = decodeBase64Payload(compact) {
+            // Re-detect decoded payload structurally — even without share schemes (JSON/YAML/conf).
             let nested = detect(text: decoded)
             if nested.kind != .unknown, nested.kind != .uriList, nested.kind != .base64URIList {
-                return Detection(kind: nested.kind, text: nested.text, wasBase64Decoded: true)
+                return Detection(
+                    kind: nested.kind,
+                    text: nested.text,
+                    wasBase64Decoded: true,
+                    unsupportedProtocolID: nested.unsupportedProtocolID
+                )
             }
-            return Detection(kind: .base64URIList, text: decoded, wasBase64Decoded: true)
+            if containsShareScheme(decoded) {
+                return Detection(kind: .base64URIList, text: decoded, wasBase64Decoded: true)
+            }
         }
         if containsShareScheme(strippedBOM) {
             return Detection(kind: .uriList, text: strippedBOM)
@@ -73,28 +100,139 @@ public enum VPNDirectContentDetector {
         return Detection(kind: .unknown, text: strippedBOM)
     }
 
-    private static func looksLikeSingBoxJSON(_ preview: String) -> Bool {
-        let t = preview.trimmingCharacters(in: .whitespacesAndNewlines)
-        return t.hasPrefix("{") && (t.contains("\"outbounds\"") || t.contains("\"inbounds\""))
+    // MARK: - Structural JSON
+
+    private static func classifyJSON(_ text: String) -> VPNDirectContentKind? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("{") || trimmed.hasPrefix("[") else { return nil }
+        guard let data = trimmed.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data)
+        else { return nil }
+
+        if let arr = obj as? [Any] {
+            return classifyXrayArray(arr) ? .xrayJSON : nil
+        }
+        guard let dict = obj as? [String: Any] else { return nil }
+
+        if looksLikeMieruObject(dict) {
+            return .mieruJSON
+        }
+        if looksLikeSingBoxObject(dict) {
+            return .singBoxJSON
+        }
+        if looksLikeXrayObject(dict) {
+            return .xrayJSON
+        }
+        // Top-level object with outbounds array (3x-ui / Xray profile object).
+        if let outs = dict["outbounds"] as? [Any], !outs.isEmpty {
+            if outs.contains(where: { ($0 as? [String: Any])?["protocol"] != nil }) {
+                return .xrayJSON
+            }
+            if outs.contains(where: { ($0 as? [String: Any])?["type"] != nil }) {
+                // Could be sing-box without inbounds — prefer sing-box if type keys dominate.
+                let typed = outs.compactMap { $0 as? [String: Any] }
+                if typed.contains(where: { ($0["type"] as? String) != nil }) {
+                    return .singBoxJSON
+                }
+            }
+        }
+        return nil
     }
 
-    private static func looksLikeXrayJSON(_ preview: String) -> Bool {
-        let t = preview.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard t.hasPrefix("[") else { return false }
-        return t.contains("\"outbounds\"") || t.contains("\"protocol\"") || t.contains("\"remarks\"")
+    private static func looksLikeSingBoxObject(_ dict: [String: Any]) -> Bool {
+        let hasOutbounds = dict["outbounds"] is [Any]
+        let hasInbounds = dict["inbounds"] is [Any]
+        let hasEndpoints = dict["endpoints"] is [Any]
+        let hasRoute = dict["route"] != nil
+        guard hasOutbounds || hasInbounds || hasEndpoints else { return false }
+        // Prefer sing-box when typed outbounds/endpoints exist.
+        if hasEndpoints { return true }
+        if let outs = dict["outbounds"] as? [[String: Any]],
+           outs.contains(where: { $0["type"] is String })
+        {
+            return true
+        }
+        if hasInbounds, hasRoute { return true }
+        if hasInbounds, hasOutbounds { return true }
+        return false
     }
 
-    private static func looksLikeMieruJSON(_ preview: String) -> Bool {
-        let t = preview.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard t.hasPrefix("{") else { return false }
-        let lower = t.lowercased()
-        return lower.contains("\"profiles\"") && (lower.contains("\"mieru\"") || lower.contains("\"userdataencryption\"") || lower.contains("\"mtu\""))
-            || lower.contains("\"activeprofile\"")
-            || (lower.contains("\"serverport\"") && lower.contains("\"username\"") && lower.contains("\"password\""))
+    private static func looksLikeXrayObject(_ dict: [String: Any]) -> Bool {
+        if dict["remarks"] is String { return true }
+        if let outs = dict["outbounds"] as? [[String: Any]],
+           outs.contains(where: { $0["protocol"] is String })
+        {
+            return true
+        }
+        if dict["protocol"] is String { return true }
+        return false
+    }
+
+    private static func classifyXrayArray(_ arr: [Any]) -> Bool {
+        for item in arr {
+            guard let dict = item as? [String: Any] else { continue }
+            if dict["remarks"] != nil || dict["protocol"] != nil { return true }
+            if let outs = dict["outbounds"] as? [[String: Any]],
+               outs.contains(where: { $0["protocol"] != nil || $0["type"] != nil })
+            {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func looksLikeMieruObject(_ dict: [String: Any]) -> Bool {
+        if dict["profiles"] is [Any] { return true }
+        if dict["activeProfile"] != nil { return true }
+        if dict["userName"] != nil || dict["username"] != nil {
+            if dict["serverPort"] != nil || dict["serverPorts"] != nil || dict["serverAddress"] != nil {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Leading `#` / `//` metadata lines (Hiddify / panel comments) before `{`/`[`.
+    private static func stripLeadingMetadataComments(from text: String) -> (String, Bool) {
+        var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var removed = false
+        while let first = lines.first {
+            let t = first.trimmingCharacters(in: .whitespaces)
+            if t.isEmpty || t.hasPrefix("#") || t.hasPrefix("//") {
+                lines.removeFirst()
+                removed = true
+                continue
+            }
+            break
+        }
+        return (lines.joined(separator: "\n"), removed)
+    }
+
+    private static func recognizeUnsupported(_ text: String) -> String? {
+        let lower = text.lowercased()
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("client") && lower.contains("dev") && lower.contains("proto") {
+            return "openvpn"
+        }
+        if lower.contains("-----begin certificate-----") && lower.contains("remote ") && lower.contains("proto ") {
+            return "openvpn"
+        }
+        if lower.contains("<openconnect") || lower.contains("anyconnect") && lower.contains("servercert") {
+            return "openconnect"
+        }
+        if lower.contains("\"tailscale\"") && lower.contains("\"control_url\"") {
+            return "tailscale"
+        }
+        if lower.contains("connect-udp") || lower.contains("\"protocol\"") && lower.contains("connect-udp") {
+            return "masque_connect_udp"
+        }
+        if lower.contains("ssr://") {
+            return "ssr"
+        }
+        return nil
     }
 
     private static func looksLikeClashYAML(_ text: String) -> Bool {
-        // Do not trim each line — only scan for Clash markers.
         let lower = text.lowercased()
         if lower.contains("\nproxies:") || lower.hasPrefix("proxies:") { return true }
         if lower.contains("proxy-groups:") { return true }
@@ -111,7 +249,6 @@ public enum VPNDirectContentDetector {
 
     private static func containsShareScheme(_ text: String) -> Bool {
         let lower = text.lowercased()
-        // Intentionally omit ssr:// — no parser; treating it as a share scheme caused false uriList hits.
         let schemes = [
             "vless://", "vmess://", "trojan://", "ss://",
             "hysteria://", "hysteria2://", "hy2://", "tuic://", "anytls://",
@@ -131,6 +268,8 @@ public enum VPNDirectContentDetector {
         guard cleaned.count >= 16, cleaned.range(of: #"^[A-Za-z0-9+/=_-]+$"#, options: .regularExpression) != nil else {
             return nil
         }
+        // Cap decoded input size to avoid zip-bomb style base64.
+        guard cleaned.count <= 48 * 1024 * 1024 else { return nil }
         let padded: String
         let remainder = cleaned.count % 4
         if remainder == 0 {
@@ -145,7 +284,9 @@ public enum VPNDirectContentDetector {
                 .replacingOccurrences(of: "_", with: "/")),
         ]
         for data in candidates {
-            guard let data, let decoded = String(data: data, encoding: .utf8) else { continue }
+            guard let data, data.count <= 32 * 1024 * 1024,
+                  let decoded = String(data: data, encoding: .utf8)
+            else { continue }
             if !decoded.isEmpty { return decoded }
         }
         return nil

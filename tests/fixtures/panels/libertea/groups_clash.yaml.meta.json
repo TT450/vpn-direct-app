@@ -1,0 +1,10 @@
+{
+  "panel": "libertea",
+  "upstream": "https://github.com/VZiChoushaDui/Libertea",
+  "commit": "synthetic-representative",
+  "generator": "representative Clash subscription with select/fallback nested proxy-groups (Libertea failover topology)",
+  "format": "clash_yaml",
+  "captured_from_generator": false,
+  "sanitized": true,
+  "notes": "Sanitized fixture encoding Libertea-style failover groups; not a live capture."
+}

@@ -30,11 +30,32 @@ enum XrayLeafConverter {
     private static func convertVMess(_ xray: [String: Any], fallbackTag: String) -> [String: Any]? {
         guard ensureSupportedNetwork(xray, protocolLabel: "vmess") else { return nil }
         let settings = (xray["settings"] as? [String: Any]) ?? [:]
-        let vnext = ((settings["vnext"] as? [[String: Any]]) ?? []).first
-        let address = (vnext?["address"] as? String) ?? ""
-        let port = vnext?["port"] as? Int ?? 0
-        let user = ((vnext?["users"] as? [[String: Any]]) ?? []).first
-        let uuid = (user?["id"] as? String) ?? ""
+        let address: String
+        let port: Int
+        let uuid: String
+        let security: String
+        let alterId: Int?
+        if let vnext = ((settings["vnext"] as? [[String: Any]]) ?? []).first {
+            address = (vnext["address"] as? String) ?? ""
+            port = vnext["port"] as? Int ?? 0
+            let user = ((vnext["users"] as? [[String: Any]]) ?? []).first
+            uuid = (user?["id"] as? String) ?? ""
+            security = (user?["security"] as? String) ?? "auto"
+            alterId = user?["alterId"] as? Int
+        } else {
+            // Flat 3x-ui / panel settings.
+            address = (settings["address"] as? String) ?? (settings["server"] as? String) ?? ""
+            if let p = settings["port"] as? Int {
+                port = p
+            } else if let p = settings["port"] as? String, let parsed = Int(p) {
+                port = parsed
+            } else {
+                port = 0
+            }
+            uuid = (settings["id"] as? String) ?? (settings["uuid"] as? String) ?? ""
+            security = (settings["security"] as? String) ?? (settings["scy"] as? String) ?? "auto"
+            alterId = settings["alterId"] as? Int ?? settings["aid"] as? Int
+        }
         guard !address.isEmpty, port > 0, !uuid.isEmpty else { return nil }
         var outbound: [String: Any] = [
             "type": "vmess",
@@ -42,21 +63,38 @@ enum XrayLeafConverter {
             "server": address,
             "server_port": port,
             "uuid": uuid,
-            "security": (user?["security"] as? String) ?? "auto",
+            "security": security,
         ]
-        if let aid = user?["alterId"] as? Int { outbound["alter_id"] = aid }
+        if let aid = alterId { outbound["alter_id"] = aid }
         if let tls = streamTLS(from: xray) { outbound["tls"] = tls }
         if let transport = streamTransport(from: xray) { outbound["transport"] = transport }
-        return outbound
+        switch XrayMuxAndMask.apply(from: xray, into: &outbound) {
+        case .ok: return outbound
+        case .unsupported: return nil
+        }
     }
 
     private static func convertTrojan(_ xray: [String: Any], fallbackTag: String) -> [String: Any]? {
         guard ensureSupportedNetwork(xray, protocolLabel: "trojan") else { return nil }
         let settings = (xray["settings"] as? [String: Any]) ?? [:]
-        let servers = ((settings["servers"] as? [[String: Any]]) ?? []).first
-        let address = (servers?["address"] as? String) ?? ""
-        let port = servers?["port"] as? Int ?? 0
-        let password = (servers?["password"] as? String) ?? ""
+        let address: String
+        let port: Int
+        let password: String
+        if let servers = ((settings["servers"] as? [[String: Any]]) ?? []).first {
+            address = (servers["address"] as? String) ?? ""
+            port = servers["port"] as? Int ?? 0
+            password = (servers["password"] as? String) ?? ""
+        } else {
+            address = (settings["address"] as? String) ?? (settings["server"] as? String) ?? ""
+            if let p = settings["port"] as? Int {
+                port = p
+            } else if let p = settings["port"] as? String, let parsed = Int(p) {
+                port = parsed
+            } else {
+                port = 0
+            }
+            password = (settings["password"] as? String) ?? ""
+        }
         guard !address.isEmpty, port > 0, !password.isEmpty else { return nil }
         var outbound: [String: Any] = [
             "type": "trojan",
@@ -71,18 +109,37 @@ enum XrayLeafConverter {
             outbound["tls"] = ["enabled": true, "server_name": address]
         }
         if let transport = streamTransport(from: xray) { outbound["transport"] = transport }
-        return outbound
+        switch XrayMuxAndMask.apply(from: xray, into: &outbound) {
+        case .ok: return outbound
+        case .unsupported: return nil
+        }
     }
 
     private static func convertShadowsocks(_ xray: [String: Any], fallbackTag: String) -> [String: Any]? {
         let settings = (xray["settings"] as? [String: Any]) ?? [:]
-        let servers = ((settings["servers"] as? [[String: Any]]) ?? []).first
-        let address = (servers?["address"] as? String) ?? ""
-        let port = servers?["port"] as? Int ?? 0
-        let method = (servers?["method"] as? String) ?? ""
-        let password = (servers?["password"] as? String) ?? ""
+        let address: String
+        let port: Int
+        let method: String
+        let password: String
+        if let servers = ((settings["servers"] as? [[String: Any]]) ?? []).first {
+            address = (servers["address"] as? String) ?? ""
+            port = servers["port"] as? Int ?? 0
+            method = (servers["method"] as? String) ?? ""
+            password = (servers["password"] as? String) ?? ""
+        } else {
+            address = (settings["address"] as? String) ?? (settings["server"] as? String) ?? ""
+            if let p = settings["port"] as? Int {
+                port = p
+            } else if let p = settings["port"] as? String, let parsed = Int(p) {
+                port = parsed
+            } else {
+                port = 0
+            }
+            method = (settings["method"] as? String) ?? ""
+            password = (settings["password"] as? String) ?? ""
+        }
         guard !address.isEmpty, port > 0, !method.isEmpty, !password.isEmpty else { return nil }
-        return [
+        var outbound: [String: Any] = [
             "type": "shadowsocks",
             "tag": (xray["tag"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? fallbackTag,
             "server": address,
@@ -90,6 +147,10 @@ enum XrayLeafConverter {
             "method": method,
             "password": password,
         ]
+        switch XrayMuxAndMask.apply(from: xray, into: &outbound) {
+        case .ok: return outbound
+        case .unsupported: return nil
+        }
     }
 
     private static func ensureSupportedNetwork(_ xray: [String: Any], protocolLabel: String) -> Bool {

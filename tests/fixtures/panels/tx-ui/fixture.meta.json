@@ -1,0 +1,12 @@
+{
+  "panel": "tx-ui",
+  "upstream": "https://github.com/AghayeCoder/tx-ui",
+  "commit": "unpinned-fixture-scaffold",
+  "generator": "repo fixture / README-derived",
+  "format": "txt",
+  "sample": "raw_links.txt",
+  "captured_from_generator": false,
+  "sanitized": true,
+  "date": "2026-09-07",
+  "note": "Provenance scaffold for REQ-P010; replace with generator-captured output when available."
+}

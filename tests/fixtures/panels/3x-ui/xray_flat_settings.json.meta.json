@@ -1,0 +1,10 @@
+{
+  "panel": "3x-ui",
+  "upstream": "https://github.com/MHSanaei/3x-ui",
+  "commit": "source-derived-shape",
+  "generator": "subscription JSON flat settings.address/port/id (non-vnext)",
+  "format": "json",
+  "captured_from_generator": false,
+  "sanitized": true,
+  "notes": "Represents flat outbound settings shape used by some 3x-ui/path JSON variants; not inventing fields."
+}

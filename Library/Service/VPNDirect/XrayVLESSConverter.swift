@@ -10,14 +10,38 @@ enum XrayVLESSConverter {
         }
 
         let settings = (xray["settings"] as? [String: Any]) ?? [:]
-        guard let vnext = (settings["vnext"] as? [[String: Any]])?.first else { return nil }
-        let address = (vnext["address"] as? String) ?? ""
+        // Nested Xray vnext[] OR flat 3x-ui / panel settings (address/port/id).
+        let address: String
+        let port: Int
+        let uuid: String
+        let flow: String
+        let encryptionRaw: String?
+        if let vnext = (settings["vnext"] as? [[String: Any]])?.first {
+            address = (vnext["address"] as? String) ?? ""
+            port = vnext["port"] as? Int ?? 443
+            let user = (vnext["users"] as? [[String: Any]])?.first ?? [:]
+            uuid = (user["id"] as? String) ?? ""
+            flow = ((user["flow"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            encryptionRaw = user["encryption"] as? String
+        } else {
+            address = (settings["address"] as? String)
+                ?? (settings["server"] as? String)
+                ?? ""
+            if let p = settings["port"] as? Int {
+                port = p
+            } else if let p = settings["port"] as? String, let parsed = Int(p) {
+                port = parsed
+            } else {
+                port = 443
+            }
+            uuid = (settings["id"] as? String)
+                ?? (settings["uuid"] as? String)
+                ?? ""
+            flow = ((settings["flow"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            encryptionRaw = settings["encryption"] as? String
+        }
         guard !address.isEmpty, !EndpointValidator.isBlockedLoopbackHost(address) else { return nil }
-        let port = vnext["port"] as? Int ?? 443
-        guard let user = (vnext["users"] as? [[String: Any]])?.first else { return nil }
-        let uuid = (user["id"] as? String) ?? ""
         guard !uuid.isEmpty else { return nil }
-        let flow = ((user["flow"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
         var outbound: [String: Any] = [
             "type": "vless",
@@ -30,11 +54,14 @@ enum XrayVLESSConverter {
         if !flow.isEmpty {
             outbound["flow"] = flow
         }
-        if let encryption = user["encryption"] as? String,
+        if let encryption = encryptionRaw,
            !encryption.isEmpty,
-           encryption.lowercased() != "none",
-           VPNDirectCoreCapabilities.current.supportsVLESSEncryption
+           encryption.lowercased() != "none"
         {
+            guard VPNDirectCoreCapabilities.current.supportsVLESSEncryption else {
+                // Fail closed — never silently strip connection-critical encryption/PQ.
+                return nil
+            }
             outbound["encryption"] = encryption
         }
 
@@ -97,9 +124,20 @@ enum XrayVLESSConverter {
             } else {
                 outbound["transport"] = transport
             }
+        } else {
+            let n = network.lowercased()
+            if !(n == "tcp" || n == "raw" || n.isEmpty) {
+                // Unknown / unsupported transport must not silently become plain TCP.
+                return nil
+            }
         }
 
-        return outbound
+        switch XrayMuxAndMask.apply(from: xray, into: &outbound) {
+        case .ok:
+            return outbound
+        case .unsupported:
+            return nil
+        }
     }
 
     private static func xrayTransport(network: String, stream: [String: Any]) -> [String: Any]? {
