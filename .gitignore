@@ -30,3 +30,6 @@ AGENTS.md
 
 # Swift package test build
 tests/VPNDirectParserPackage/.build/
+
+# Swift package test build
+tests/VPNDirectParserPackage/.build/
