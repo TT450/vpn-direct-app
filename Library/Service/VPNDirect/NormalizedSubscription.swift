@@ -4,6 +4,8 @@ import Foundation
 public enum NormalizedLocationKind: String, Equatable, Sendable {
     case country
     case globalAuto
+    /// Clash / Mihomo proxy list (not a geo country row).
+    case group
 }
 
 /// How leaf endpoints are selected inside a location.

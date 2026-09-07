@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Remnawave / Happ XRAY_JSON → NormalizedSubscription (TheTochka location semantics).
@@ -78,20 +79,21 @@ public enum XrayJSONAdapter {
                 let type = (outbound["type"] as? String) ?? proto
                 let server = (outbound["server"] as? String) ?? ""
                 let port = outbound["server_port"] as? Int ?? 0
+                var detourXray: String?
+                if let dialer = xrayDialerProxyTag(xray) {
+                    detourXray = dialer
+                }
                 if EndpointValidator.isBlockedLoopbackHost(server) {
+                    let label = xrayTag.isEmpty ? fallbackTag : xrayTag
+                    convertFailures.append("loopback:\(label)")
                     continue
                 }
-                let fingerprint = "\(type)|\(server)|\(port)"
+                let fingerprint = leafFingerprint(outbound, detour: detourXray)
                 if !seenServersInProfile.insert(fingerprint).inserted {
                     continue
                 }
 
                 let leafName = "\(displayName)-n\(entryIndex + 1)"
-
-                var detourXray: String?
-                if let dialer = xrayDialerProxyTag(xray) {
-                    detourXray = dialer
-                }
 
                 var attributes = flattenOutboundFields(outbound)
                 var rawExtensions: [String: String] = [:]
@@ -156,13 +158,15 @@ public enum XrayJSONAdapter {
                 return ah && !bh
             }
 
+            // Refuse silent partial leaf loss — any convert/loopback failure aborts the profile.
+            if !convertFailures.isEmpty {
+                let preview = convertFailures.prefix(8).joined(separator: ",")
+                throw VPNDirectCoreError.unsupportedFeature(
+                    component: "xray.\(displayName)",
+                    detail: "lost \(convertFailures.count) leaf(s): \(preview)"
+                )
+            }
             guard !endpoints.isEmpty else {
-                if !convertFailures.isEmpty {
-                    throw VPNDirectCoreError.unsupportedFeature(
-                        component: "xray.\(displayName)",
-                        detail: "all proxy outbounds failed conversion: \(convertFailures.joined(separator: ","))"
-                    )
-                }
                 continue
             }
 
@@ -189,6 +193,41 @@ public enum XrayJSONAdapter {
         }
 
         return NormalizedSubscription(name: firstName, locations: locations)
+    }
+
+    /// Rich within-profile leaf key (no raw secrets — hashed uuid/password/pbk).
+    private static func leafFingerprint(_ outbound: [String: Any], detour: String?) -> String {
+        let type = (outbound["type"] as? String) ?? ""
+        let server = (outbound["server"] as? String) ?? ""
+        let port = outbound["server_port"] as? Int ?? 0
+        let transportDict = outbound["transport"] as? [String: Any]
+        let transport = (transportDict?["type"] as? String) ?? ""
+        let tls = outbound["tls"] as? [String: Any]
+        let securityFlag: String
+        if (tls?["enabled"] as? Bool) == true {
+            securityFlag = tls?["reality"] != nil ? "reality" : "tls"
+        } else {
+            securityFlag = "none"
+        }
+        let uuidHash = stableHash(outbound["uuid"] as? String)
+        let passHash = stableHash(outbound["password"] as? String)
+        let path = firstString(transportDict?["path"]) ?? ""
+        let serviceName = (transportDict?["service_name"] as? String) ?? ""
+        let sni = (tls?["server_name"] as? String) ?? ""
+        let pbk = (tls?["reality"] as? [String: Any])?["public_key"] as? String
+        let pbkHash = stableHash(pbk)
+        let detourTag = detour ?? ""
+        return [
+            type, server, "\(port)", transport, securityFlag,
+            uuidHash, passHash, path, serviceName, sni, pbkHash, detourTag,
+        ].joined(separator: "|")
+    }
+
+    /// First 8 hex chars of SHA256 — presence/identity without storing secrets in fingerprints/logs.
+    private static func stableHash(_ value: String?) -> String {
+        guard let value, !value.isEmpty else { return "-" }
+        let digest = SHA256.hash(data: Data(value.utf8))
+        return digest.prefix(4).map { String(format: "%02x", $0) }.joined()
     }
 
     /// Extract builder-facing fields from a converted sing-box outbound dict.

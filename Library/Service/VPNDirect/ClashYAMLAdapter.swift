@@ -21,10 +21,32 @@ public enum ClashYAMLAdapter {
             throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks
         }
         var endpoints: [NormalizedNode] = []
+        var failures: [String] = []
         for proxy in proxies {
-            if let node = try? mapProxy(proxy) {
-                endpoints.append(node)
+            do {
+                endpoints.append(try mapProxy(proxy))
+            } catch {
+                let label = proxy["name"] ?? proxy["type"] ?? "?"
+                let detail: String
+                if case let VPNDirectCoreError.unsupportedFeature(_, d) = error {
+                    detail = d
+                } else if case let VPNDirectCoreError.malformedConfig(_, d) = error {
+                    detail = d
+                } else {
+                    detail = error.localizedDescription
+                }
+                failures.append("\(label):\(detail)")
             }
+        }
+        // Refuse silent drop / partial import — any mapProxy failure aborts.
+        if !failures.isEmpty {
+            let preview = failures.prefix(8).joined(separator: "; ")
+            throw VPNDirectCoreError.unsupportedFeature(
+                component: "clash",
+                detail: endpoints.isEmpty
+                    ? preview
+                    : "dropped \(failures.count) of \(proxies.count) proxies: \(preview)"
+            )
         }
         guard !endpoints.isEmpty else {
             throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks
@@ -32,7 +54,7 @@ public enum ClashYAMLAdapter {
         let location = NormalizedLocation(
             id: "clash",
             name: "Clash",
-            kind: .country,
+            kind: .group,
             strategy: endpoints.count > 1 ? .urltest : .single,
             endpoints: endpoints
         )
@@ -108,6 +130,30 @@ public enum ClashYAMLAdapter {
             return NormalizedNode(name: name, protocolID: .socks, server: server, port: port, attributes: attrs)
         case "http":
             return NormalizedNode(name: name, protocolID: .http, server: server, port: port, attributes: attrs)
+        case "shadowtls":
+            attrs["password"] = attrs["password"] ?? ""
+            return NormalizedNode(
+                name: name,
+                protocolID: VPNDirectProtocolID(rawValue: "shadowtls"),
+                server: server,
+                port: port,
+                security: .tls,
+                attributes: attrs
+            )
+        case "naive":
+            attrs["username"] = attrs["username"] ?? attrs["user"] ?? ""
+            attrs["password"] = attrs["password"] ?? ""
+            return NormalizedNode(
+                name: name,
+                protocolID: VPNDirectProtocolID(rawValue: "naive"),
+                server: server,
+                port: port,
+                security: .tls,
+                attributes: attrs
+            )
+        case "ssh":
+            attrs["user"] = attrs["username"] ?? attrs["user"] ?? "root"
+            return NormalizedNode(name: name, protocolID: .ssh, server: server, port: port, attributes: attrs)
         default:
             throw VPNDirectCoreError.unsupportedFeature(component: "clash", detail: "Unsupported proxy type \(type)")
         }

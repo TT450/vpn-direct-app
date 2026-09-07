@@ -37,6 +37,32 @@ public enum SubscriptionClientIdentity {
     }
 }
 
+/// Strips HWID / device headers on cross-host redirects to avoid leaking identity.
+final class SubscriptionSessionDelegate: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        let originalHost = task.originalRequest?.url?.host?.lowercased()
+        let nextHost = request.url?.host?.lowercased()
+        guard let originalHost, let nextHost, originalHost != nextHost else {
+            completionHandler(request)
+            return
+        }
+        var stripped = request
+        for key in request.allHTTPHeaderFields?.keys ?? [] {
+            let lower = key.lowercased()
+            if lower == "x-hwid" || lower.hasPrefix("x-device-") {
+                stripped.setValue(nil, forHTTPHeaderField: key)
+            }
+        }
+        completionHandler(stripped)
+    }
+}
+
 enum SubscriptionHTTP {
     struct Response {
         let body: String
@@ -47,6 +73,14 @@ enum SubscriptionHTTP {
     /// HTTP 304 — body unchanged since cached validators (`If-None-Match` / `If-Modified-Since`).
     struct ConditionalNotModified: Error, Equatable {}
 
+    private static let maxBodyBytes = 32 * 1024 * 1024
+    private static let sessionDelegate = SubscriptionSessionDelegate()
+    private static let session = URLSession(
+        configuration: .ephemeral,
+        delegate: sessionDelegate,
+        delegateQueue: nil
+    )
+
     /// Compatibility alias — always Happ-first via `SubscriptionClientIdentity`.
     static var userAgents: [String] { SubscriptionClientIdentity.userAgents }
 
@@ -56,7 +90,10 @@ enum SubscriptionHTTP {
         cachedETag: String? = nil,
         cachedLastModified: String? = nil
     ) async throws -> Response {
-        guard let requestURL = URL(string: url) else {
+        guard let requestURL = URL(string: url),
+              let scheme = requestURL.scheme?.lowercased(),
+              scheme == "http" || scheme == "https"
+        else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: requestURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 45)
@@ -70,10 +107,23 @@ enum SubscriptionHTTP {
         if let cachedLastModified, !cachedLastModified.isEmpty {
             request.setValue(cachedLastModified, forHTTPHeaderField: "If-Modified-Since")
         }
-        SubscriptionClientIdentity.applyDeviceHeaders(to: &request)
+        // HWID only for primary Happ panel UA — brand fallback UAs get none.
+        if userAgent.hasPrefix("Happ/") {
+            SubscriptionClientIdentity.applyDeviceHeaders(to: &request)
+        }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse {
+            if let contentLength = http.value(forHTTPHeaderField: "Content-Length"),
+               let length = Int(contentLength),
+               length > maxBodyBytes
+            {
+                throw NSError(
+                    domain: "SubscriptionHTTP",
+                    code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "Subscription body exceeds size limit"]
+                )
+            }
             if http.statusCode == 304 {
                 throw ConditionalNotModified()
             }
@@ -84,6 +134,13 @@ enum SubscriptionHTTP {
                     userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"]
                 )
             }
+        }
+        guard data.count <= maxBodyBytes else {
+            throw NSError(
+                domain: "SubscriptionHTTP",
+                code: -2,
+                userInfo: [NSLocalizedDescriptionKey: "Subscription body exceeds size limit"]
+            )
         }
         guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
             throw NSError(
@@ -212,7 +269,11 @@ public enum DeviceIdentity {
         var add = base
         add[kSecValueData as String] = data
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(add as CFDictionary, nil)
+        let status = SecItemAdd(add as CFDictionary, nil)
+        if status != errSecSuccess {
+            NSLog("%@", VPNDirectRedactor.redact("DeviceIdentity keychain write failed status=\(status)"))
+            VPNDirectLog.subscription.error("\(VPNDirectRedactor.redact("hwid_keychain_write_failed status=\(status)"))")
+        }
     }
 
     private static func machineIdentifier() -> String {
