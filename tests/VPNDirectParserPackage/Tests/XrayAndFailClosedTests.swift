@@ -86,6 +86,40 @@ final class XrayAndFailClosedTests: XCTestCase {
                              "An explicit unsupported Xray TCP header must never become ordinary TCP")
     }
 
+    func testRealityXHTTPStreamOneModeIsPreserved() throws {
+        let xray: [String: Any] = [
+            "protocol": "vless",
+            "tag": "xhttp-stream-one",
+            "settings": [
+                "address": "203.0.113.53",
+                "port": 443,
+                "id": "88888888-8888-8888-8888-888888888888",
+                "encryption": "none",
+            ],
+            "streamSettings": [
+                "network": "xhttp",
+                "security": "reality",
+                "realitySettings": [
+                    "serverName": "example.com",
+                    "publicKey": "test-public-key",
+                    "shortId": "0123456789abcdef",
+                    "fingerprint": "chrome",
+                ],
+                "xhttpSettings": [
+                    "path": "/xhttp",
+                    "mode": "stream-one",
+                ],
+            ],
+        ]
+
+        let converted = try XCTUnwrap(XrayVLESSConverter.convert(xray, fallbackTag: "xhttp-stream-one"))
+        let transport = try XCTUnwrap(converted["transport"] as? [String: Any])
+        XCTAssertEqual(transport["type"] as? String, "xhttp")
+        XCTAssertEqual(transport["path"] as? String, "/xhttp")
+        XCTAssertEqual(transport["mode"] as? String, "stream-one",
+                       "Pinned sing-box-lx supports stream-one directly; never rewrite it to auto")
+    }
+
     func testVLESSPQDoesNotDowngradeWhenCapabilityMissing() throws {
         let previous = ProcessInfo.processInfo.environment["VPN_DIRECT_CAPABILITY_JSON"]
         _ = previous // Environment mutation is intentionally avoided; exercise converter by direct policy fixture in CI capability-negative suite.
