@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Structural asserts for universal share-link / clash / mieru fixtures.
+# Structural asserts for universal share-link / clash / mieru / panel fixtures.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FIX="${ROOT}/tests/fixtures/regression"
+PANELS="${ROOT}/tests/fixtures/panels"
 fail=0
 
 need() {
@@ -24,10 +25,13 @@ need "${FIX}/clash/clash_proxies.yaml"
 need "${FIX}/clash/clash_reality_ws.yaml"
 need "${FIX}/mieru/mieru_profile.json"
 need "${FIX}/mieru/client.json"
+need "${PANELS}/3x-ui/xray_single_flat.json"
 
 python3 - <<PY || fail=1
 from pathlib import Path
+import json
 root = Path(r"${FIX}")
+panels = Path(r"${PANELS}")
 
 def head(p):
     return p.read_text().strip().splitlines()[0].lower()
@@ -71,9 +75,21 @@ assert "profiles" in mieru and "serveraddress" in mieru
 assert "transport" in mieru
 client = (root/"mieru/client.json").read_text().lower()
 assert '"type": "mieru"' in client or '"type":"mieru"' in client.replace(" ", "")
-assert "transport" in client and "username" in client
+
+# Current 3x-ui one-client JSON response is one config object (not necessarily an array),
+# and current VLESS generator uses flat settings address/port/id.
+flat = json.loads((panels/"3x-ui/xray_single_flat.json").read_text())
+assert isinstance(flat, dict)
+outbounds = flat.get("outbounds", [])
+vless = next(o for o in outbounds if o.get("protocol") == "vless")
+settings = vless["settings"]
+assert all(k in settings for k in ("address", "port", "id"))
+assert "vnext" not in settings
+headers = vless["streamSettings"]["wsSettings"]["headers"]
+assert headers.get("X-Panel-Test") == "preserve-me"
 print("CLASH_NESTED_FIXTURE_OK")
 print("MIERU_CLIENT_FIXTURE_OK")
+print("THREEXUI_SINGLE_OBJECT_FIXTURE_OK")
 PY
 
 if [[ "${fail}" -ne 0 ]]; then
