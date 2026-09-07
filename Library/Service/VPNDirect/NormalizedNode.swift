@@ -53,6 +53,9 @@ public struct VPNDirectObfuscationID: RawRepresentable, Hashable, Sendable, Coda
 }
 
 /// Canonical intermediate node produced by VPN Direct parsers.
+///
+/// `source` is provenance only. Runtime builders must consume normalized fields, not reparse it.
+/// `outbound` is a temporary legacy bridge and must not be used by new production adapters.
 public struct NormalizedNode: Equatable {
     public var name: String
     public var protocolID: VPNDirectProtocolID
@@ -66,12 +69,14 @@ public struct NormalizedNode: Equatable {
     public var attributes: [String: String]
     /// Opaque extras: panel metadata, future fields, unclassified keys (never silently dropped).
     public var rawExtensions: [String: String]
-    /// Original share link / fragment when available.
+    /// Original share link / fragment when available. Provenance only.
     public var source: String?
-    /// Pre-built sing-box outbound when the adapter already constructed one.
+    /// Pre-built sing-box outbound from legacy adapters. New code must prefer typed normalized models.
     public var outbound: [String: Any]?
-    /// Optional detour / next-hop tag (Xray dialerProxy → sing-box detour).
+    /// Optional detour / next-hop source reference (resolved only after all graph nodes are tagged).
     public var detour: String?
+    /// Exact typed WireGuard/AmneziaWG endpoint model for endpoint-only pinned Core.
+    public var wireguardEndpoint: AmneziaWGEndpointOptions?
 
     public init(
         name: String,
@@ -86,7 +91,8 @@ public struct NormalizedNode: Equatable {
         rawExtensions: [String: String] = [:],
         source: String? = nil,
         outbound: [String: Any]? = nil,
-        detour: String? = nil
+        detour: String? = nil,
+        wireguardEndpoint: AmneziaWGEndpointOptions? = nil
     ) {
         self.name = name
         self.protocolID = protocolID
@@ -101,8 +107,13 @@ public struct NormalizedNode: Equatable {
         self.source = source
         self.outbound = outbound
         self.detour = detour
+        self.wireguardEndpoint = wireguardEndpoint
     }
 
+    /// Semantic equality intentionally excludes `source`: two equivalent configs imported from
+    /// different textual representations are the same connection. While the legacy `outbound`
+    /// bridge exists, its canonical JSON is included so a runtime-affecting legacy change is not
+    /// accidentally hidden by equality/caching/tests.
     public static func == (lhs: NormalizedNode, rhs: NormalizedNode) -> Bool {
         lhs.name == rhs.name
             && lhs.protocolID == rhs.protocolID
@@ -114,7 +125,26 @@ public struct NormalizedNode: Equatable {
             && lhs.uuid == rhs.uuid
             && lhs.attributes == rhs.attributes
             && lhs.rawExtensions == rhs.rawExtensions
-            && lhs.source == rhs.source
             && lhs.detour == rhs.detour
+            && lhs.wireguardEndpoint == rhs.wireguardEndpoint
+            && canonicalLegacyOutbound(lhs.outbound) == canonicalLegacyOutbound(rhs.outbound)
+    }
+
+    /// Compare import provenance separately from connection semantics when UI/debug code needs it.
+    public func hasSameProvenance(as other: NormalizedNode) -> Bool {
+        source == other.source
+    }
+
+    private static func canonicalLegacyOutbound(_ value: [String: Any]?) -> String? {
+        guard let value else { return nil }
+        guard JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+              let string = String(data: data, encoding: .utf8)
+        else {
+            // A legacy adapter that stores non-JSON Any values is already invalid for sing-box;
+            // still make equality conservative rather than silently treating two such objects equal.
+            return String(describing: value)
+        }
+        return string
     }
 }
