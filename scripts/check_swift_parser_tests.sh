@@ -14,6 +14,7 @@ for file in \
   HysteriaShareLinkParser.swift \
   MieruConfigAdapter.swift \
   UniversalOutboundBuilder.swift \
+  XrayVLESSConverter.swift \
   VPNDirectCoreCapabilities+Compatibility.swift
 do
   src="${ROOT}/Library/Service/VPNDirect/${file}"
