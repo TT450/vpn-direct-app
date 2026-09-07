@@ -120,6 +120,73 @@ final class XrayAndFailClosedTests: XCTestCase {
                        "Pinned sing-box-lx supports stream-one directly; never rewrite it to auto")
     }
 
+    func testPinnedXHTTPBuilderKeepsRangeFieldsAsStrings() throws {
+        let node = NormalizedNode(
+            name: "xhttp-types",
+            protocolID: .vless,
+            server: "203.0.113.54",
+            port: 443,
+            transport: .xhttp,
+            security: .none,
+            uuid: "99999999-9999-9999-9999-999999999999",
+            attributes: [
+                "mode": "stream-one",
+                "x_padding_bytes": "100-300",
+                "sc_max_each_post_bytes": "100000-200000",
+                "sc_min_posts_interval_ms": "20-40",
+                "sc_stream_up_server_secs": "20-80",
+                "sc_max_buffered_posts": "30",
+                "xmux_max_concurrency": "1-4",
+                "xmux_max_connections": "3",
+                "xmux_c_max_reuse_times": "0",
+                "xmux_h_max_request_times": "600-900",
+                "xmux_h_max_reusable_secs": "1800-3000",
+                "xmux_h_keep_alive_period": "0",
+                "no_grpc_header": "true",
+                "x_padding_obfs_mode": "true",
+                "session_placement": "path",
+                "seq_placement": "path",
+                "uplink_data_placement": "body",
+                "uplink_chunk_size": "4096-8192",
+                "uplink_http_method": "POST",
+            ]
+        )
+
+        let outbound = try UniversalOutboundBuilder.build(from: node)
+        let transport = try XCTUnwrap(outbound["transport"] as? [String: Any])
+        XCTAssertEqual(transport["mode"] as? String, "stream-one")
+        XCTAssertEqual(transport["x_padding_bytes"] as? String, "100-300")
+        XCTAssertEqual(transport["sc_max_each_post_bytes"] as? String, "100000-200000")
+        XCTAssertEqual(transport["sc_min_posts_interval_ms"] as? String, "20-40")
+        XCTAssertEqual(transport["sc_stream_up_server_secs"] as? String, "20-80")
+        XCTAssertEqual(transport["xmux_max_concurrency"] as? String, "1-4")
+        XCTAssertEqual(transport["xmux_h_max_request_times"] as? String, "600-900")
+        XCTAssertEqual(transport["xmux_h_max_reusable_secs"] as? String, "1800-3000")
+        XCTAssertEqual(transport["sc_max_buffered_posts"] as? Int, 30)
+        XCTAssertEqual(transport["xmux_max_connections"] as? Int, 3)
+        XCTAssertEqual(transport["xmux_c_max_reuse_times"] as? Int, 0)
+        XCTAssertEqual(transport["xmux_h_keep_alive_period"] as? Int, 0)
+        XCTAssertEqual(transport["no_grpc_header"] as? Bool, true)
+        XCTAssertEqual(transport["x_padding_obfs_mode"] as? Bool, true)
+        XCTAssertNil(transport["extra"])
+        XCTAssertNil(transport["sc_max_concurrent_posts"])
+    }
+
+    func testXHTTPExtraWrapperIsNotSilentlyDropped() throws {
+        var node = NormalizedNode(
+            name: "xhttp-extra",
+            protocolID: .vless,
+            server: "203.0.113.55",
+            port: 443,
+            transport: .xhttp,
+            security: .none,
+            uuid: "aaaaaaaa-9999-9999-9999-999999999999"
+        )
+        node.attributes["extra"] = #"{"futureConnectionKnob":true}"#
+        XCTAssertThrowsError(try UniversalOutboundBuilder.build(from: node),
+                             "Unknown Xray extra must fail closed until it has an exact pinned-Core mapping")
+    }
+
     func testVLESSPQDoesNotDowngradeWhenCapabilityMissing() throws {
         let previous = ProcessInfo.processInfo.environment["VPN_DIRECT_CAPABILITY_JSON"]
         _ = previous // Environment mutation is intentionally avoided; exercise converter by direct policy fixture in CI capability-negative suite.
