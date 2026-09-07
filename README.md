@@ -73,7 +73,7 @@ The Core remains intentionally close to upstream sing-box. Custom functionality 
 
 ## Current Core status
 
-**Latest published: **v1.0.7**) · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
+Latest published: v1.0.7 · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
 
 A feature is not **production / `tested`** merely because a builder exists. Production requires:
 
