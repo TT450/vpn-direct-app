@@ -6,9 +6,17 @@ PKG="${ROOT}/tests/VPNDirectParserPackage"
 SRC="${PKG}/Sources/VPNDirectParsers"
 
 # The parser package mirrors production Swift sources inside the package root because SPM does not
-# allow target paths outside that root. Keep newly introduced production model files synchronized
-# before compiling so CI exercises the exact branch implementation rather than a stale mirror.
-cp -f "${ROOT}/Library/Service/VPNDirect/NormalizedWireGuardEndpoint.swift" "${SRC}/NormalizedWireGuardEndpoint.swift"
+# allow target paths outside that root. Keep remediated production sources synchronized before
+# compiling so CI exercises the branch implementation rather than stale mirror files.
+for file in \
+  NormalizedWireGuardEndpoint.swift \
+  HysteriaShareLinkParser.swift \
+  MieruConfigAdapter.swift \
+  UniversalOutboundBuilder.swift \
+  VPNDirectCoreCapabilities+Compatibility.swift
+do
+  cp -f "${ROOT}/Library/Service/VPNDirect/${file}" "${SRC}/${file}"
+done
 
 # Prefer local Core binary when present (after prepare_core / check_parser_execution).
 if [[ -x "${ROOT}/core/sing-box/sing-box" ]]; then
