@@ -121,17 +121,9 @@ APPLE_PLATFORM="${VPN_DIRECT_APPLE_PLATFORM:-ios,iossimulator,macos,tvos}"
 echo "running build_libbox (platform=${APPLE_PLATFORM})…"
 rm -rf "${CORE}/Libbox.xcframework" "${ROOT}/Libbox.xcframework.build"
 
-set +e
-go run ./cmd/internal/build_libbox -target apple -platform "${APPLE_PLATFORM}" "$@"
-STATUS=$?
-set -e
-
-if [[ ${STATUS} -ne 0 ]]; then
-  echo "build_libbox failed with ${STATUS}; retrying without -platform…"
-  go run ./cmd/internal/build_libbox -target apple "$@" || {
-    echo "error: build_libbox failed" >&2
-    exit 1
-  }
+if ! go run ./cmd/internal/build_libbox -target apple -platform "${APPLE_PLATFORM}" "$@"; then
+  echo "error: build_libbox failed (platform=${APPLE_PLATFORM})" >&2
+  exit 1
 fi
 
 CANDIDATE=""
@@ -149,6 +141,81 @@ done
 if [[ -z "${CANDIDATE}" ]]; then
   echo "error: Libbox.xcframework not found after build" >&2
   find "${CORE}" -maxdepth 3 -name 'Libbox.xcframework' -type d 2>/dev/null || true
+  exit 1
+fi
+
+# Fail closed: requested platforms must appear as xcframework slice dirs + Info.plist Library entries.
+FOUND_SLICES="$(find "${CANDIDATE}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort | tr '\n' ' ')"
+PLIST_BLOB=""
+if [[ -f "${CANDIDATE}/Info.plist" ]]; then
+  PLIST_BLOB="$(plutil -p "${CANDIDATE}/Info.plist" 2>/dev/null || true)"
+fi
+REQUIRED_FAMILIES=()
+MISSING_FAMILIES=()
+NEED_TVOS=0
+NEED_IOS=0
+NEED_MACOS=0
+IFS=',' read -r -a _REQ_PLATFORMS <<< "${APPLE_PLATFORM}"
+for plat in "${_REQ_PLATFORMS[@]}"; do
+  plat="$(echo "${plat}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+  [[ -z "${plat}" ]] && continue
+  case "${plat}" in
+    tvos|tvsimulator|tvossimulator) NEED_TVOS=1 ;;
+    ios|iossimulator) NEED_IOS=1 ;;
+    macos|maccatalyst) NEED_MACOS=1 ;;
+  esac
+done
+[[ "${NEED_TVOS}" -eq 1 ]] && REQUIRED_FAMILIES+=("tvos")
+[[ "${NEED_IOS}" -eq 1 ]] && REQUIRED_FAMILIES+=("ios")
+[[ "${NEED_MACOS}" -eq 1 ]] && REQUIRED_FAMILIES+=("macos")
+for fam in "${REQUIRED_FAMILIES[@]}"; do
+  slice_ok=0
+  plist_ok=0
+  while IFS= read -r slice_dir; do
+    [[ -z "${slice_dir}" ]] && continue
+    base="$(basename "${slice_dir}")"
+    case "${fam}" in
+      ios)
+        # ios-* only (tvos-* must not count)
+        if [[ "${base}" == ios* ]]; then slice_ok=1; fi
+        ;;
+      tvos)
+        if [[ "${base}" == *tvos* ]]; then slice_ok=1; fi
+        ;;
+      macos)
+        if [[ "${base}" == *macos* ]]; then slice_ok=1; fi
+        ;;
+    esac
+  done < <(find "${CANDIDATE}" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
+  if [[ -n "${PLIST_BLOB}" ]]; then
+    case "${fam}" in
+      ios)
+        # Exact platform token; avoid matching "tvos"
+        if grep -Eq 'SupportedPlatform[[:space:]]*=>[[:space:]]*"ios"' <<< "${PLIST_BLOB}" \
+          || grep -Eq '"LibraryIdentifier"[[:space:]]*=>[[:space:]]*"ios' <<< "${PLIST_BLOB}"; then
+          plist_ok=1
+        fi
+        ;;
+      tvos)
+        if grep -Eqi 'tvos' <<< "${PLIST_BLOB}"; then plist_ok=1; fi
+        ;;
+      macos)
+        if grep -Eqi 'macos' <<< "${PLIST_BLOB}"; then plist_ok=1; fi
+        ;;
+    esac
+  else
+    # No parsable Info.plist — rely on slice dirs only
+    plist_ok="${slice_ok}"
+  fi
+  if [[ "${slice_ok}" -ne 1 || "${plist_ok}" -ne 1 ]]; then
+    MISSING_FAMILIES+=("${fam}")
+  fi
+done
+if [[ ${#MISSING_FAMILIES[@]} -gt 0 ]]; then
+  echo "error: Libbox.xcframework missing required platform Library slices" >&2
+  echo "  required: ${REQUIRED_FAMILIES[*]}" >&2
+  echo "  found:    ${FOUND_SLICES:-"(none)"}" >&2
+  echo "  missing:  ${MISSING_FAMILIES[*]}" >&2
   exit 1
 fi
 

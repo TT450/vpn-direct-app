@@ -124,6 +124,8 @@ jobs:
             -configuration Debug \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build/DerivedData-ci \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=- \
@@ -157,6 +159,8 @@ jobs:
             -configuration Debug \
             -destination 'generic/platform=macOS' \
             -derivedDataPath build/DerivedData-ci-sfm \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=- \
@@ -190,6 +194,8 @@ jobs:
             -configuration Debug \
             -destination 'generic/platform=tvOS' \
             -derivedDataPath build/DerivedData-ci-sft \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=- \

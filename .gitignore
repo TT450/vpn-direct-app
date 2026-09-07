@@ -34,3 +34,6 @@ tests/VPNDirectParserPackage/.build/
 
 # Swift package test build
 /tests/fixtures/battle/cache/
+
+# Local agent ship logs / meta
+.ship_*

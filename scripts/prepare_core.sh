@@ -89,17 +89,23 @@ case "${MODE}" in
     echo "prepare_core: resetting ${CORE} to pin ${PIN:-HEAD}"
     (
       cd "${CORE}"
-      git fetch --tags origin 2>/dev/null || true
+      if [[ -n "${PIN}" ]]; then
+        git fetch --tags origin
+      else
+        git fetch --tags origin 2>/dev/null || true
+      fi
       if [[ -n "${PIN}" ]] && git rev-parse --verify "${PIN}^{commit}" >/dev/null 2>&1; then
         git checkout --force "${PIN}"
       elif [[ -n "${PIN}" ]] && git rev-parse --verify "tags/${PIN}" >/dev/null 2>&1; then
         git checkout --force "tags/${PIN}"
+      elif [[ -n "${PIN}" ]]; then
+        echo "error: pin ${PIN} not resolvable after fetch" >&2
+        exit 1
       else
-        echo "warning: pin ${PIN} not resolvable; using current HEAD $(git rev-parse --short HEAD)" >&2
         git reset --hard HEAD
       fi
       git clean -fd
-      git submodule update --init --recursive || true
+      git submodule update --init --recursive
     )
     ;;
 esac
