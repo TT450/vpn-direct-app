@@ -72,7 +72,7 @@ Core намеренно близок к upstream sing-box. Кастомные в
 
 ## Текущий статус Core
 
-**Последний релиз:** [`v1.0.5`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.5) · pin Core: [`core/VERSION`](core/VERSION).
+**Последний релиз:** [`v1.0.6`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.6) · pin Core: [`core/VERSION`](core/VERSION).
 
 Фича не считается **production / `tested`** только из‑за builder. Нужен полный путь:
 
@@ -93,7 +93,7 @@ Core намеренно близок к upstream sing-box. Кастомные в
 | MASQUE CONNECT-IP / WARP | Parser + runtime; квалификация в процессе |
 | Clash / Mihomo YAML (только proxies) | Реализован |
 | Content detector + production gate | Реализован (`make check-production-ready`) |
-| Mieru | Swift parse fail-closed; Core runtime ещё не зарегистрирован |
+| Mieru | Parser + Core (`with_mieru`); interop planned |
 | Interop lab / evidence `tested` | Каркасы + checklist; live evidence pending |
 | CONNECT-UDP / Tailscale / OpenVPN | `out_of_scope` для Core 1.x |
 

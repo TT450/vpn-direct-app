@@ -46,16 +46,30 @@ print("MATRIX_HONESTY_OK")
 PY
 fi
 
-echo "== mieru capability must stay false until registration =="
-if rg -n "with_mieru" "${ROOT}/scripts/tags/vpn_direct_ios.tags" "${ROOT}/scripts/tags/vpn_direct_full.tags" 2>/dev/null; then
-  echo "with_mieru unexpectedly enabled in default tags" >&2
+echo "== mieru Core registration (with_mieru required for v1.0.6+) =="
+if ! grep -q "with_mieru" "${ROOT}/scripts/tags/vpn_direct_ios.tags" "${ROOT}/scripts/tags/vpn_direct_full.tags" 2>/dev/null; then
+  echo "with_mieru missing from default tags (Mieru Core port incomplete)" >&2
   fail=1
 else
-  echo "MIERU_TAG_OFF_OK"
+  echo "MIERU_TAG_ON_OK"
 fi
+if [[ ! -f "${ROOT}/core/sing-box/protocol/mieru/outbound.go" ]] || [[ ! -f "${ROOT}/core/sing-box/include/mieru.go" ]]; then
+  echo "MISSING mieru protocol/include registration files" >&2
+  fail=1
+else
+  echo "MIERU_PROTOCOL_PRESENT_OK"
+fi
+if ! grep -q "return true" "${ROOT}/core/overlays/libbox/vpndirect_mieru_register.go"; then
+  echo "vpndirect_mieru_register.go must report registered" >&2
+  fail=1
+else
+  echo "MIERU_REGISTER_FLAG_OK"
+fi
+
+"${ROOT}/scripts/check_parser_execution.sh" || fail=1
 
 if [[ "${fail}" -ne 0 ]]; then
   echo "check_production_ready FAILED" >&2
   exit 1
 fi
-echo "check_production_ready OK (implementation gate; interop/device still required for tested)"
+echo "check_production_ready OK (qualification_ready; interop/device still required for tested)"

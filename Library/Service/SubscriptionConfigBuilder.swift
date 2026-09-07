@@ -363,6 +363,10 @@ public enum SubscriptionConfigBuilder {
                     || lower.hasPrefix("ssh://")
                     || lower.hasPrefix("http-proxy://")
                     || lower.hasPrefix("https-proxy://")
+                    || lower.hasPrefix("shadowtls://")
+                    || lower.hasPrefix("naive://")
+                    || lower.hasPrefix("naive+https://")
+                    || lower.hasPrefix("naive+quic://")
             }
     }
 

@@ -6,7 +6,8 @@
       "serverPort": 8964,
       "userName": "user",
       "password": "password123",
-      "mtu": 1400,
+      "transport": "TCP",
+      "multiplexing": "MULTIPLEXING_HIGH",
       "lowEntropy": "48"
     }
   ]

@@ -95,9 +95,9 @@
       "id": "mieru",
       "name": "Mieru",
       "parser": "yes",
-      "core": false,
-      "status": "deferred",
-      "notes": "Swift parser present; Core outbound not registered; capability false",
+      "core": true,
+      "status": "parser+runtime",
+      "notes": "with_mieru registered; Interop planned until live mita evidence",
       "evidence": {}
     },
     {

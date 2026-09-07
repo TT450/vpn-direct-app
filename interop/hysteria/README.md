@@ -1,16 +1,21 @@
-# Interop — hysteria
+# Interop — Hysteria / Hysteria2
 
-## Case template
+## Inject battle keys
 
-| Field | Value |
+| Variable | Meaning |
 | --- | --- |
-| server_implementation | TBD |
-| server_version | TBD |
-| server_config | `server/` |
-| client_fixture | `../../tests/fixtures/regression/` |
-| core_sha | see `core/VERSION` |
-| expected_capabilities | TBD |
+| `BATTLE_HOST` | Server host |
+| `BATTLE_PORT` | UDP port |
+| `BATTLE_PASSWORD` | HY2 password / HY1 auth |
+| `BATTLE_SNI` | TLS SNI |
+| `BATTLE_OBFS` | Optional obfuscation type |
+| `BATTLE_OBFS_PASSWORD` | Obfuscation password |
 
-## Exit criteria
+## Run
 
-Handshake, TCP/(UDP), DNS, reconnect. Do not mark PROTOCOL_MATRIX `tested` until evidence is attached under `evidence/`.
+```bash
+./run.sh
+docker compose --profile lab up -d
+```
+
+Expected client fixture: `tests/fixtures/battle/hysteria.generated.uri`

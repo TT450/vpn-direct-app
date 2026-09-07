@@ -8,23 +8,30 @@ OVERLAY="${ROOT}/core/overlays/libbox"
 
 fail=0
 
-assert_no_mieru_tag() {
+assert_mieru_tag_on() {
   local f="$1"
   if [[ ! -f "${f}" ]]; then
     echo "MISSING tags file ${f}" >&2
     fail=1
     return
   fi
-  if grep -q 'with_mieru' "${f}"; then
-    echo "ERROR ${f} still enables with_mieru (runtime not ported)" >&2
+  if ! grep -q 'with_mieru' "${f}"; then
+    echo "ERROR ${f} missing with_mieru (runtime is ported)" >&2
     fail=1
   else
-    echo "OK no with_mieru in $(basename "${f}")"
+    echo "OK with_mieru in $(basename "${f}")"
   fi
 }
 
-assert_no_mieru_tag "${ROOT}/scripts/tags/vpn_direct_ios.tags"
-assert_no_mieru_tag "${ROOT}/scripts/tags/vpn_direct_full.tags"
+if [[ ! -f "${CORE}/protocol/mieru/outbound.go" ]] || [[ ! -f "${CORE}/include/mieru.go" ]]; then
+  echo "ERROR mieru runtime missing under core/sing-box" >&2
+  fail=1
+else
+  echo "OK mieru runtime sources present"
+fi
+
+assert_mieru_tag_on "${ROOT}/scripts/tags/vpn_direct_ios.tags"
+assert_mieru_tag_on "${ROOT}/scripts/tags/vpn_direct_full.tags"
 
 if [[ ! -d "${CORE}/experimental/libbox" ]]; then
   echo "note: core/sing-box missing — skipping Go capability tests"
@@ -36,7 +43,7 @@ fi
 
 cp -f "${OVERLAY}"/*.go "${CORE}/experimental/libbox/"
 
-TAGS='with_gvisor,with_quic,with_wireguard,with_utls,with_xhttp,with_awg,with_lx_idle_suspend'
+TAGS='with_gvisor,with_quic,with_wireguard,with_utls,with_xhttp,with_awg,with_lx_idle_suspend,with_mieru'
 set +e
 (
   cd "${CORE}"

@@ -20,11 +20,13 @@ Public roadmap for VPN Direct (Apple client + VPN Direct Core). Status language 
 - [x] Interop lab scaffolds + iPhone qualification checklist
 - [x] Machine-readable `core/protocol-matrix.json`
 - [x] `scripts/check_production_ready.sh` release gate
-- [ ] Mieru Core runtime registration behind `with_mieru` (Swift parse/fail-closed done; capability still false)
+- [x] Mieru Core runtime registration behind `with_mieru` (v1.0.6)
+- [x] Clash nested Reality/WS/gRPC/plugin opts + executable parser checks
+- [x] Interop lab runnable templates (env battle-key injection)
 
 ## Next
 
-- [ ] Mieru protocol merge + RSS budget + capability true
+- [ ] NE RSS budget measurement with Mieru enabled (device evidence)
 - [ ] Interop evidence per family (`interop/*/evidence/`)
 - [ ] iPhone device qualification filled for Tier‑1 protocols
 - [ ] Flip matrix rows to `tested` only with interop+device evidence

@@ -24,8 +24,18 @@ public struct HysteriaShareLinkParser: VPNDirectParser {
         }
         let name = (outbound["tag"] as? String) ?? "Hysteria"
         var attributes: [String: String] = [:]
+        if let password = outbound["password"] as? String {
+            attributes["password"] = password
+        }
+        if let auth = outbound["auth_str"] as? String {
+            attributes["auth"] = auth
+        }
+        if let tls = outbound["tls"] as? [String: Any], let sni = tls["server_name"] as? String {
+            attributes["sni"] = sni
+        }
         if let obfs = outbound["obfs"] as? [String: Any], let t = obfs["type"] as? String {
             attributes["obfs"] = t
+            if let p = obfs["password"] as? String { attributes["obfs_password"] = p }
         } else if let obfs = outbound["obfs"] as? String {
             attributes["obfs"] = obfs
         }
@@ -38,8 +48,8 @@ public struct HysteriaShareLinkParser: VPNDirectParser {
             security: .tls,
             obfuscation: attributes["obfs"].map { VPNDirectObfuscationID(rawValue: $0) },
             attributes: attributes,
-            source: link,
-            outbound: outbound
+            source: link
+            // attributes-only — HysteriaOutboundFactory.fromAttributes rebuilds outbound
         )
     }
 }

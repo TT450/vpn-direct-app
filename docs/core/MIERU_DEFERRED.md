@@ -2,24 +2,36 @@
 
 ## Status
 
-**Swift side: DONE for this tranche.** `MieruConfigAdapter` parses client JSON → `NormalizedNode(protocolID: .mieru)`. Builder emits only when `VPNDirectCoreCapabilities.supportsMieru`.
+**DONE for Core registration (v1.0.6).** `protocol/mieru` + `option/mieru.go` ported from [enfein/mbox](https://github.com/enfein/mbox) behind `with_mieru`. Tags enabled in `scripts/tags/vpn_direct_*.tags`. CapabilityJSON `mieru=true` when Libbox is rebuilt with those tags.
 
-**Core runtime: NOT REGISTERED.** `with_mieru` remains absent from `scripts/tags/vpn_direct_*.tags`. CapabilityJSON `mieru=false`.
+**Interop:** still `planned` until live mita evidence is committed under `interop/mieru/evidence/`.
 
-Donor: [enfein/mieru](https://github.com/enfein/mieru) / [enfein/mbox](https://github.com/enfein/mbox) — pin a modern revision (Low Entropy 32/40/48/56) when merging.
+Donor: [enfein/mieru](https://github.com/enfein/mieru) / [enfein/mbox](https://github.com/enfein/mbox).
 
-## Unblock checklist
+## Checklist
 
 - [x] Libbox baseline builds in CI (XHTTP/AWG/MASQUE)
-- [ ] Measure NE RSS with idle_suspend on mid-tier iPhone
-- [ ] Port `protocol/mieru` + option/registry behind `with_mieru` into `core/sing-box`
-- [ ] Call real Register; set capability true only after validate
-- [ ] Add `with_mieru` to tags only after size budget OK
+- [ ] Measure NE RSS with idle_suspend on mid-tier iPhone (device evidence)
+- [x] Port `protocol/mieru` + option/registry behind `with_mieru` into `core/sing-box`
+- [x] Call real Register; capability true only with tag + registration
+- [x] Add `with_mieru` to tags after compile/`sing-box check` green
 - [x] Fixtures under `tests/fixtures/regression/mieru/`
-- [x] Swift fail-closed builder when capability false
-- [ ] Flip matrix Core column + status after registration proof
+- [x] Swift builder aligned with mbox JSON (`transport`, `username`, `password`, `multiplexing`, `traffic_pattern`)
+- [x] Flip matrix Core column + status to `parser+runtime` (Interop planned)
 - [ ] Interop TCP / UDP / Low Entropy evidence under `interop/mieru/evidence/`
 
-## Interim behavior
+## Runtime JSON shape
 
-Parse succeeds; graph build / outbound emit throws `unsupportedFeature(mieru)` until Core registers the outbound. Happ UA is never used for Mieru.
+```json
+{
+  "type": "mieru",
+  "tag": "mieru-out",
+  "server": "host",
+  "server_port": 8964,
+  "transport": "TCP",
+  "username": "user",
+  "password": "pass",
+  "multiplexing": "MULTIPLEXING_HIGH",
+  "traffic_pattern": "48"
+}
+```

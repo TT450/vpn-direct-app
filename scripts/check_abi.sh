@@ -75,13 +75,22 @@ else
   echo "note: Libbox.xcframework not present — overlay-only ABI check"
 fi
 
-# Default profiles must not claim Mieru until runtime exists.
+# Default profiles enable with_mieru only when protocol runtime is present.
+if [[ ! -f "${CORE}/protocol/mieru/outbound.go" ]] || [[ ! -f "${CORE}/include/mieru.go" ]]; then
+  echo "ERROR mieru runtime missing under core/sing-box (protocol/include)" >&2
+  fail=1
+else
+  echo "OK mieru runtime sources present"
+fi
 for tags_file in "${ROOT}/scripts/tags/vpn_direct_ios.tags" "${ROOT}/scripts/tags/vpn_direct_full.tags"; do
-  if [[ -f "${tags_file}" ]] && grep -q 'with_mieru' "${tags_file}"; then
-    echo "ERROR ${tags_file} enables with_mieru without runtime" >&2
+  if [[ ! -f "${tags_file}" ]]; then
+    echo "ERROR missing ${tags_file}" >&2
+    fail=1
+  elif ! grep -q 'with_mieru' "${tags_file}"; then
+    echo "ERROR ${tags_file} missing with_mieru (runtime is ported)" >&2
     fail=1
   else
-    echo "OK mieru disabled in $(basename "${tags_file}")"
+    echo "OK with_mieru in $(basename "${tags_file}")"
   fi
 done
 
@@ -116,10 +125,27 @@ if [[ -d "${CORE}/experimental/libbox" ]]; then
   mieru_status=$?
   set -e
   if [[ "${mieru_status}" -eq 0 ]]; then
-    echo "OK CapabilityJSON asserts mieru=false"
+    echo "OK CapabilityJSON asserts mieru=false without with_mieru"
   else
     echo "ERROR mieru=false capability assertion failed" >&2
     tail -40 /tmp/vpndirect-mieru-cap.log || true
+    fail=1
+  fi
+
+  set +e
+  (
+    cd "${CORE}"
+    go test ./experimental/libbox -count=1 -run 'TestVPNDirectCapabilityJSONMieruTrueWithTag' \
+      -tags 'with_gvisor,with_quic,with_wireguard,with_utls,with_xhttp,with_awg,with_mieru' \
+      >/tmp/vpndirect-mieru-cap-on.log 2>&1
+  )
+  mieru_on_status=$?
+  set -e
+  if [[ "${mieru_on_status}" -eq 0 ]]; then
+    echo "OK CapabilityJSON asserts mieru=true with with_mieru"
+  else
+    echo "ERROR mieru=true capability assertion failed" >&2
+    tail -40 /tmp/vpndirect-mieru-cap-on.log || true
     fail=1
   fi
 fi

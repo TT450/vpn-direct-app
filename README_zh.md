@@ -54,7 +54,7 @@ Subscription / Config → Content Detector → Universal Parser / Adapters
 
 ## 当前 Core 状态
 
-**最新发布：** [`v1.0.5`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.5)
+**最新发布：** [`v1.0.6`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.6)
 
 仅有 builder / parser **不等于** `tested` / production。权威状态见 [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md)。
 
@@ -68,7 +68,7 @@ Subscription / Config → Content Detector → Universal Parser / Adapters
 | WireGuard / AmneziaWG / MASQUE | Parser + runtime；真机资格认证进行中 |
 | Clash YAML（仅 proxies）+ content detector | 已实现 |
 | `make check-production-ready` | 已实现 |
-| Mieru | Swift 解析 fail-closed；Core runtime 未注册 |
+| Mieru | Parser + Core（`with_mieru`）；interop 仍为 planned |
 | CONNECT-UDP / Tailscale / OpenVPN | `out_of_scope` |
 
 ## 构建配置

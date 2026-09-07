@@ -3,6 +3,8 @@ import Foundation
 /// Builds sing-box outbound dictionaries from NormalizedNode fields (no pre-built outbound required).
 enum UniversalOutboundBuilder {
     static func build(from node: NormalizedNode) throws -> [String: Any] {
+        // LEGACY: pre-built outbound dictionaries from older converters.
+        // Prefer attributes-only NormalizedNode; keep this early-return until remaining writers migrate.
         if let existing = node.outbound, !existing.isEmpty {
             var copy = existing
             if copy["tag"] == nil { copy["tag"] = node.name }
@@ -83,13 +85,32 @@ enum UniversalOutboundBuilder {
     // MARK: - Helpers
 
     private static func attr(_ node: NormalizedNode, _ key: String) -> String? {
-        let v = node.attributes[key] ?? node.attributes[key.lowercased()]
-        guard let v, !v.isEmpty else { return nil }
-        return v
+        let aliases: [String: [String]] = [
+            "pbk": ["pbk", "public-key", "public_key"],
+            "sid": ["sid", "short-id", "short_id"],
+            "fp": ["fp", "client-fingerprint", "client_fingerprint", "fingerprint"],
+            "sni": ["sni", "servername", "server_name"],
+            "path": ["path", "ws-path"],
+            "service_name": ["service_name", "grpc-service-name", "grpc_service_name"],
+            "plugin_opts": ["plugin_opts", "plugin-opts"],
+            "transport": ["transport"],
+            "traffic_pattern": ["traffic_pattern", "traffic-pattern", "low_entropy", "low-entropy"],
+        ]
+        let keys = aliases[key] ?? [key, key.lowercased()]
+        for k in keys {
+            if let v = node.attributes[k] ?? node.attributes[k.lowercased()], !v.isEmpty {
+                return v
+            }
+        }
+        return nil
     }
 
     private static func tlsObject(from node: NormalizedNode, defaultSNI: String) -> [String: Any]? {
-        let security = node.security?.rawValue ?? attr(node, "security") ?? "none"
+        let securityRaw = node.security?.rawValue ?? attr(node, "security") ?? "none"
+        let hasReality = securityRaw == "reality"
+            || attr(node, "pbk") != nil
+            || node.attributes.keys.contains(where: { $0.hasPrefix("reality-opts") || $0 == "public-key" })
+        let security = hasReality ? "reality" : securityRaw
         guard security == "tls" || security == "reality" else { return nil }
         var tls: [String: Any] = [
             "enabled": true,
@@ -125,7 +146,7 @@ enum UniversalOutboundBuilder {
             return ws
         case "grpc":
             var grpc: [String: Any] = ["type": "grpc"]
-            if let service = attr(node, "serviceName") ?? attr(node, "servicename") {
+            if let service = attr(node, "service_name") ?? attr(node, "serviceName") ?? attr(node, "servicename") {
                 grpc["service_name"] = service
             }
             return grpc
@@ -396,13 +417,19 @@ enum UniversalOutboundBuilder {
             "tag": node.name,
             "server": node.server,
             "server_port": node.port,
+            // mbox / enfein mieru require transport TCP|UDP
+            "transport": (attr(node, "transport") ?? "TCP").uppercased(),
         ]
         if let user = attr(node, "username") { outbound["username"] = user }
         if let pass = attr(node, "password") { outbound["password"] = pass }
-        if let mtu = attr(node, "mtu").flatMap(Int.init) { outbound["mtu"] = mtu }
         if let multiplexing = attr(node, "multiplexing") { outbound["multiplexing"] = multiplexing }
-        if let handshake = attr(node, "handshake_mode") { outbound["handshake_mode"] = handshake }
-        if let le = attr(node, "low_entropy") { outbound["low_entropy"] = le }
+        // Low entropy is encoded as traffic_pattern string (not a closed enum).
+        if let pattern = attr(node, "traffic_pattern") {
+            outbound["traffic_pattern"] = pattern
+        }
+        if let ports = attr(node, "server_ports") {
+            outbound["server_ports"] = ports.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        }
         return outbound
     }
 }

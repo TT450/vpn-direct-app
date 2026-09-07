@@ -72,13 +72,15 @@ The Core remains intentionally close to upstream sing-box. Custom functionality 
 
 ## Current Core status
 
-**Latest release:** [`v1.0.5`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.5) · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
+**Latest release:** [`v1.0.6`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.6) · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
 
 A feature is not **production / `tested`** merely because a builder exists. Production requires:
 
 `import → Core validation → Packet Tunnel start → handshake → TCP/UDP → DNS → reconnect → iOS memory check`
 
 Authoritative row-level status: [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) · machine-readable [`core/protocol-matrix.json`](core/protocol-matrix.json).
+
+**v1.0.6 is battle-key qualification-ready** (parsers + Core + interop templates). Matrix Interop stays `planned` until live evidence is attached — do not treat `parser+runtime` as `tested`.
 
 | Area | State |
 | --- | --- |
@@ -91,10 +93,10 @@ Authoritative row-level status: [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) 
 | VMess / Trojan / Shadowsocks / TUIC / AnyTLS / ShadowTLS / Naive | Parser + builder; interop ongoing |
 | WireGuard / AmneziaWG 2–3.1 (URI + `.conf`) | Parser + runtime; device qualification ongoing |
 | MASQUE CONNECT-IP / WARP profile | Parser + runtime; qualification ongoing |
-| Clash / Mihomo YAML (proxies only) | Implemented |
+| Clash / Mihomo YAML (proxies + nested opts) | Implemented |
 | Content detector + production gate | Implemented (`make check-production-ready`) |
-| Mieru | Swift parse fail-closed; Core runtime not registered |
-| Interop lab / iPhone `tested` evidence | Scaffolds + checklist; live evidence pending |
+| Mieru | Parser + Core runtime (`with_mieru`); interop planned |
+| Interop lab / iPhone `tested` evidence | Runnable templates + checklist; live evidence pending |
 | CONNECT-UDP / Tailscale / OpenVPN | `out_of_scope` for Core 1.x |
 
 ## Architecture

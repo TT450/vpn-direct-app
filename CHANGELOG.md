@@ -2,6 +2,15 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.6] — 2026-09-07
+
+### Battle-key qualification ready
+
+- Mieru Core outbound/inbound behind `with_mieru`; Swift builder aligned to mbox JSON
+- Clash nested Reality/WS/gRPC/plugin opts; detector schemes for naive/shadowtls/http-proxy
+- Executable `check_parser_execution.sh` + panic-boundary doc; interop env templates
+- Matrix/docs honest: `parser+runtime` / qualification-ready — not fake `tested`
+
 ## [1.0.5] — 2026-09-07
 
 ### What's New

@@ -6,6 +6,9 @@ import (
 )
 
 func TestVPNDirectCapabilityJSONMieruFalseByDefault(t *testing.T) {
+	if vpnDirectTagMieru {
+		t.Skip("built with with_mieru — see TestVPNDirectCapabilityJSONMieruTrueWithTag")
+	}
 	raw := VPNDirectCapabilityJSON()
 	var doc map[string]any
 	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
@@ -15,12 +18,12 @@ func TestVPNDirectCapabilityJSONMieruFalseByDefault(t *testing.T) {
 		t.Fatalf("magic=%v want %s", doc["magic"], vpnDirectCoreMagicValue)
 	}
 	if mieru, _ := doc["mieru"].(bool); mieru {
-		t.Fatalf("top-level mieru must be false until runtime is ported")
+		t.Fatalf("top-level mieru must be false without with_mieru")
 	}
 	protocols, _ := doc["protocols"].(map[string]any)
 	mieruObj, _ := protocols["mieru"].(map[string]any)
 	if supported, _ := mieruObj["supported"].(bool); supported {
-		t.Fatalf("protocols.mieru.supported must be false until runtime is ported")
+		t.Fatalf("protocols.mieru.supported must be false without with_mieru")
 	}
 	if VPNDirectSupportsMieru() {
 		t.Fatalf("VPNDirectSupportsMieru must be false without with_mieru")
@@ -45,5 +48,27 @@ func TestVPNDirectCapabilityJSONHasVLESSTree(t *testing.T) {
 	security, _ := vless["security"].([]any)
 	if len(security) == 0 {
 		t.Fatal("protocols.vless.security empty")
+	}
+}
+
+func TestVPNDirectCapabilityJSONMieruTrueWithTag(t *testing.T) {
+	if !vpnDirectTagMieru {
+		t.Skip("built without with_mieru")
+	}
+	raw := VPNDirectCapabilityJSON()
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if mieru, _ := doc["mieru"].(bool); !mieru {
+		t.Fatalf("top-level mieru must be true with with_mieru")
+	}
+	protocols, _ := doc["protocols"].(map[string]any)
+	mieruObj, _ := protocols["mieru"].(map[string]any)
+	if supported, _ := mieruObj["supported"].(bool); !supported {
+		t.Fatalf("protocols.mieru.supported must be true with with_mieru")
+	}
+	if !VPNDirectSupportsMieru() {
+		t.Fatalf("VPNDirectSupportsMieru must be true with with_mieru")
 	}
 }

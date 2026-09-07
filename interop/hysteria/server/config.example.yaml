@@ -1,0 +1,10 @@
+listen: :443
+tls:
+  cert: /etc/hysteria/server.crt
+  key: /etc/hysteria/server.key
+auth:
+  type: password
+  password: lab-password-change-me
+bandWidth:
+  up: 100 mbps
+  down: 100 mbps

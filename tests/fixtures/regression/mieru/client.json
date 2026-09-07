@@ -1,0 +1,13 @@
+{
+  "outbounds": [
+    {
+      "type": "mieru",
+      "tag": "mieru-out",
+      "server": "203.0.113.21",
+      "server_port": 8964,
+      "transport": "TCP",
+      "username": "user",
+      "password": "password123"
+    }
+  ]
+}

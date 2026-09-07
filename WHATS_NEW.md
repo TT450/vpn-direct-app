@@ -1,26 +1,26 @@
-# What's New — VPN Direct 1.0.5
+# What's New — VPN Direct 1.0.6
 
 Release date: 2026-09-07  
-Git tag: `v1.0.5`
+Git tag: `v1.0.6`
 
 ## App Store / short What's New
 
-- Broader subscription import: VMess, Trojan, Shadowsocks, TUIC, AnyTLS, WireGuard/AWG, SOCKS, HTTP proxy, SSH
-- Clash / Mihomo YAML proxies and smarter content detection (JSON / YAML / conf / URI)
-- Remnawave/Happ topology from 1.0.4 kept; docs and Protocol Matrix refreshed
-- Production readiness gate: `make check-production-ready`
+- Battle-key qualification ready: detectors, parsers, and Core cover declared protocols
+- Mieru runtime registered behind `with_mieru` (TCP/UDP + traffic pattern)
+- Clash nested Reality/WS/gRPC/plugin opts import
+- Executable parser→`sing-box check` regression + interop lab templates (env battle keys)
+- Honest matrix: Interop stays `planned` until you attach live evidence
 
 ## Engineering detail
 
-- `VPNDirectContentDetector` — ordered detect, no YAML line-trim
-- Universal share-link parsers + `UniversalOutboundBuilder`
-- Clash YAML adapter (proxies only); Xray leaves: VLESS / HY / VMess / Trojan / SS
-- `VPNDirectConfigValidator`, error model v2, `VPNDirectRedactor`
-- `core/protocol-matrix.json`, interop scaffolds, iPhone qualification checklist
-- Mieru: Swift parse + fail-closed emit; Core runtime still off (`with_mieru` not in tags)
+- Ported `protocol/mieru` from enfein/mbox; tags in `vpn_direct_*.tags`
+- Content detector schemes: shadowtls / naive / http-proxy family
+- ClashYAMLAdapter nest flatten; VLESS/HY share links attributes-only (legacy outbound marked)
+- `scripts/check_parser_execution.sh` + `docs/core/PANIC_BOUNDARY.md`
+- Interop runnable templates: xray / hysteria / amnezia / mieru
 
-### Still not `tested` / production
+### Still not `tested` / production-wide
 
-Interop lab evidence and filled device qualification are required before matrix rows move to `tested`. CONNECT-UDP / Tailscale / OpenVPN remain `out_of_scope`.
+Do not flip matrix rows to `tested` without `evidence.interop` + `evidence.device`. CONNECT-UDP / Tailscale / OpenVPN remain `out_of_scope`.
 
 See also: `docs/core/PROTOCOL_MATRIX.md`, `ROADMAP.md`, `CHANGELOG.md`.

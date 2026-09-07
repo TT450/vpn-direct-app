@@ -114,8 +114,10 @@ public enum VPNDirectContentDetector {
         let schemes = [
             "vless://", "vmess://", "trojan://", "ss://", "ssr://",
             "hysteria://", "hysteria2://", "hy2://", "tuic://", "anytls://",
-            "wireguard://", "wg://", "awg://", "socks://", "socks5://",
-            "ssh://",
+            "wireguard://", "wg://", "awg://", "socks://", "socks5://", "socks4://",
+            "ssh://", "shadowtls://",
+            "naive://", "naive+https://", "naive+quic://",
+            "http-proxy://", "https-proxy://",
         ]
         return schemes.contains { lower.contains($0) }
     }

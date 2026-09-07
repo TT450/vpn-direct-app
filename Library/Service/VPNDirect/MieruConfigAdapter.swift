@@ -56,17 +56,25 @@ enum MieruConfigAdapter {
         if let pass = profile["password"] as? String ?? profile["userPassword"] as? String {
             attrs["password"] = pass
         }
-        if let mtu = profile["mtu"] as? Int { attrs["mtu"] = String(mtu) }
-        if let mtu = profile["mtu"] as? String { attrs["mtu"] = mtu }
+        let transport = (profile["transport"] as? String)
+            ?? (profile["protocol"] as? String)
+            ?? "TCP"
+        attrs["transport"] = transport.uppercased()
         if let multiplexing = profile["multiplexing"] as? String {
             attrs["multiplexing"] = multiplexing
         }
-        if let handshake = profile["handshakeMode"] as? String ?? profile["handshake_mode"] as? String {
-            attrs["handshake_mode"] = handshake
+        // Low entropy → traffic_pattern string aligned with mbox outbound JSON.
+        if let pattern = profile["trafficPattern"] as? String
+            ?? profile["traffic_pattern"] as? String
+        {
+            attrs["traffic_pattern"] = pattern
+        } else if let le = profile["lowEntropy"] ?? profile["low_entropy"] {
+            attrs["traffic_pattern"] = "\(le)"
         }
-        // Low entropy as config-driven string (32/40/48/56…), not a closed enum.
-        if let le = profile["lowEntropy"] ?? profile["low_entropy"] {
-            attrs["low_entropy"] = "\(le)"
+        if let ports = profile["serverPorts"] as? [String] ?? profile["server_ports"] as? [String] {
+            attrs["server_ports"] = ports.joined(separator: ",")
+        } else if let ports = profile["server_ports"] as? String {
+            attrs["server_ports"] = ports
         }
         let name = (profile["profileName"] as? String) ?? (profile["name"] as? String) ?? "Mieru"
         return NormalizedNode(

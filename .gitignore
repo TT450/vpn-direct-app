@@ -23,3 +23,7 @@ AGENTS.md
 *.p12
 .env
 .env.*
+/tests/fixtures/battle/
+*.generated.uri
+*.generated.json
+*.generated.conf

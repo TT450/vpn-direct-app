@@ -1,6 +1,6 @@
 # Protocol matrix — VPN Direct Core 0.1
 
-Last docs sync: **2026-09-07** (app release **v1.0.5**). Status legend: `planned` | `parser` | `runtime` | `parser+runtime` | `tested` | `deferred` | `out_of_scope`
+Last docs sync: **2026-09-07** (app release **v1.0.6**). Status legend: `planned` | `parser` | `runtime` | `parser+runtime` | `qualification_ready` | `tested` | `deferred` | `out_of_scope`
 
 ## Support definition (`tested`)
 
@@ -15,21 +15,24 @@ A protocol/transport row may move to **`tested`** only when all of the following
 7. Reconnect / profile switch works
 8. Network Extension RSS stays within the project budget vs stock Libbox
 
-Until then, keep `runtime` / `parser+runtime` / `planned` even if builders exist.
+Until then, keep `runtime` / `parser+runtime` / `qualification_ready` / `planned` even if builders exist.
+
+**Interop=`planned` is intentional** until battle-key evidence files are committed. Product is **qualification-ready** when detectors, parsers, builders, and Core registration are green (`scripts/check_production_ready.sh`).
 
 ## Capability policy
 
 - No silent XHTTP → HTTPUpgrade (or any other) downgrade.
 - Capability Registry is **fail-closed**: unproven ⇒ `false` / empty lists.
 - AWG versions and Hysteria2 `gecko` come from Core CapabilityJSON, not Swift hardcodes.
-- Mieru capability stays `false` until outbound is registered behind `with_mieru`.
+- Mieru capability is `true` only in Libbox builds tagged `with_mieru` (registered outbound).
 - Parser=`yes` requires a fixture + builder path in-tree.
+- Clash nested `ws-opts` / `grpc-opts` / `reality-opts` / `plugin-opts` flatten to attributes (no SPM YAML).
 
 ## Matrix
 
 | Protocol | Version | Transport | Security | Obfuscation | Parser | Core | iOS | Interop | Status | Source |
 |----------|---------|-----------|----------|-------------|--------|------|-----|---------|--------|--------|
-| VLESS | current | tcp/ws/grpc/httpupgrade | tls/reality | — | yes | yes | yes | partial | runtime | sing-box |
+| VLESS | current | tcp/ws/grpc/httpupgrade | tls/reality | — | yes | yes | yes | planned | parser+runtime | sing-box |
 | VLESS | current | xhttp | tls/reality | — | yes | yes | yes | planned | parser+runtime | sing-box-lx |
 | VLESS | encryption | * | * | PQ mlkem… | yes | yes | yes | planned | parser+runtime | sing-box-lx |
 | VMess | current | * | * | — | yes | yes | yes | planned | parser+runtime | sing-box |
@@ -45,13 +48,17 @@ Until then, keep `runtime` / `parser+runtime` / `planned` even if builders exist
 | MASQUE | CONNECT-IP | h3/h2 | tls | — | yes | yes | yes | planned | parser+runtime | sing-box-lx |
 | MASQUE | CONNECT-UDP | — | — | — | — | no | — | — | out_of_scope | — |
 | WARP | via MASQUE | h3/h2 | pin | — | yes | yes | yes | planned | parser+runtime | sing-box-lx |
-| Mieru | TCP/UDP/LE | — | — | low entropy | yes | no (tag off) | trial | planned | deferred (Swift parse; Core port pending) | mbox |
+| Mieru | TCP/UDP/LE | — | — | low entropy | yes | yes (`with_mieru`) | yes | planned | parser+runtime | mbox |
 | SSH/SOCKS/HTTP | current | — | — | — | yes | yes | yes | planned | parser+runtime | sing-box |
 | Tailscale | — | — | — | — | — | no (ios profile) | — | — | out_of_scope | — |
 | OpenVPN / OpenConnect | — | — | — | — | — | no (ios profile) | — | — | out_of_scope | — |
 
 \* Update rows when `core/VERSION` and real device tests change.
 
-Machine-readable: [`core/protocol-matrix.json`](../protocol-matrix.json).
+### Outbound debt note
 
-See also: [`MIERU_DEFERRED.md`](MIERU_DEFERRED.md), [`REMOTES.md`](REMOTES.md), [`BUILDING.md`](BUILDING.md), [`docs/device/IPHONE_QUALIFICATION.md`](../device/IPHONE_QUALIFICATION.md).
+`NormalizedNode.outbound` early-return in `UniversalOutboundBuilder` is marked `// LEGACY`. New parsers (Clash, Mieru, migrated VLESS/HY share links) prefer attributes-only. Remaining Xray JSON converters may still attach pre-built outbound maps until fully migrated.
+
+Machine-readable: [`core/protocol-matrix.json`](../../core/protocol-matrix.json).
+
+See also: [`MIERU_DEFERRED.md`](MIERU_DEFERRED.md), [`PANIC_BOUNDARY.md`](PANIC_BOUNDARY.md), [`REMOTES.md`](REMOTES.md), [`BUILDING.md`](BUILDING.md), [`docs/device/IPHONE_QUALIFICATION.md`](../device/IPHONE_QUALIFICATION.md).
