@@ -1,0 +1,37 @@
+{
+  "remarks": "3x-ui current single client",
+  "log": { "loglevel": "warning" },
+  "outbounds": [
+    {
+      "protocol": "vless",
+      "tag": "proxy",
+      "settings": {
+        "address": "203.0.113.44",
+        "port": 443,
+        "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "flow": "",
+        "encryption": "none",
+        "level": 8
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "cdn.example.com",
+          "allowInsecure": false,
+          "alpn": ["http/1.1"]
+        },
+        "wsSettings": {
+          "path": "/sub-ws",
+          "headers": {
+            "Host": "cdn.example.com",
+            "X-Panel-Test": "preserve-me"
+          }
+        }
+      }
+    },
+    { "protocol": "freedom", "tag": "direct", "settings": {} },
+    { "protocol": "blackhole", "tag": "block", "settings": {} }
+  ],
+  "routing": { "domainStrategy": "AsIs", "rules": [] }
+}
