@@ -17,9 +17,14 @@ public enum CompatibilityFieldPolicy {
         "remark", "remarks", "ps", "name", "title", "fragment", "emoji",
         "flag", "country", "isp", "provider", "group", "category",
         "download", "upload", "total", "expire", "usage",
+        // Derived display/debug counters. Runtime WireGuard emission uses the typed
+        // `wireguardEndpoint` model; these counters never carry connection semantics.
+        "peer_count", "address_count",
     ]
 
     /// Protocol/transport keys we already understand (lowercase).
+    /// IMPORTANT: an entry here is only valid when the production parser/normalized model/builder
+    /// actually consumes it. Do not add fields merely to suppress fail-closed diagnostics.
     public static let knownProtocolKeys: Set<String> = [
         "type", "network", "security", "encryption", "flow", "sni", "host", "path",
         "fp", "fingerprint", "alpn", "pbk", "public-key", "public_key", "sid", "short-id", "short_id",
@@ -27,9 +32,11 @@ public enum CompatibilityFieldPolicy {
         "servicename", "service_name", "serviceName", "mode", "headertype", "headerType",
         "seed", "authority", "quicsecurity", "key", "password", "uuid", "id", "aid", "scy",
         "method", "cipher", "plugin", "plugin-opts", "plugin_opts",
-        "obfs", "obfs_password", "auth", "auth_str", "up", "down", "mtu",
+        "obfs", "obfs_password", "obfs_min_packet_size", "obfs_max_packet_size",
+        "auth", "auth_str", "up", "down", "mtu",
         "username", "user", "pass", "transport", "multiplexing", "traffic_pattern",
-        "server_ports", "congestion_control", "udp_relay_mode", "zero_rtt",
+        "server_ports", "hop_interval", "hop_interval_max", "bbr_profile", "brutal_debug", "disable_chrome_parrot",
+        "congestion_control", "udp_relay_mode", "zero_rtt",
         "private_key", "peer_public_key", "public_key", "local_address", "preshared_key",
         "keepalive", "allowed_ips", "endpoint", "jc", "jmin", "jmax", "s1", "s2", "s3", "s4",
         "h1", "h2", "h3", "h4", "i1", "i2", "i3", "i4", "i5",
