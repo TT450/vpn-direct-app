@@ -76,7 +76,11 @@ public enum SubscriptionConfigBuilder {
         return "Subscription"
     }
 
-    public static func fetchAndNormalize(url: String) async throws -> Result {
+    public static func fetchAndNormalize(
+        url: String,
+        cachedETag: String? = nil,
+        cachedLastModified: String? = nil
+    ) async throws -> Result {
         let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
         var lastError: Error = SubscriptionError.empty
         // Always Happ first (SubscriptionClientIdentity.userAgents[0]); brand UAs only as fallback.
@@ -84,7 +88,12 @@ public enum SubscriptionConfigBuilder {
 
         for agent in SubscriptionClientIdentity.userAgents {
             do {
-                let response = try await SubscriptionHTTP.fetch(url: trimmedURL, userAgent: agent)
+                let response = try await SubscriptionHTTP.fetch(
+                    url: trimmedURL,
+                    userAgent: agent,
+                    cachedETag: cachedETag,
+                    cachedLastModified: cachedLastModified
+                )
                 do {
                     return try normalizeRemoteContent(response.body, sourceURL: trimmedURL, headers: response.headers)
                 } catch {
@@ -107,6 +116,8 @@ public enum SubscriptionConfigBuilder {
                     // Happ (or current UA) returned something we cannot parse — try fallback UA.
                     continue
                 }
+            } catch is SubscriptionHTTP.ConditionalNotModified {
+                throw SubscriptionHTTP.ConditionalNotModified()
             } catch {
                 lastError = error
             }

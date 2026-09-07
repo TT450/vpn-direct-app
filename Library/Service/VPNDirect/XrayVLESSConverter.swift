@@ -153,14 +153,8 @@ enum XrayVLESSConverter {
             } else {
                 transport["mode"] = "auto"
             }
-            if let extra = xhttp["extra"] as? String, !extra.isEmpty {
-                transport["extra"] = extra
-            } else if let extraObj = xhttp["extra"] as? [String: Any],
-                      let data = try? JSONSerialization.data(withJSONObject: extraObj),
-                      let extraJSON = String(data: data, encoding: .utf8)
-            {
-                transport["extra"] = extraJSON
-            }
+            // Preserve `extra` object keys and merge sibling tuning (scMaxEachPostBytes, …).
+            XrayXHTTPExtra.merge(from: xhttp, into: &transport)
             return transport
         case "http", "h2":
             let http = (stream["httpSettings"] as? [String: Any]) ?? [:]

@@ -1,0 +1,44 @@
+[
+  {
+    "remarks": "XHTTP unknown-critical fail-closed",
+    "outbounds": [
+      {
+        "protocol": "vless",
+        "tag": "proxy",
+        "settings": {
+          "vnext": [
+            {
+              "address": "203.0.113.40",
+              "port": 443,
+              "users": [
+                {
+                  "id": "55555555-5555-5555-5555-555555555555",
+                  "encryption": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "xhttp",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "cdn.example.com",
+            "fingerprint": "chrome"
+          },
+          "xhttpSettings": {
+            "path": "/xhttp",
+            "mode": "auto",
+            "xmux": {
+              "maxConcurrency": 8
+            },
+            "vpnDirectCriticalInventedField": {
+              "mustFailClosed": true,
+              "reason": "invented connection-critical extension for CompatibilityFieldPolicy tests"
+            }
+          }
+        }
+      }
+    ]
+  }
+]

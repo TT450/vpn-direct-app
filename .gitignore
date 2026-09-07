@@ -27,3 +27,6 @@ AGENTS.md
 *.generated.uri
 *.generated.json
 *.generated.conf
+
+# Swift package test build
+tests/VPNDirectParserPackage/.build/

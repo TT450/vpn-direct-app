@@ -1,6 +1,6 @@
 # Protocol matrix — VPN Direct Core 0.1
 
-Last docs sync: **2026-09-07** (app release **v1.0.6**). Status legend: `planned` | `parser` | `runtime` | `parser+runtime` | `qualification_ready` | `tested` | `deferred` | `out_of_scope`
+Last docs sync: **2026-09-07** (app release **v1.0.7**). Status legend: `planned` | `parser` | `runtime` | `parser+runtime` | `qualification_ready` | `tested` | `deferred` | `out_of_scope`
 
 ## Support definition (`tested`)
 
@@ -18,6 +18,8 @@ A protocol/transport row may move to **`tested`** only when all of the following
 Until then, keep `runtime` / `parser+runtime` / `qualification_ready` / `planned` even if builders exist.
 
 **Interop=`planned` is intentional** until battle-key evidence files are committed. Product is **qualification-ready** when detectors, parsers, builders, and Core registration are green (`scripts/check_production_ready.sh`).
+
+Panel / format compatibility (URI × Xray × Clash × fixtures) lives in [`docs/compatibility/`](../compatibility/README.md) and [`core/panel-compatibility.json`](../../core/panel-compatibility.json). A panel is not “supported” from a single sample link.
 
 ## Capability policy
 
@@ -57,7 +59,7 @@ Until then, keep `runtime` / `parser+runtime` / `qualification_ready` / `planned
 
 ### Outbound debt note
 
-`NormalizedNode.outbound` early-return in `UniversalOutboundBuilder` is marked `// LEGACY`. New parsers (Clash, Mieru, migrated VLESS/HY share links) prefer attributes-only. Remaining Xray JSON converters may still attach pre-built outbound maps until fully migrated.
+`NormalizedNode.outbound` early-return in `UniversalOutboundBuilder` is marked `// LEGACY` for older writers. Clash, Mieru, share-link parsers, and **Xray JSON** (`XrayJSONAdapter`) prefer attributes-only; converters still produce outbound dicts only as an intermediate flatten source.
 
 Machine-readable: [`core/protocol-matrix.json`](../../core/protocol-matrix.json).
 

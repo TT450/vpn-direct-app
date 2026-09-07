@@ -8,7 +8,7 @@
       "name": "VLESS",
       "parser": "yes",
       "core": true,
-      "status": "runtime",
+      "status": "parser+runtime",
       "evidence": {}
     },
     {
@@ -17,6 +17,15 @@
       "parser": "yes",
       "core": true,
       "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "vless-encryption",
+      "name": "VLESS encryption",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "notes": "PQ/mlkem string; capability-gated",
       "evidence": {}
     },
     {
@@ -68,6 +77,22 @@
       "evidence": {}
     },
     {
+      "id": "shadowtls",
+      "name": "ShadowTLS",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "naive",
+      "name": "NaiveProxy",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
       "id": "wireguard",
       "name": "WireGuard",
       "parser": "yes",
@@ -92,12 +117,21 @@
       "evidence": {}
     },
     {
+      "id": "warp",
+      "name": "WARP",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "notes": "Cloudflare WARP via MASQUE CONNECT-IP profile",
+      "evidence": {}
+    },
+    {
       "id": "mieru",
       "name": "Mieru",
       "parser": "yes",
       "core": true,
       "status": "parser+runtime",
-      "notes": "with_mieru registered; Interop planned until live mita evidence",
+      "notes": "with_mieru overlays; Interop planned until live mita evidence",
       "evidence": {}
     },
     {

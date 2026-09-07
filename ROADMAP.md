@@ -23,9 +23,13 @@ Public roadmap for VPN Direct (Apple client + VPN Direct Core). Status language 
 - [x] Mieru Core runtime registration behind `with_mieru` (v1.0.6)
 - [x] Clash nested Reality/WS/gRPC/plugin opts + executable parser checks
 - [x] Interop lab runnable templates (env battle-key injection)
+- [x] Compatibility KB + P0 fail-closed unknown fields / panel HTTP metadata / panel-compatibility gate
 
 ## Next
 
+- [ ] Deep Marzban / Hiddify / PasarGuard / s-ui fixtures + Response Rules corpus
+- [ ] Full Clash YAML library evaluation
+- [ ] XHTTP extra / CDN quirks (TheTochka)
 - [ ] NE RSS budget measurement with Mieru enabled (device evidence)
 - [ ] Interop evidence per family (`interop/*/evidence/`)
 - [ ] iPhone device qualification filled for Tier‑1 protocols

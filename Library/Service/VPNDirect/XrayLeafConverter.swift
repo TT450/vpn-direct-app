@@ -1,7 +1,18 @@
 import Foundation
 
 /// Converts common Xray outbound protocols (VMess / Trojan / Shadowsocks) to sing-box dicts.
+///
+/// Unsupported stream networks (kcp, quic, …) return `nil` so `XrayJSONAdapter` records a convert
+/// failure and fail-closes when every leaf in a profile fails.
 enum XrayLeafConverter {
+    /// Networks we map (or intentionally omit as plain TCP). Anything else is unsupported.
+    private static let supportedNetworks: Set<String> = [
+        "ws", "websocket", "grpc", "httpupgrade",
+        "tcp", "raw", "",
+        "http", "h2",
+        "xhttp", "splithttp",
+    ]
+
     static func convert(_ xray: [String: Any], fallbackTag: String) -> [String: Any]? {
         let proto = ((xray["protocol"] as? String) ?? "").lowercased()
         switch proto {
@@ -17,6 +28,7 @@ enum XrayLeafConverter {
     }
 
     private static func convertVMess(_ xray: [String: Any], fallbackTag: String) -> [String: Any]? {
+        guard ensureSupportedNetwork(xray, protocolLabel: "vmess") else { return nil }
         let settings = (xray["settings"] as? [String: Any]) ?? [:]
         let vnext = ((settings["vnext"] as? [[String: Any]]) ?? []).first
         let address = (vnext?["address"] as? String) ?? ""
@@ -39,6 +51,7 @@ enum XrayLeafConverter {
     }
 
     private static func convertTrojan(_ xray: [String: Any], fallbackTag: String) -> [String: Any]? {
+        guard ensureSupportedNetwork(xray, protocolLabel: "trojan") else { return nil }
         let settings = (xray["settings"] as? [String: Any]) ?? [:]
         let servers = ((settings["servers"] as? [[String: Any]]) ?? []).first
         let address = (servers?["address"] as? String) ?? ""
@@ -79,6 +92,28 @@ enum XrayLeafConverter {
         ]
     }
 
+    private static func ensureSupportedNetwork(_ xray: [String: Any], protocolLabel: String) -> Bool {
+        let network = networkName(from: xray)
+        if (network == "xhttp" || network == "splithttp"), !VPNDirectCoreCapabilities.current.supportsXHTTP {
+            VPNDirectLog.parser.warning(
+                "\(VPNDirectRedactor.redact("xray_leaf_unsupported protocol=\(protocolLabel) network=\(network) (no xhttp capability)"))"
+            )
+            return false
+        }
+        guard supportedNetworks.contains(network) else {
+            VPNDirectLog.parser.warning(
+                "\(VPNDirectRedactor.redact("xray_leaf_unsupported protocol=\(protocolLabel) network=\(network)"))"
+            )
+            return false
+        }
+        return true
+    }
+
+    private static func networkName(from xray: [String: Any]) -> String {
+        let stream = (xray["streamSettings"] as? [String: Any]) ?? [:]
+        return ((stream["network"] as? String) ?? "tcp").lowercased()
+    }
+
     private static func streamTLS(from xray: [String: Any]) -> [String: Any]? {
         let stream = (xray["streamSettings"] as? [String: Any]) ?? [:]
         let security = ((stream["security"] as? String) ?? "").lowercased()
@@ -89,6 +124,9 @@ enum XrayLeafConverter {
         var tls: [String: Any] = ["enabled": true]
         if let sni = tlsSettings["serverName"] as? String { tls["server_name"] = sni }
         if let alpn = tlsSettings["alpn"] as? [String] { tls["alpn"] = alpn }
+        if let fingerprint = tlsSettings["fingerprint"] as? String, !fingerprint.isEmpty {
+            tls["utls"] = ["enabled": true, "fingerprint": fingerprint]
+        }
         if security == "reality" {
             var reality: [String: Any] = ["enabled": true]
             if let pbk = tlsSettings["publicKey"] as? String { reality["public_key"] = pbk }
@@ -102,7 +140,7 @@ enum XrayLeafConverter {
         let stream = (xray["streamSettings"] as? [String: Any]) ?? [:]
         let network = ((stream["network"] as? String) ?? "tcp").lowercased()
         switch network {
-        case "ws":
+        case "ws", "websocket":
             let ws = (stream["wsSettings"] as? [String: Any]) ?? [:]
             var out: [String: Any] = ["type": "ws"]
             if let path = ws["path"] as? String { out["path"] = path }
@@ -114,13 +152,126 @@ enum XrayLeafConverter {
             if let service = grpc["serviceName"] as? String { out["service_name"] = service }
             return out
         case "httpupgrade":
-            let hu = (stream["httpupgradeSettings"] as? [String: Any]) ?? [:]
+            let hu = (stream["httpupgradeSettings"] as? [String: Any])
+                ?? (stream["httpUpgradeSettings"] as? [String: Any])
+                ?? [:]
             var out: [String: Any] = ["type": "httpupgrade"]
             if let path = hu["path"] as? String { out["path"] = path }
             if let host = hu["host"] as? String { out["host"] = host }
             return out
+        case "http", "h2":
+            let http = (stream["httpSettings"] as? [String: Any]) ?? [:]
+            var out: [String: Any] = ["type": "http"]
+            if let path = http["path"] as? String, !path.isEmpty {
+                out["path"] = [path]
+            } else if let paths = http["path"] as? [String], !paths.isEmpty {
+                out["path"] = paths
+            }
+            if let host = http["host"] as? [String], !host.isEmpty {
+                out["host"] = host
+            } else if let host = http["host"] as? String, !host.isEmpty {
+                out["host"] = [host]
+            }
+            return out
+        case "xhttp", "splithttp":
+            return xhttpTransport(from: stream)
+        case "tcp", "raw", "":
+            let tcp = (stream["tcpSettings"] as? [String: Any]) ?? [:]
+            let header = (tcp["header"] as? [String: Any]) ?? [:]
+            if ((header["type"] as? String) ?? "none").lowercased() == "http" {
+                var out: [String: Any] = ["type": "http"]
+                let request = (header["request"] as? [String: Any]) ?? [:]
+                if let path = request["path"] as? [String], !path.isEmpty {
+                    out["path"] = path
+                }
+                if let headers = request["headers"] as? [String: Any] {
+                    if let host = headers["Host"] as? [String], !host.isEmpty {
+                        out["host"] = host
+                    } else if let host = headers["Host"] as? String, !host.isEmpty {
+                        out["host"] = [host]
+                    }
+                }
+                return out
+            }
+            return nil
         default:
             return nil
         }
+    }
+
+    /// XHTTP / SplitHTTP mapping aligned with `XrayVLESSConverter`.
+    private static func xhttpTransport(from stream: [String: Any]) -> [String: Any] {
+        let xhttp = (stream["xhttpSettings"] as? [String: Any])
+            ?? (stream["splithttpSettings"] as? [String: Any])
+            ?? [:]
+        var transport: [String: Any] = ["type": "xhttp"]
+        if let path = xhttp["path"] as? String, !path.isEmpty {
+            transport["path"] = path
+        }
+        if let host = xhttp["host"] as? String, !host.isEmpty {
+            transport["host"] = host
+        } else if let headers = xhttp["headers"] as? [String: String],
+                  let host = headers["Host"] ?? headers["host"], !host.isEmpty
+        {
+            transport["host"] = host
+        }
+        if let mode = xhttp["mode"] as? String, !mode.isEmpty {
+            transport["mode"] = mode
+        } else {
+            transport["mode"] = "auto"
+        }
+        XrayXHTTPExtra.merge(from: xhttp, into: &transport)
+        return transport
+    }
+}
+
+/// Shared XHTTP `extra` + sibling tuning keys (scMaxEachPostBytes, …).
+enum XrayXHTTPExtra {
+    private static let siblingKeys: [(xray: String, sing: String)] = [
+        ("scMaxEachPostBytes", "sc_max_each_post_bytes"),
+        ("scMinPostsIntervalMs", "sc_min_posts_interval_ms"),
+        ("scMaxConcurrentPosts", "sc_max_concurrent_posts"),
+        ("xPaddingBytes", "x_padding_bytes"),
+        ("noGRPCHeader", "no_grpc_header"),
+        ("xmux", "xmux"),
+    ]
+
+    static func merge(from xhttp: [String: Any], into transport: inout [String: Any]) {
+        var extraMerged: [String: Any] = [:]
+        if let extraObj = xhttp["extra"] as? [String: Any] {
+            extraMerged = extraObj
+        } else if let extraStr = xhttp["extra"] as? String, !extraStr.isEmpty,
+                  let data = extraStr.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        {
+            extraMerged = obj
+        } else if let extraStr = xhttp["extra"] as? String, !extraStr.isEmpty {
+            transport["extra"] = extraStr
+        }
+
+        for (xrayKey, singKey) in siblingKeys {
+            guard let raw = xhttp[xrayKey] else { continue }
+            if transport[singKey] == nil {
+                transport[singKey] = stringifyScalar(raw) ?? raw
+            }
+            if extraMerged[xrayKey] == nil {
+                extraMerged[xrayKey] = raw
+            }
+        }
+
+        if !extraMerged.isEmpty,
+           let data = try? JSONSerialization.data(withJSONObject: extraMerged),
+           let extraJSON = String(data: data, encoding: .utf8)
+        {
+            transport["extra"] = extraJSON
+        }
+    }
+
+    private static func stringifyScalar(_ raw: Any) -> Any? {
+        if raw is String || raw is NSNumber || raw is Bool { return raw }
+        if let arr = raw as? [Any] {
+            return arr.map { "\($0)" }.joined(separator: ",")
+        }
+        return nil
     }
 }

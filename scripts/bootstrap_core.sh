@@ -47,8 +47,6 @@ STOCK_LIBBOX_BACKUP=Libbox.xcframework.stock
 EOF
 
 # Apply in-tree protocol overlays (mieru) so Core builds without a private sing-box fork push
-if [[ -f "${ROOT}/scripts/apply_singbox_overlays.sh" ]]; then
-  bash "${ROOT}/scripts/apply_singbox_overlays.sh"
-fi
+bash "${ROOT}/scripts/prepare_core.sh"
 
 echo "bootstrapped ${DESC} (upstream ${UPSTREAM}, go ${GOV})"

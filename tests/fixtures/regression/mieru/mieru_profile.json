@@ -7,8 +7,7 @@
       "userName": "user",
       "password": "password123",
       "transport": "TCP",
-      "multiplexing": "MULTIPLEXING_HIGH",
-      "lowEntropy": "48"
+      "multiplexing": "MULTIPLEXING_HIGH"
     }
   ]
 }

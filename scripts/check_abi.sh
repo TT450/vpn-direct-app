@@ -81,9 +81,7 @@ if [[ ! -f "${OV_SB}/protocol/mieru/outbound.go" ]] || [[ ! -f "${OV_SB}/include
   echo "ERROR mieru overlay sources missing under core/overlays/sing-box" >&2
   fail=1
 else
-  if [[ -f "${ROOT}/scripts/apply_singbox_overlays.sh" ]]; then
-    bash "${ROOT}/scripts/apply_singbox_overlays.sh" || fail=1
-  fi
+  bash "${ROOT}/scripts/prepare_core.sh" || fail=1
   if [[ ! -f "${CORE}/protocol/mieru/outbound.go" ]] || [[ ! -f "${CORE}/include/mieru.go" ]]; then
     echo "ERROR mieru runtime missing under core/sing-box after overlay apply" >&2
     fail=1

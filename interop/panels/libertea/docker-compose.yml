@@ -1,0 +1,10 @@
+# Libertea uses bootstrap.sh on Ubuntu/Debian (not a single official Docker image).
+# Install notes:
+#   curl -s https://raw.githubusercontent.com/VZiChoushaDui/Libertea/master/bootstrap.sh -o /tmp/bootstrap.sh
+#   bash /tmp/bootstrap.sh install
+# Pin bootstrap commit in VERSION before lab.
+services:
+  libertea-lab-note:
+    image: busybox:1.36
+    profiles: ["lab"]
+    command: ["sh", "-c", "echo Use Libertea bootstrap.sh on Ubuntu 22.04 with a CDN domain; sleep infinity"]

@@ -1,0 +1,4 @@
+vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443?encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&sid=abcd1234&type=tcp#Marzban-DE
+vmess://eyJ2IjoiMiIsInBzIjoiTWFyemJhbi1WTUVTUyIsImFkZCI6IjIwMy4wLjExMy4xMSIsInBvcnQiOiI0NDMiLCJpZCI6IjIyMjIyMjIyLTIyMjItMjIyMi0yMjIyLTIyMjIyMjIyMjIyMiIsImFpZCI6IjAiLCJzY3kiOiJhdXRvIiwibmV0Ijoid3MiLCJ0eXBlIjoibm9uZSIsImhvc3QiOiJjZG4uZXhhbXBsZS5jb20iLCJwYXRoIjoiL3dzIiwidGxzIjoidGxzIiwic25pIjoiY2RuLmV4YW1wbGUuY29tIn0=
+trojan://password-fixture@203.0.113.12:443?security=tls&sni=cdn.example.com#Marzban-Trojan
+ss://YWVzLTI1Ni1nY206cGFzc3dvcmQtZml4dHVyZQ==@203.0.113.13:8388#Marzban-SS

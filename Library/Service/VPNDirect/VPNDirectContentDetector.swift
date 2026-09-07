@@ -111,8 +111,9 @@ public enum VPNDirectContentDetector {
 
     private static func containsShareScheme(_ text: String) -> Bool {
         let lower = text.lowercased()
+        // Intentionally omit ssr:// — no parser; treating it as a share scheme caused false uriList hits.
         let schemes = [
-            "vless://", "vmess://", "trojan://", "ss://", "ssr://",
+            "vless://", "vmess://", "trojan://", "ss://",
             "hysteria://", "hysteria2://", "hy2://", "tuic://", "anytls://",
             "wireguard://", "wg://", "awg://", "socks://", "socks5://", "socks4://",
             "ssh://", "shadowtls://",

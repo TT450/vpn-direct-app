@@ -24,6 +24,9 @@ jobs:
           go-version: "1.26.6"
           cache-dependency-path: core/sing-box/go.sum
 
+      - name: Prepare Core (overlays)
+        run: ./scripts/prepare_core.sh
+
       - name: check-fixtures
         run: make check-fixtures
 
@@ -72,11 +75,25 @@ jobs:
           BIN="$(find Libbox.xcframework -type f -name Libbox | head -1)"
           strings "$BIN" | grep -q 'VPN_DIRECT_CORE'
 
+      - name: Write build manifest
+        run: ./scripts/write_build_manifest.sh
+
       - name: Upload Libbox artifact
         uses: actions/upload-artifact@v4
         with:
           name: Libbox.xcframework
           path: Libbox.xcframework
+          if-no-files-found: error
+
+      - name: Upload build metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-metadata
+          path: |
+            core/protocol-matrix.json
+            core/panel-compatibility.json
+            Libbox.xcframework/VPNDirectCore.version
+            build/build-manifest.txt
           if-no-files-found: error
 
   sfi-compile:
@@ -107,6 +124,72 @@ jobs:
             -configuration Debug \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build/DerivedData-ci \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=- \
+            build
+
+  sfm-compile:
+    name: Compile SFM (unsigned)
+    runs-on: macos-15
+    needs: libbox
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download Libbox
+        uses: actions/download-artifact@v4
+        with:
+          name: Libbox.xcframework
+          path: Libbox.xcframework
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: xcodebuild SFM
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project sing-box.xcodeproj \
+            -scheme SFM \
+            -configuration Debug \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath build/DerivedData-ci-sfm \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=- \
+            build
+
+  sft-compile:
+    name: Compile SFT (unsigned)
+    runs-on: macos-15
+    needs: libbox
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download Libbox
+        uses: actions/download-artifact@v4
+        with:
+          name: Libbox.xcframework
+          path: Libbox.xcframework
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: xcodebuild SFT
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project sing-box.xcodeproj \
+            -scheme SFT \
+            -configuration Debug \
+            -destination 'generic/platform=tvOS' \
+            -derivedDataPath build/DerivedData-ci-sft \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=- \

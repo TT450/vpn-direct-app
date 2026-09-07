@@ -21,6 +21,7 @@
 
 <p align="center">
   <a href="https://apps.apple.com/app/id6807402257"><b>App Store</b></a> ·
+  <a href="docs/compatibility/README.md"><b>Compatibility & Providers</b></a> ·
   <a href="docs/core/ARCHITECTURE.md"><b>Architecture</b></a> ·
   <a href="docs/core/PROTOCOL_MATRIX.md"><b>Protocol Matrix</b></a> ·
   <a href="docs/core/BUILDING.md"><b>Build</b></a> ·
@@ -72,7 +73,7 @@ The Core remains intentionally close to upstream sing-box. Custom functionality 
 
 ## Current Core status
 
-**Latest release:** [`v1.0.6`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.6) · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
+**Latest published: **v1.0.7**) · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
 
 A feature is not **production / `tested`** merely because a builder exists. Production requires:
 
@@ -197,6 +198,7 @@ vpn-direct-app/
 
 | Document | Purpose |
 | --- | --- |
+| [Compatibility & Providers](docs/compatibility/README.md) | Panel / subscription / protocol knowledge base |
 | [Architecture](docs/core/ARCHITECTURE.md) | Core design and Apple integration |
 | [Current Architecture](docs/core/CURRENT_ARCHITECTURE.md) | Current repository architecture |
 | [Build Guide](docs/core/BUILDING.md) | Reproduce Libbox and Apple builds |

@@ -1,0 +1,53 @@
+[
+  {
+    "remarks": "Germany",
+    "outbounds": [
+      {
+        "protocol": "vless",
+        "tag": "proxy",
+        "settings": {
+          "vnext": [
+            {
+              "address": "de1.example.com",
+              "port": 443,
+              "users": [{ "id": "11111111-1111-1111-1111-111111111111", "encryption": "none" }]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "security": "reality",
+          "realitySettings": {
+            "serverName": "www.cloudflare.com",
+            "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "shortId": "abcd",
+            "fingerprint": "chrome"
+          }
+        }
+      },
+      {
+        "protocol": "hysteria2",
+        "tag": "proxy-2",
+        "settings": {
+          "address": "de2.example.com",
+          "port": 443,
+          "version": 2,
+          "password": "hy2-password"
+        },
+        "streamSettings": {
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "de2.example.com",
+            "alpn": ["h3"]
+          },
+          "hysteriaSettings": {
+            "password": "hy2-password"
+          }
+        }
+      }
+    ],
+    "routing": {
+      "balancers": [{ "tag": "balancer", "selector": ["proxy"], "strategy": "leastLoad" }]
+    }
+  }
+]

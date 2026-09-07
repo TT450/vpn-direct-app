@@ -1,0 +1,9 @@
+{
+  "Subscription-Userinfo": "upload=0; download=512; total=10737418240; expire=1893456000",
+  "Profile-Title": "base64:eC11aSBGaXh0dXJl",
+  "Profile-Update-Interval": "12",
+  "Support-Url": "https://example.com/support",
+  "Profile-Web-Page-Url": "https://example.com/profile",
+  "Announce": "base64:QW5ub3VuY2VtZW50",
+  "format_note": "x-ui format twin of 3x-ui — verify headers against alireza0/x-ui lab before fingerprint alias"
+}

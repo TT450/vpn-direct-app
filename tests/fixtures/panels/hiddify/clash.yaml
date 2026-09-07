@@ -1,0 +1,25 @@
+proxies:
+  - name: Hiddify-DE-VLESS
+    type: vless
+    server: 203.0.113.10
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111111
+    network: tcp
+    tls: true
+    udp: true
+    servername: www.cloudflare.com
+    client-fingerprint: chrome
+    reality-opts:
+      public-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      short-id: abcd1234
+  - name: Hiddify-Trojan
+    type: trojan
+    server: 203.0.113.12
+    port: 443
+    password: password-fixture
+    sni: cdn.example.com
+    network: ws
+    ws-opts:
+      path: /trojan
+      headers:
+        Host: cdn.example.com

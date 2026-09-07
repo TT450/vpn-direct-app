@@ -11,6 +11,9 @@ public struct VLESSShareLinkParser: VPNDirectParser {
         let outbound = parsed.outbound
         let server = outbound["server"] as? String ?? ""
         let port = outbound["server_port"] as? Int ?? 0
+        if EndpointValidator.isBlockedLoopbackHost(server) || EndpointValidator.isPanelStubLink(link) {
+            throw VPNDirectCoreError.unsupportedFeature(component: "vless", detail: "Loopback/panel stub rejected")
+        }
         let transportType = ((outbound["transport"] as? [String: Any])?["type"] as? String)
             ?? "tcp"
         let tlsEnabled = ((outbound["tls"] as? [String: Any])?["enabled"] as? Bool) ?? false
@@ -25,6 +28,7 @@ public struct VLESSShareLinkParser: VPNDirectParser {
         }
 
         var attributes: [String: String] = [:]
+        var rawExtensions: [String: String] = [:]
         if let encryption = outbound["encryption"] as? String {
             attributes["encryption"] = encryption
         }
@@ -42,10 +46,27 @@ public struct VLESSShareLinkParser: VPNDirectParser {
             }
         }
         if let transport = outbound["transport"] as? [String: Any] {
+            attributes["type"] = transportType
             if let path = transport["path"] as? String { attributes["path"] = path }
             if let service = transport["service_name"] as? String { attributes["service_name"] = service }
+            if let mode = transport["mode"] as? String { attributes["mode"] = mode }
+            if let extra = transport["extra"] as? String {
+                attributes["extra"] = extra
+                rawExtensions["xhttp.extra"] = extra
+            }
             if let headers = transport["headers"] as? [String: String], let host = headers["Host"] {
                 attributes["host"] = host
+            }
+        }
+        // Preserve full query map for diagnostics / future builders.
+        for (k, v) in ShareLinkURI.queryMap(from: link) {
+            if attributes[k] == nil {
+                switch CompatibilityFieldPolicy.classify(key: k, value: v) {
+                case .harmlessMetadata, .panelMetadata, .futureField:
+                    rawExtensions[k] = v
+                case .protocolExtension, .connectionCritical:
+                    attributes[k] = v
+                }
             }
         }
 
@@ -58,8 +79,8 @@ public struct VLESSShareLinkParser: VPNDirectParser {
             security: security,
             uuid: parsed.uuid,
             attributes: attributes,
+            rawExtensions: rawExtensions,
             source: link
-            // attributes-only — UniversalOutboundBuilder rebuilds outbound
         )
     }
 }

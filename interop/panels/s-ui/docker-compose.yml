@@ -1,0 +1,17 @@
+services:
+  s-ui:
+    image: alireza7/s-ui:latest
+    container_name: vpn-direct-s-ui
+    profiles: ["lab"]
+    ports:
+      - "2095:2095"
+      - "2096:2096"
+      - "443:443"
+      - "80:80"
+    volumes:
+      - sui_db:/app/db
+      - sui_cert:/root/cert
+    restart: unless-stopped
+volumes:
+  sui_db:
+  sui_cert:

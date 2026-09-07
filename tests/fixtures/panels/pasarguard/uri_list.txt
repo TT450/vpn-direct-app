@@ -1,0 +1,12 @@
+vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443?encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&sid=abcd1234&type=tcp#PasarGuard-VLESS
+wireguard://AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEE=@203.0.113.50:51820?publickey=BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB%3D&address=10.8.0.2%2F32&allowed_ips=0.0.0.0%2F0&keepalive=25#PasarGuard-WG
+
+# Alternate WG conf snippet (same peer semantics):
+# [Interface]
+# PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEE=
+# Address = 10.8.0.2/32
+# [Peer]
+# PublicKey = BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
+# Endpoint = 203.0.113.50:51820
+# AllowedIPs = 0.0.0.0/0, ::/0
+# PersistentKeepalive = 25

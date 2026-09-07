@@ -3,6 +3,28 @@ import Foundation
 /// Builds sing-box outbound dictionaries from NormalizedNode fields (no pre-built outbound required).
 enum UniversalOutboundBuilder {
     static func build(from node: NormalizedNode) throws -> [String: Any] {
+        // LEGACY outbound already encodes mapped Core JSON — do not re-fail on preserved Xray stream dumps.
+        // Attributes-only path: refuse connection-critical unknowns that builders do not consume.
+        if node.outbound == nil || node.outbound?.isEmpty == true {
+            let candidateKeys = Set(node.attributes.keys)
+                .union(node.rawExtensions.keys)
+                .filter { key in
+                    let k = key.lowercased()
+                    if k.hasPrefix("xray") { return false }
+                    if k.hasPrefix("stream.") || k.hasPrefix("settings.") {
+                        // Keep connection-critical nested unknowns in the fail-closed scan.
+                        return CompatibilityFieldPolicy.classify(key: key) == .connectionCritical
+                    }
+                    return true
+                }
+            try CompatibilityFieldPolicy.assertNoCriticalUnknowns(
+                allKeys: candidateKeys,
+                consumedKeys: CompatibilityFieldPolicy.knownProtocolKeys,
+                ecosystem: "builder",
+                protocolID: node.protocolID.rawValue
+            )
+        }
+
         // LEGACY: pre-built outbound dictionaries from older converters.
         // Prefer attributes-only NormalizedNode; keep this early-return until remaining writers migrate.
         if let existing = node.outbound, !existing.isEmpty {
@@ -135,7 +157,11 @@ enum UniversalOutboundBuilder {
     }
 
     private static func transportObject(from node: NormalizedNode) -> [String: Any]? {
-        let t = (node.transport?.rawValue ?? attr(node, "type") ?? attr(node, "net") ?? "tcp").lowercased()
+        let t = (node.transport?.rawValue
+            ?? attr(node, "network")
+            ?? attr(node, "net")
+            ?? attr(node, "type")
+            ?? "tcp").lowercased()
         switch t {
         case "ws", "websocket":
             var ws: [String: Any] = ["type": "ws"]
@@ -161,8 +187,24 @@ enum UniversalOutboundBuilder {
             if let host = attr(node, "host") { http["host"] = [host] }
             return http
         case "xhttp", "splithttp":
-            // Fail-closed: builder must go through VLESS XHTTP path with capability.
-            return ["type": "xhttp", "path": attr(node, "path") ?? "/"]
+            var xhttp: [String: Any] = ["type": "xhttp"]
+            if let path = attr(node, "path") { xhttp["path"] = path } else { xhttp["path"] = "/" }
+            if let host = attr(node, "host") { xhttp["host"] = host }
+            xhttp["mode"] = attr(node, "mode") ?? "auto"
+            if let extra = attr(node, "extra") { xhttp["extra"] = extra }
+            if let sc = attr(node, "scMaxEachPostBytes") ?? attr(node, "sc_max_each_post_bytes") {
+                xhttp["sc_max_each_post_bytes"] = sc
+            }
+            if let sc = attr(node, "scMinPostsIntervalMs") ?? attr(node, "sc_min_posts_interval_ms") {
+                xhttp["sc_min_posts_interval_ms"] = sc
+            }
+            if let sc = attr(node, "scMaxConcurrentPosts") ?? attr(node, "sc_max_concurrent_posts") {
+                xhttp["sc_max_concurrent_posts"] = sc
+            }
+            if let pad = attr(node, "x_padding_bytes") ?? attr(node, "xPaddingBytes") {
+                xhttp["x_padding_bytes"] = pad
+            }
+            return xhttp
         default:
             return nil
         }
@@ -173,6 +215,15 @@ enum UniversalOutboundBuilder {
     private static func buildVLESS(_ node: NormalizedNode) throws -> [String: Any] {
         guard let uuid = node.uuid ?? attr(node, "uuid"), !uuid.isEmpty else {
             throw VPNDirectCoreError.malformedConfig(component: "vless", detail: "Missing uuid")
+        }
+        let network = (node.transport?.rawValue ?? attr(node, "network") ?? attr(node, "net") ?? "tcp").lowercased()
+        if network == "xhttp" || network == "splithttp" {
+            guard VPNDirectCoreCapabilities.current.supportsXHTTP else {
+                throw VPNDirectCoreError.unsupportedFeature(
+                    component: "xhttp",
+                    detail: "Current Libbox build lacks native xhttp transport"
+                )
+            }
         }
         var outbound: [String: Any] = [
             "type": "vless",
@@ -335,15 +386,13 @@ enum UniversalOutboundBuilder {
             if !VPNDirectCoreCapabilities.current.supportsAWG {
                 throw VPNDirectCoreError.unsupportedFeature(component: "amneziawg", detail: "Current Libbox build lacks with_awg")
             }
-            var awg: [String: Any] = [:]
-            if let v = attr(node, "amnezia_version") { awg["version"] = v }
+            // sing-box embeds AmneziaWGOptions on the wireguard object (no "amnezia" wrapper).
             for key in ["jc", "jmin", "jmax", "s1", "s2", "s3", "s4"] {
-                if let n = attr(node, key).flatMap(Int.init) { awg[key] = n }
+                if let n = attr(node, key).flatMap(Int.init) { outbound[key] = n }
             }
             for key in ["h1", "h2", "h3", "h4", "i1", "i2", "i3", "i4", "i5"] {
-                if let s = attr(node, key) { awg[key] = s }
+                if let s = attr(node, key) { outbound[key] = s }
             }
-            if !awg.isEmpty { outbound["amnezia"] = awg }
         }
         return outbound
     }

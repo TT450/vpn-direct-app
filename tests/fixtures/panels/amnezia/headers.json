@@ -1,0 +1,5 @@
+{
+  "note": "Amnezia exports AWG conf via client or amnezia-wg-easy — not HTTP subscription-userinfo",
+  "content-type": "text/plain",
+  "content-disposition": "attachment; filename=\"amneziawg.conf\""
+}

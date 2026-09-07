@@ -98,11 +98,7 @@ echo "out:        ${OUT_FRAMEWORK}"
 cd "${CORE}"
 
 # Protocol / option / include overlays (mieru, etc.) onto stock sing-box-lx pin
-if [[ -x "${ROOT}/scripts/apply_singbox_overlays.sh" ]]; then
-  "${ROOT}/scripts/apply_singbox_overlays.sh"
-elif [[ -f "${ROOT}/scripts/apply_singbox_overlays.sh" ]]; then
-  bash "${ROOT}/scripts/apply_singbox_overlays.sh"
-fi
+bash "${ROOT}/scripts/prepare_core.sh"
 
 OVERLAY_DIR="${ROOT}/core/overlays/libbox"
 if [[ -d "${OVERLAY_DIR}" ]]; then

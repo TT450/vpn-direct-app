@@ -44,10 +44,18 @@ enum SubscriptionHTTP {
         let userAgent: String
     }
 
+    /// HTTP 304 — body unchanged since cached validators (`If-None-Match` / `If-Modified-Since`).
+    struct ConditionalNotModified: Error, Equatable {}
+
     /// Compatibility alias — always Happ-first via `SubscriptionClientIdentity`.
     static var userAgents: [String] { SubscriptionClientIdentity.userAgents }
 
-    static func fetch(url: String, userAgent: String) async throws -> Response {
+    static func fetch(
+        url: String,
+        userAgent: String,
+        cachedETag: String? = nil,
+        cachedLastModified: String? = nil
+    ) async throws -> Response {
         guard let requestURL = URL(string: url) else {
             throw URLError(.badURL)
         }
@@ -56,15 +64,26 @@ enum SubscriptionHTTP {
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("text/plain, application/json, */*", forHTTPHeaderField: "Accept")
         request.setValue("gzip, deflate, br", forHTTPHeaderField: "Accept-Encoding")
+        if let cachedETag, !cachedETag.isEmpty {
+            request.setValue(cachedETag, forHTTPHeaderField: "If-None-Match")
+        }
+        if let cachedLastModified, !cachedLastModified.isEmpty {
+            request.setValue(cachedLastModified, forHTTPHeaderField: "If-Modified-Since")
+        }
         SubscriptionClientIdentity.applyDeviceHeaders(to: &request)
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        if let http = response as? HTTPURLResponse, !(200 ... 299).contains(http.statusCode) {
-            throw NSError(
-                domain: "SubscriptionHTTP",
-                code: http.statusCode,
-                userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"]
-            )
+        if let http = response as? HTTPURLResponse {
+            if http.statusCode == 304 {
+                throw ConditionalNotModified()
+            }
+            if !(200 ... 299).contains(http.statusCode) {
+                throw NSError(
+                    domain: "SubscriptionHTTP",
+                    code: http.statusCode,
+                    userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"]
+                )
+            }
         }
         guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
             throw NSError(

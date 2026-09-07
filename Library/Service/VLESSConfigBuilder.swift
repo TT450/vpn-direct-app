@@ -125,6 +125,18 @@ public enum VLESSConfigBuilder {
             outbound["transport"] = transport
         }
 
+        // Never silently drop connection-critical unknown query keys.
+        do {
+            try CompatibilityFieldPolicy.assertNoCriticalUnknowns(
+                allKeys: query.allKeys,
+                consumedKeys: Query.consumedVLESSKeys,
+                ecosystem: "uri",
+                protocolID: "vless"
+            )
+        } catch let VPNDirectCoreError.unsupportedFeature(component, detail) {
+            throw VLESSError.unsupportedFeature(component: component, detail: detail)
+        }
+
         let name = fragmentName?.removingPercentEncoding ?? fragmentName ?? host
         return OutboundResult(name: name.isEmpty ? host : name, uuid: uuid, outbound: outbound)
     }
@@ -290,7 +302,10 @@ public enum VLESSConfigBuilder {
             }
             return nil
         default:
-            return nil
+            throw VLESSError.unsupportedFeature(
+                component: "vless.transport",
+                detail: "unsupported option field=type value=\(type) (unknown transport; refusing silent drop)"
+            )
         }
     }
 
@@ -301,19 +316,33 @@ public enum VLESSConfigBuilder {
     }
 
     private struct Query {
+        /// Keys read by this builder (lowercase). Anything else must classify as non-critical or fail.
+        static let consumedVLESSKeys: Set<String> = [
+            "type", "network", "security", "encryption", "flow", "sni", "host", "path",
+            "fp", "alpn", "pbk", "sid", "spx", "pqv", "allowinsecure", "packetencoding",
+            "servicename", "service_name", "mode", "headertype", "extra",
+            "scmaxeachpostbytes", "scminpostsintervalms", "x_padding_bytes",
+        ]
+
         private let map: [String: String]
+        let allKeys: Set<String>
+
         init(_ items: [URLQueryItem]) {
             var dict: [String: String] = [:]
+            var keys = Set<String>()
             for item in items {
+                keys.insert(item.name)
                 if let value = item.value {
                     dict[item.name] = value
+                    dict[item.name.lowercased()] = value
                 }
             }
             map = dict
+            allKeys = keys
         }
 
         subscript(_ key: String) -> String? {
-            map[key]
+            map[key] ?? map[key.lowercased()]
         }
     }
 

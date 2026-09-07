@@ -1,0 +1,7 @@
+# Hiddify is typically installed via upstream install.sh on a VPS (not a slim single-container).
+# Use this compose only if you maintain a custom lab image; otherwise see README install notes.
+services:
+  hiddify-lab-note:
+    image: busybox:1.36
+    profiles: ["lab"]
+    command: ["sh", "-c", "echo Use Hiddify-Manager install.sh on a disposable Ubuntu 22.04 VPS; sleep infinity"]

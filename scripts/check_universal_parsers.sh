@@ -46,7 +46,7 @@ assert head(root/"shadowtls/shadowtls_share.uri").startswith("shadowtls://")
 
 # Detector must recognize registry schemes (mirror of VPNDirectContentDetector.containsShareScheme).
 schemes = [
-    "vless://", "vmess://", "trojan://", "ss://", "ssr://",
+    "vless://", "vmess://", "trojan://", "ss://",
     "hysteria://", "hysteria2://", "hy2://", "tuic://", "anytls://",
     "wireguard://", "wg://", "awg://", "socks://", "socks5://", "socks4://",
     "ssh://", "shadowtls://",

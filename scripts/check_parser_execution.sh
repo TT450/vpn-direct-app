@@ -11,6 +11,9 @@ trap 'rm -rf "${TMP}"' EXIT
 
 fail=0
 
+# Ensure mieru (and other) overlays are on the Core pin before any go build.
+bash "${ROOT}/scripts/prepare_core.sh"
+
 resolve_singbox() {
   if [[ -x "${CORE}/sing-box" ]]; then
     echo "${CORE}/sing-box"

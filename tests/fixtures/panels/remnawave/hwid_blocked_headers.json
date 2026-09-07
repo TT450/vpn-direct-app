@@ -1,0 +1,9 @@
+{
+  "x-hwid-active": "true",
+  "x-hwid-limit": "3",
+  "x-hwid-device-limit": "3",
+  "x-hwid-device-used": "3",
+  "x-hwid-max-devices-reached": "true",
+  "x-hwid-not-supported": "false",
+  "x-provider-id": "fixture-provider-hwid-block"
+}

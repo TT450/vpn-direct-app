@@ -6,9 +6,14 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 fail=0
 
 echo "== fixtures =="
+"${ROOT}/scripts/prepare_core.sh" || fail=1
 "${ROOT}/scripts/check_fixtures.sh" || fail=1
 "${ROOT}/scripts/check_subscription_graph.sh" || fail=1
 "${ROOT}/scripts/check_universal_parsers.sh" || fail=1
+"${ROOT}/scripts/check_panel_compatibility.sh" || fail=1
+"${ROOT}/scripts/check_matrix_sync.sh" || fail=1
+"${ROOT}/scripts/check_parser_execution.sh" || fail=1
+"${ROOT}/scripts/check_swift_parser_tests.sh" || fail=1
 
 echo "== ABI / capability proofs =="
 "${ROOT}/scripts/check_abi.sh" || fail=1

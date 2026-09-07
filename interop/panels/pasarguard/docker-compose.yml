@@ -1,0 +1,12 @@
+# Prefer pasarguard.sh install with TimescaleDB. Stub:
+services:
+  pasarguard:
+    image: pasarguard/panel:latest
+    profiles: ["lab"]
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - pasarguard_data:/var/lib/pasarguard
+volumes:
+  pasarguard_data:

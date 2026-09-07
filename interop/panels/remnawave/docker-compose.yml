@@ -1,0 +1,13 @@
+# Remnawave official compose varies by release — replace image tags after pinning VERSION.
+# This file is a lab stub; prefer upstream compose from remnawave docs for the pinned tag.
+services:
+  remnawave:
+    image: remnawave/backend:latest
+    profiles: ["lab"]
+    env_file: .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - remnawave_data:/var/lib/remnawave
+volumes:
+  remnawave_data:

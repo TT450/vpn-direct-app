@@ -64,6 +64,8 @@ public struct NormalizedNode: Equatable {
     public var uuid: String?
     /// Protocol-specific fields preserved for builders (share-link query, JSON keys, …).
     public var attributes: [String: String]
+    /// Opaque extras: panel metadata, future fields, unclassified keys (never silently dropped).
+    public var rawExtensions: [String: String]
     /// Original share link / fragment when available.
     public var source: String?
     /// Pre-built sing-box outbound when the adapter already constructed one.
@@ -81,6 +83,7 @@ public struct NormalizedNode: Equatable {
         obfuscation: VPNDirectObfuscationID? = nil,
         uuid: String? = nil,
         attributes: [String: String] = [:],
+        rawExtensions: [String: String] = [:],
         source: String? = nil,
         outbound: [String: Any]? = nil,
         detour: String? = nil
@@ -94,6 +97,7 @@ public struct NormalizedNode: Equatable {
         self.obfuscation = obfuscation
         self.uuid = uuid
         self.attributes = attributes
+        self.rawExtensions = rawExtensions
         self.source = source
         self.outbound = outbound
         self.detour = detour
@@ -109,6 +113,7 @@ public struct NormalizedNode: Equatable {
             && lhs.obfuscation == rhs.obfuscation
             && lhs.uuid == rhs.uuid
             && lhs.attributes == rhs.attributes
+            && lhs.rawExtensions == rhs.rawExtensions
             && lhs.source == rhs.source
             && lhs.detour == rhs.detour
     }

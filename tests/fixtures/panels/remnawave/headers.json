@@ -1,0 +1,14 @@
+{
+  "Subscription-Userinfo": "upload=100; download=200; total=10737418240; expire=1893456000",
+  "Profile-Update-Interval": "12",
+  "Profile-Title": "base64:VlBOIERpcmVjdCBGaXh0dXJl",
+  "x-hwid-active": "true",
+  "x-hwid-limit": "5",
+  "x-hwid-device-limit": "5",
+  "x-hwid-device-used": "1",
+  "x-hwid-max-devices-reached": "false",
+  "x-hwid-not-supported": "false",
+  "x-provider-id": "fixture-provider",
+  "announce": "base64:QW5ub3VuY2VtZW50",
+  "support-url": "https://example.com/support"
+}

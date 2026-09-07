@@ -11,6 +11,17 @@ public struct SubscriptionMetadata: Codable, Equatable {
     public var deviceUsed: Int?
     public var hwidLimitEnabled: Bool?
     public var unlimitedDevices: Bool = false
+    public var announce: String?
+    public var supportURL: String?
+    public var profileWebPageURL: String?
+    public var updateIntervalHours: Int?
+    public var routingEnabled: Bool?
+    public var routingRules: String?
+    public var providerID: String?
+    public var etag: String?
+    public var lastModified: String?
+    /// Soft panel fingerprint id (remnawave / 3x-ui / …), never from domain alone.
+    public var compatibilityProfileID: String?
 
     public init(
         title: String? = nil,
@@ -21,7 +32,17 @@ public struct SubscriptionMetadata: Codable, Equatable {
         deviceLimit: Int? = nil,
         deviceUsed: Int? = nil,
         hwidLimitEnabled: Bool? = nil,
-        unlimitedDevices: Bool = false
+        unlimitedDevices: Bool = false,
+        announce: String? = nil,
+        supportURL: String? = nil,
+        profileWebPageURL: String? = nil,
+        updateIntervalHours: Int? = nil,
+        routingEnabled: Bool? = nil,
+        routingRules: String? = nil,
+        providerID: String? = nil,
+        etag: String? = nil,
+        lastModified: String? = nil,
+        compatibilityProfileID: String? = nil
     ) {
         self.title = title
         self.expireTimestamp = expireTimestamp
@@ -32,6 +53,16 @@ public struct SubscriptionMetadata: Codable, Equatable {
         self.deviceUsed = deviceUsed
         self.hwidLimitEnabled = hwidLimitEnabled
         self.unlimitedDevices = unlimitedDevices
+        self.announce = announce
+        self.supportURL = supportURL
+        self.profileWebPageURL = profileWebPageURL
+        self.updateIntervalHours = updateIntervalHours
+        self.routingEnabled = routingEnabled
+        self.routingRules = routingRules
+        self.providerID = providerID
+        self.etag = etag
+        self.lastModified = lastModified
+        self.compatibilityProfileID = compatibilityProfileID
     }
 
     public var expiryLabel: String {
@@ -151,6 +182,41 @@ public struct SubscriptionMetadata: Codable, Equatable {
 
         applyDeviceHeaders(normalized, into: &meta)
 
+        if let announce = normalized["announce"] {
+            meta.announce = decodeHeaderValue(announce)
+        }
+        if let support = normalized["support-url"] ?? normalized["supporturl"] {
+            meta.supportURL = support.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let page = normalized["profile-web-page-url"] ?? normalized["profile-webpage-url"] {
+            meta.profileWebPageURL = page.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let interval = normalized["profile-update-interval"],
+           let hours = Int(interval.trimmingCharacters(in: .whitespacesAndNewlines))
+        {
+            meta.updateIntervalHours = hours
+        }
+        if let routingEnable = normalized["routing-enable"] {
+            meta.routingEnabled = parseBool(routingEnable)
+        }
+        if let routing = normalized["routing"], !routing.isEmpty {
+            meta.routingRules = routing
+        }
+        if let provider = normalized["x-provider-id"], !provider.isEmpty {
+            meta.providerID = provider
+        }
+        if let etag = normalized["etag"], !etag.isEmpty {
+            meta.etag = etag
+        }
+        if let lastModified = normalized["last-modified"], !lastModified.isEmpty {
+            meta.lastModified = lastModified
+        }
+
+        let profile = CompatibilityProfile.detect(headers: headers, body: body)
+        if profile.id != CompatibilityProfile.generic.id {
+            meta.compatibilityProfileID = profile.id
+        }
+
         if meta.title == nil, let disposition = normalized["content-disposition"],
            let filename = filenameFromContentDisposition(disposition)
         {
@@ -172,16 +238,27 @@ public struct SubscriptionMetadata: Codable, Equatable {
         return meta
     }
 
-    public static func fetch(from url: String) async throws -> SubscriptionMetadata {
+    public static func fetch(
+        from url: String,
+        cachedETag: String? = nil,
+        cachedLastModified: String? = nil
+    ) async throws -> SubscriptionMetadata {
         var lastMeta = SubscriptionMetadata()
         for agent in SubscriptionHTTP.userAgents {
             do {
-                let response = try await SubscriptionHTTP.fetch(url: url, userAgent: agent)
+                let response = try await SubscriptionHTTP.fetch(
+                    url: url,
+                    userAgent: agent,
+                    cachedETag: cachedETag,
+                    cachedLastModified: cachedLastModified
+                )
                 let meta = parse(headers: response.headers, body: response.body)
                 if meta.title != nil || meta.expireTimestamp != nil || meta.deviceLimit != nil || meta.hwidLimitEnabled != nil {
                     return meta
                 }
                 lastMeta = meta
+            } catch is SubscriptionHTTP.ConditionalNotModified {
+                throw SubscriptionHTTP.ConditionalNotModified()
             } catch {
                 continue
             }

@@ -1,0 +1,13 @@
+services:
+  x-ui:
+    image: ghcr.io/mhsanaei/3x-ui:latest
+    container_name: vpn-direct-3x-ui
+    profiles: ["lab"]
+    volumes:
+      - xui_db:/etc/x-ui
+      - xui_cert:/root/cert
+    network_mode: host
+    restart: unless-stopped
+volumes:
+  xui_db:
+  xui_cert:
