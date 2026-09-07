@@ -127,6 +127,16 @@ public enum UniversalOutboundBuilder {
         return values.isEmpty ? nil : values
     }
 
+    private static func jsonAttr(_ node: NormalizedNode, _ key: String) throws -> Any? {
+        guard let raw = attr(node, key) else { return nil }
+        guard let data = raw.data(using: .utf8),
+              let value = try? JSONSerialization.jsonObject(with: data)
+        else {
+            throw VPNDirectCoreError.malformedConfig(component: node.protocolID.rawValue, detail: "\(key) must be valid JSON")
+        }
+        return value
+    }
+
     private static func tlsObject(from node: NormalizedNode, defaultSNI: String? = nil, forceEnabled: Bool = false) throws -> [String: Any]? {
         let securityRaw = (node.security?.rawValue ?? attr(node, "security") ?? "none").lowercased()
         let hasReality = securityRaw == "reality"
@@ -232,20 +242,61 @@ public enum UniversalOutboundBuilder {
                 throw VPNDirectCoreError.unsupportedFeature(component: "xhttp", detail: "Current Libbox build lacks native xhttp transport")
             }
             var xhttp: [String: Any] = ["type": "xhttp"]
+            if let hosts = listAttr(node, "host") { xhttp["host"] = hosts }
             if let path = attr(node, "path") { xhttp["path"] = path }
-            if let host = attr(node, "host") { xhttp["host"] = host }
             if let mode = attr(node, "mode") { xhttp["mode"] = mode }
-            if let extra = attr(node, "extra") {
-                if let data = extra.data(using: .utf8), let json = try? JSONSerialization.jsonObject(with: data) {
-                    xhttp["extra"] = json
-                } else {
-                    throw VPNDirectCoreError.malformedConfig(component: "xhttp", detail: "extra must be valid JSON")
-                }
+            if let rawHeaders = attr(node, "headers_json"),
+               let data = rawHeaders.data(using: .utf8),
+               let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+            { xhttp["headers"] = parsed }
+
+            // Pinned Leadaxe/sing-box-lx v1.14.0-lx.35 models these as strings because they
+            // accept both a single value and Xray-compatible ranges such as `1000-2000`.
+            for key in [
+                "x_padding_bytes",
+                "sc_max_each_post_bytes",
+                "sc_min_posts_interval_ms",
+                "sc_stream_up_server_secs",
+                "xmux_max_concurrency",
+                "xmux_h_max_request_times",
+                "xmux_h_max_reusable_secs",
+                "session_placement",
+                "session_key",
+                "seq_placement",
+                "seq_key",
+                "session_table",
+                "session_length",
+                "uplink_data_placement",
+                "uplink_data_key",
+                "uplink_chunk_size",
+                "uplink_http_method",
+                "x_padding_key",
+                "x_padding_header",
+                "x_padding_placement",
+                "x_padding_method",
+            ] {
+                if let value = attr(node, key) { xhttp[key] = value }
             }
-            if let value = try intAttr(node, "scMaxEachPostBytes") ?? intAttr(node, "sc_max_each_post_bytes") { xhttp["sc_max_each_post_bytes"] = value }
-            if let value = try intAttr(node, "scMinPostsIntervalMs") ?? intAttr(node, "sc_min_posts_interval_ms") { xhttp["sc_min_posts_interval_ms"] = value }
-            if let value = try intAttr(node, "scMaxConcurrentPosts") ?? intAttr(node, "sc_max_concurrent_posts") { xhttp["sc_max_concurrent_posts"] = value }
-            if let value = try intAttr(node, "x_padding_bytes") ?? intAttr(node, "xPaddingBytes") { xhttp["x_padding_bytes"] = value }
+
+            // These pinned fields are true integer fields, not range strings.
+            for key in [
+                "sc_max_buffered_posts",
+                "xmux_max_connections",
+                "xmux_c_max_reuse_times",
+                "xmux_h_keep_alive_period",
+            ] {
+                if let value = try intAttr(node, key) { xhttp[key] = value }
+            }
+
+            for key in ["no_grpc_header", "xmux_no_grpc_header", "x_padding_obfs_mode"] {
+                if let value = try boolAttr(node, key) { xhttp[key] = value }
+            }
+
+            // `download_settings` is `any` in the pinned Core. Preserve a structured JSON value;
+            // never stringify it and never emit the Xray-only wrapper key `extra` to sing-box.
+            if let value = try jsonAttr(node, "download_settings_json") ?? jsonAttr(node, "download_settings") {
+                xhttp["download_settings"] = value
+            }
             return xhttp
         default:
             throw VPNDirectCoreError.unsupportedFeature(component: "transport", detail: "Unsupported explicit transport: \(explicit)")
