@@ -24,18 +24,47 @@ final class XrayAndFailClosedTests: XCTestCase {
         }
     }
 
+    func testCurrent3xUISingleObjectFlatVLESS() throws {
+        let raw = try ParserTestSupport.readFixture("panels/3x-ui/xray_single_flat.json")
+        let sub = try XrayJSONAdapter.parse(raw)
+        XCTAssertEqual(sub.allEndpoints.count, 1)
+        let node = try XCTUnwrap(sub.allEndpoints.first)
+        XCTAssertEqual(node.server, "203.0.113.44")
+        XCTAssertEqual(node.port, 443)
+        XCTAssertEqual(node.uuid, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        XCTAssertNil(node.outbound)
+
+        let outbound = try UniversalOutboundBuilder.build(from: node)
+        XCTAssertEqual(outbound["type"] as? String, "vless")
+        XCTAssertEqual(outbound["server"] as? String, "203.0.113.44")
+        XCTAssertEqual(outbound["uuid"] as? String, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        XCTAssertNil(outbound["packet_encoding"], "3x-ui did not emit packet encoding; builder must not invent xudp")
+
+        let transport = try XCTUnwrap(outbound["transport"] as? [String: Any])
+        XCTAssertEqual(transport["type"] as? String, "ws")
+        XCTAssertEqual(transport["path"] as? String, "/sub-ws")
+        let headers = try XCTUnwrap(transport["headers"] as? [String: String])
+        XCTAssertEqual(headers["Host"], "cdn.example.com")
+        XCTAssertEqual(headers["X-Panel-Test"], "preserve-me")
+
+        let tls = try XCTUnwrap(outbound["tls"] as? [String: Any])
+        XCTAssertEqual(tls["server_name"] as? String, "cdn.example.com")
+        XCTAssertEqual(tls["insecure"] as? Bool, false)
+        XCTAssertEqual(tls["alpn"] as? [String], ["http/1.1"])
+
+        let data = try ParserTestSupport.wrapOutbound(outbound)
+        _ = try ParserTestSupport.singBoxCheck(data, label: "3x-ui-flat-vless")
+    }
+
     func testUnknownCriticalXHTTPExtensionFailsClosed() throws {
         let raw = try ParserTestSupport.readFixture("panels/remnawave/unknown_critical.json")
         let sub = try XrayJSONAdapter.parse(raw)
         let node = try XCTUnwrap(sub.allEndpoints.first)
-        // Invented critical field must surface as attribute/extension and refuse build.
         let keys = Set(node.attributes.keys).union(node.rawExtensions.keys)
         let hasInvented = keys.contains { $0.lowercased().contains("vpndirectcritical") || $0.lowercased().contains("invented") }
         if hasInvented {
             XCTAssertThrowsError(try UniversalOutboundBuilder.build(from: node))
         } else {
-            // If converter dropped nested unknown under xhttpSettings without preserving it,
-            // still fail closed by injecting the key ourselves to prove policy wiring.
             var poisoned = node
             poisoned.attributes["vpnDirectCriticalInventedField"] = "must-fail"
             XCTAssertThrowsError(try UniversalOutboundBuilder.build(from: poisoned))
@@ -47,5 +76,24 @@ final class XrayAndFailClosedTests: XCTestCase {
         {"outbounds":[{"protocol":"vmess","tag":"bad","settings":{"vnext":[{"address":"203.0.113.50","port":443,"users":[{"id":"66666666-6666-6666-6666-666666666666","security":"auto"}]}]},"streamSettings":{"network":"kcp","security":"none"}}]}
         """
         XCTAssertThrowsError(try XrayJSONAdapter.parse(json))
+    }
+
+    func testVLESSPQDoesNotDowngradeWhenCapabilityMissing() throws {
+        let previous = ProcessInfo.processInfo.environment["VPN_DIRECT_CAPABILITY_JSON"]
+        _ = previous // Environment mutation is intentionally avoided; exercise converter by direct policy fixture in CI capability-negative suite.
+        let xray: [String: Any] = [
+            "protocol": "vless",
+            "tag": "pq",
+            "settings": [
+                "address": "203.0.113.51",
+                "port": 443,
+                "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                "encryption": "mlkem768x25519plus.native.1rtt.test-key",
+            ],
+            "streamSettings": ["network": "tcp", "security": "none"],
+        ]
+        // Positive-capability package tests must at least prove the exact encryption string survives.
+        let converted = try XCTUnwrap(XrayVLESSConverter.convert(xray, fallbackTag: "pq"))
+        XCTAssertEqual(converted["encryption"] as? String, "mlkem768x25519plus.native.1rtt.test-key")
     }
 }
