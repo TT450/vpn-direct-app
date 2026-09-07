@@ -13,9 +13,10 @@ enum SingBoxGraphBuilder {
     static func build(from subscription: NormalizedSubscription) throws -> GraphResult {
         var usedTags = Set<String>()
         var locationTags: [String] = []
-        var allLeafTags: [String] = []
+        var builtLeafCount = 0
         var outbounds: [[String: Any]] = []
-        /// Endpoint provisional name → final sing-box leaf tag (for detour rewrite).
+        /// Endpoint provisional reference name → final sing-box selectable tag.
+        /// This is still a compatibility bridge until normalized graph IDs replace display-name references.
         var nameToLeafTag: [String: String] = [:]
 
         for location in subscription.locations {
@@ -23,32 +24,31 @@ enum SingBoxGraphBuilder {
             var leafOutbounds: [[String: Any]] = []
 
             for (entryIndex, endpoint) in location.endpoints.enumerated() {
-                var outbound: [String: Any]
-                do {
-                    outbound = try UniversalOutboundBuilder.build(from: endpoint)
-                } catch {
-                    continue
-                }
+                // Never silently drop a node that failed to build. A topology-aware partial-import
+                // policy belongs above this layer; the production graph itself must be fail-closed.
+                var outbound = try UniversalOutboundBuilder.build(from: endpoint)
                 let leafTag = VPNDirectTagFactory.uniqueTag(
-                    from: "\(location.name)-n\(entryIndex + 1)",
+                    from: "\(location.id)-n\(entryIndex + 1)",
                     fallback: "leaf-\(locationTags.count + 1)-\(entryIndex + 1)",
                     used: &usedTags
                 )
                 outbound["tag"] = leafTag
                 if let detourName = endpoint.detour, !detourName.isEmpty {
-                    // Temporarily store provisional detour name; resolve after all leaves tagged.
+                    // Resolve only after every node has a final tag so forward references are valid.
                     outbound["_vpndirect_detour_name"] = detourName
                 }
                 nameToLeafTag[endpoint.name] = leafTag
                 leafTags.append(leafTag)
                 leafOutbounds.append(outbound)
+                builtLeafCount += 1
             }
 
             guard !leafTags.isEmpty else { continue }
 
-            if location.strategy == .urltest || leafTags.count > 1 {
+            switch location.strategy {
+            case .urltest:
                 let locationTag = VPNDirectTagFactory.uniqueTag(
-                    from: location.name,
+                    from: location.id.isEmpty ? location.name : location.id,
                     fallback: "loc-\(locationTags.count + 1)",
                     used: &usedTags
                 )
@@ -63,33 +63,45 @@ enum SingBoxGraphBuilder {
                     "idle_timeout": "30m",
                 ])
                 locationTags.append(locationTag)
-                allLeafTags.append(contentsOf: leafTags)
-            } else {
+
+            case .single:
+                guard leafOutbounds.count == 1 else {
+                    throw NSError(
+                        domain: "VPNDirect.SingBoxGraphBuilder",
+                        code: 1001,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: "Location '\(location.name)' is marked single but contains \(leafOutbounds.count) endpoints"
+                        ]
+                    )
+                }
                 var only = leafOutbounds[0]
                 let locationTag = VPNDirectTagFactory.uniqueTag(
-                    from: location.name,
+                    from: location.id.isEmpty ? location.name : location.id,
                     fallback: leafTags[0],
                     used: &usedTags
                 )
                 only["tag"] = locationTag
-                only.removeValue(forKey: "_vpndirect_detour_name")
-                if let detourName = location.endpoints.first?.detour,
-                   let detourTag = nameToLeafTag[detourName]
-                {
-                    only["detour"] = detourTag
-                }
                 outbounds.append(only)
                 locationTags.append(locationTag)
-                allLeafTags.append(locationTag)
                 nameToLeafTag[location.endpoints[0].name] = locationTag
             }
         }
 
-        // Resolve detours on multi-leaf locations.
+        // Resolve all detours in a second pass, including single-node locations.
+        // Missing references are connection-critical and must never disappear silently.
         for index in outbounds.indices {
-            guard let provisional = outbounds[index].removeValue(forKey: "_vpndirect_detour_name") as? String,
-                  let detourTag = nameToLeafTag[provisional]
-            else { continue }
+            guard let provisional = outbounds[index].removeValue(forKey: "_vpndirect_detour_name") as? String else {
+                continue
+            }
+            guard let detourTag = nameToLeafTag[provisional] else {
+                throw NSError(
+                    domain: "VPNDirect.SingBoxGraphBuilder",
+                    code: 1002,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Missing detour target '\(provisional)'"
+                    ]
+                )
+            }
             outbounds[index]["detour"] = detourTag
         }
 
@@ -97,12 +109,12 @@ enum SingBoxGraphBuilder {
             throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks
         }
 
-        let autoMembers = allLeafTags.isEmpty ? locationTags : allLeafTags
+        // Global Auto operates on semantic selectable roots, not every helper/leaf node.
         let selectorOutbounds = ["auto"] + locationTags
         let urlTest: [String: Any] = [
             "type": "urltest",
             "tag": "auto",
-            "outbounds": autoMembers,
+            "outbounds": locationTags,
             "url": "https://www.gstatic.com/generate_204",
             "interval": "1m",
             "tolerance": 80,
@@ -176,28 +188,29 @@ enum SingBoxGraphBuilder {
             throw SubscriptionConfigBuilder.SubscriptionError.serializationFailed
         }
 
+        // The exact JSON that will be returned/launched must be the JSON Core validates.
+        let migrated = try SingBoxConfigMigrator.migrate(json)
         var error: NSError?
-        LibboxCheckConfig(json, &error)
+        LibboxCheckConfig(migrated, &error)
         if let error {
             throw error
         }
 
-        let migrated = try SingBoxConfigMigrator.migrate(json)
         return GraphResult(
             json: migrated,
             locationCount: locationTags.count,
-            leafCount: allLeafTags.count,
+            leafCount: builtLeafCount,
             firstName: subscription.name
         )
     }
 
-    /// Share-link list → one location per node, then same graph.
+    /// Share-link list → one selectable group per node, then same graph.
     static func build(fromShareNodes nodes: [NormalizedNode]) throws -> GraphResult {
         let locations: [NormalizedLocation] = nodes.enumerated().map { index, node in
             NormalizedLocation(
                 id: "share-\(index + 1)",
                 name: node.name.isEmpty ? "Server \(index + 1)" : node.name,
-                kind: .country,
+                kind: .group,
                 strategy: .single,
                 endpoints: [node]
             )
