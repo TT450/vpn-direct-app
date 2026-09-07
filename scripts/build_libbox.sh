@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build VPN Direct Libbox.xcframework from core/sing-box (sing-box-lx).
+# Build VPN Direct Libbox.xcframework from the exact pinned sing-box-lx tree.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -7,237 +7,174 @@ CORE="${ROOT}/core/sing-box"
 OUT_FRAMEWORK="${ROOT}/Libbox.xcframework"
 VERSION_FILE="${ROOT}/core/VERSION"
 
-# shellcheck disable=SC1090
-if [[ -f "${VERSION_FILE}" ]]; then
+load_version() {
+  [[ -f "${VERSION_FILE}" ]] || { echo "error: missing ${VERSION_FILE}" >&2; exit 1; }
   while IFS= read -r line || [[ -n "${line}" ]]; do
     [[ -z "${line}" || "${line}" =~ ^# ]] && continue
-    if [[ "${line}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
-      export "${line?}"
-    fi
+    [[ "${line}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && export "${line?}"
   done < "${VERSION_FILE}"
-fi
+}
+load_version
 
 BUILD_PROFILE="${BUILD_PROFILE:-vpn_direct_ios}"
 PROFILE_TAGS_FILE="${ROOT}/scripts/tags/${BUILD_PROFILE}.tags"
-if [[ -f "${PROFILE_TAGS_FILE}" ]]; then
-  BUILD_TAGS="$(tr -d ' \n' < "${PROFILE_TAGS_FILE}")"
-elif [[ -f "${ROOT}/scripts/vpn_direct_ios.tags" ]]; then
-  BUILD_TAGS="$(tr -d ' \n' < "${ROOT}/scripts/vpn_direct_ios.tags")"
-fi
-BUILD_TAGS="${BUILD_TAGS:-with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_naive_outbound,with_clash_api,with_xhttp,with_awg,with_lx_idle_suspend}"
+[[ -f "${PROFILE_TAGS_FILE}" ]] || {
+  echo "error: release build profile is missing: ${PROFILE_TAGS_FILE}" >&2
+  exit 1
+}
+BUILD_TAGS="$(tr -d ' \n' < "${PROFILE_TAGS_FILE}")"
+[[ -n "${BUILD_TAGS}" ]] || { echo "error: empty build tags profile ${BUILD_PROFILE}" >&2; exit 1; }
+
 CORE_VERSION="${CORE_VERSION:-0.1.0}"
 GOMOBILE_MODULE="${GOMOBILE_MODULE:-github.com/sagernet/gomobile}"
 GOMOBILE_REV="${GOMOBILE_REV:-v0.1.12}"
 GOBIND_REV="${GOBIND_REV:-${GOMOBILE_REV}}"
+APPLE_PLATFORM="${VPN_DIRECT_APPLE_PLATFORM:-ios,iossimulator,macos,tvos}"
 
-if [[ ! -d "${CORE}" ]]; then
-  echo "error: missing ${CORE}" >&2
-  echo "Run: git submodule update --init --recursive" >&2
-  echo "Or:  ./scripts/bootstrap_core.sh" >&2
-  exit 1
-fi
-
-if [[ ! -f "${CORE}/cmd/internal/build_libbox/main.go" ]] && [[ ! -d "${CORE}/cmd/internal/build_libbox" ]]; then
-  echo "error: build_libbox not found under ${CORE}" >&2
-  exit 1
-fi
-
+[[ -d "${CORE}" ]] || { echo "error: missing ${CORE}; initialize submodules" >&2; exit 1; }
 command -v go >/dev/null || { echo "error: go not installed" >&2; exit 1; }
 
+# Go is part of the reproducibility contract. Do not merely print a mismatch.
 if [[ -f "${CORE}/go.version" ]]; then
-  PINNED="$(tr -d ' \n' < "${CORE}/go.version")"
-  echo "note: donor pins Go ${PINNED}; current $(go version)"
-fi
-
-export PATH="${PATH}:$(go env GOPATH)/bin"
-
-install_mobile_tools() {
-  echo "installing ${GOMOBILE_MODULE}/cmd/gomobile@${GOMOBILE_REV} and gobind@${GOBIND_REV}…"
-  go install "${GOMOBILE_MODULE}/cmd/gomobile@${GOMOBILE_REV}"
-  go install "${GOMOBILE_MODULE}/cmd/gobind@${GOBIND_REV}"
-  gomobile init || true
-}
-
-NEED_INSTALL=0
-if ! command -v gomobile >/dev/null || ! command -v gobind >/dev/null; then
-  NEED_INSTALL=1
-elif [[ "${VPN_DIRECT_FORCE_GOMOBILE_INSTALL:-}" == "1" ]]; then
-  NEED_INSTALL=1
-fi
-if [[ "${NEED_INSTALL}" -eq 1 ]]; then
-  install_mobile_tools
-fi
-
-GOMOBILE_SHA="$(go env GOMODCACHE 2>/dev/null || true)"
-# Resolve installed module version (sagernet fork first; fallback to golang.org/x/mobile).
-GOMOBILE_BIN="$(command -v gomobile)"
-GOMOBILE_MOD_INFO="$(go version -m "${GOMOBILE_BIN}" 2>/dev/null | awk '/github.com\/sagernet\/gomobile/{print $2; exit}' || true)"
-if [[ -z "${GOMOBILE_MOD_INFO}" ]]; then
-  GOMOBILE_MOD_INFO="$(go version -m "${GOMOBILE_BIN}" 2>/dev/null | awk '/golang.org\/x\/mobile/{print $2; exit}' || true)"
-fi
-GOMOBILE_SHA="${GOMOBILE_MOD_INFO:-${GOMOBILE_REV}}"
-
-SING_BOX_SHA="unknown"
-if git -C "${CORE}" rev-parse HEAD >/dev/null 2>&1; then
-  SING_BOX_SHA="$(git -C "${CORE}" rev-parse HEAD)"
-fi
-SING_BOX_TAG="${SING_BOX_REV:-unknown}"
-if git -C "${CORE}" describe --tags --exact-match >/dev/null 2>&1; then
-  SING_BOX_TAG="$(git -C "${CORE}" describe --tags --exact-match)"
-fi
-
-echo "=== VPN Direct Libbox build ==="
-echo "core:       ${CORE}"
-echo "profile:    ${BUILD_PROFILE}"
-echo "tags:       ${BUILD_TAGS}"
-echo "version:    ${CORE_VERSION}"
-echo "sing-box:   ${SING_BOX_SHA} (${SING_BOX_TAG})"
-echo "gomobile:   ${GOMOBILE_SHA}"
-echo "out:        ${OUT_FRAMEWORK}"
-
-cd "${CORE}"
-
-# Protocol / option / include overlays (mieru, etc.) onto stock sing-box-lx pin
-bash "${ROOT}/scripts/prepare_core.sh"
-
-OVERLAY_DIR="${ROOT}/core/overlays/libbox"
-if [[ -d "${OVERLAY_DIR}" ]]; then
-  echo "applying overlays from ${OVERLAY_DIR}"
-  cp -f "${OVERLAY_DIR}"/*.go "${CORE}/experimental/libbox/"
-fi
-
-if [[ "${BUILD_TAGS}" == *with_awg* ]]; then
-  if ! git submodule update --init --recursive; then
-    echo "error: required AWG submodules failed to initialize (with_awg is mandatory for this profile)" >&2
+  PINNED_GO="$(tr -d ' \n' < "${CORE}/go.version")"
+  CURRENT_GO="$(go version | awk '{print $3}')"
+  if [[ "${CURRENT_GO}" != "${PINNED_GO}" ]]; then
+    echo "error: Core requires ${PINNED_GO}, current toolchain is ${CURRENT_GO}" >&2
     exit 1
   fi
 fi
 
+export PATH="${PATH}:$(go env GOPATH)/bin"
+install_mobile_tools() {
+  echo "installing pinned gomobile/gobind…"
+  go install "${GOMOBILE_MODULE}/cmd/gomobile@${GOMOBILE_REV}"
+  go install "${GOMOBILE_MODULE}/cmd/gobind@${GOBIND_REV}"
+  # Modern VPN Direct build does not rely on `gomobile init`; do not hide an init error with `|| true`.
+}
+
+if ! command -v gomobile >/dev/null || ! command -v gobind >/dev/null || [[ "${VPN_DIRECT_FORCE_GOMOBILE_INSTALL:-}" == "1" ]]; then
+  install_mobile_tools
+fi
+
+GOMOBILE_BIN="$(command -v gomobile)"
+GOMOBILE_MOD_INFO="$(go version -m "${GOMOBILE_BIN}" 2>/dev/null | awk '/github.com\/sagernet\/gomobile/{print $2; exit}' || true)"
+[[ -n "${GOMOBILE_MOD_INFO}" ]] || GOMOBILE_MOD_INFO="${GOMOBILE_REV}"
+
+# Canonical preparation always resets to the configured pin, then applies deterministic overlays.
+bash "${ROOT}/scripts/prepare_core.sh" --reset
+
+OVERLAY_DIR="${ROOT}/core/overlays/libbox"
+if [[ -d "${OVERLAY_DIR}" ]]; then
+  shopt -s nullglob
+  overlay_files=("${OVERLAY_DIR}"/*.go)
+  shopt -u nullglob
+  if [[ ${#overlay_files[@]} -gt 0 ]]; then
+    cp -f "${overlay_files[@]}" "${CORE}/experimental/libbox/"
+  fi
+fi
+
+if [[ "${BUILD_TAGS}" == *with_awg* ]]; then
+  git -C "${CORE}" submodule update --init --recursive
+fi
+
+# Provenance is computed AFTER preparation, never before it.
+SING_BOX_BASE_SHA="$(git -C "${CORE}" rev-parse HEAD)"
+SING_BOX_STATUS="$(git -C "${CORE}" status --porcelain=v1 --untracked-files=all)"
+GO_MOD_SHA256="$(shasum -a 256 "${CORE}/go.mod" | awk '{print $1}')"
+GO_SUM_SHA256="$(shasum -a 256 "${CORE}/go.sum" | awk '{print $1}')"
+OVERLAY_SHA256="$(find "${ROOT}/core/overlays" -type f -print0 2>/dev/null | sort -z | xargs -0 cat 2>/dev/null | shasum -a 256 | awk '{print $1}')"
+
 export LIBBOX_BUILD_TAGS="${BUILD_TAGS}"
 export VPN_DIRECT_CORE_VERSION="${CORE_VERSION}"
 
-APPLE_PLATFORM="${VPN_DIRECT_APPLE_PLATFORM:-ios,iossimulator,macos,tvos}"
+printf '%s\n' \
+  "=== VPN Direct Libbox build ===" \
+  "core pin:    ${SING_BOX_REV}" \
+  "base sha:    ${SING_BOX_BASE_SHA}" \
+  "profile:     ${BUILD_PROFILE}" \
+  "tags:        ${BUILD_TAGS}" \
+  "platforms:   ${APPLE_PLATFORM}" \
+  "go:          $(go version)" \
+  "gomobile:    ${GOMOBILE_MOD_INFO}"
 
-echo "running build_libbox (platform=${APPLE_PLATFORM})…"
-rm -rf "${CORE}/Libbox.xcframework" "${ROOT}/Libbox.xcframework.build"
+cd "${CORE}"
 
-if ! go run ./cmd/internal/build_libbox -target apple -platform "${APPLE_PLATFORM}" "$@"; then
-  echo "error: build_libbox failed (platform=${APPLE_PLATFORM})" >&2
-  exit 1
-fi
-
-CANDIDATE=""
-for p in \
+# Remove EVERY candidate from previous invocations, including the final root framework.
+rm -rf \
   "${CORE}/Libbox.xcframework" \
   "${CORE}/bind/Libbox.xcframework" \
-  "${ROOT}/Libbox.xcframework"
-do
+  "${ROOT}/Libbox.xcframework.build" \
+  "${OUT_FRAMEWORK}"
+
+BUILD_START_EPOCH="$(date +%s)"
+go run ./cmd/internal/build_libbox -target apple -platform "${APPLE_PLATFORM}" "$@"
+
+CANDIDATE=""
+for p in "${CORE}/Libbox.xcframework" "${CORE}/bind/Libbox.xcframework" "${OUT_FRAMEWORK}"; do
   if [[ -d "${p}" ]]; then
     CANDIDATE="${p}"
     break
   fi
 done
+[[ -n "${CANDIDATE}" ]] || { echo "error: Libbox.xcframework not produced by this build" >&2; exit 1; }
 
-if [[ -z "${CANDIDATE}" ]]; then
-  echo "error: Libbox.xcframework not found after build" >&2
-  find "${CORE}" -maxdepth 3 -name 'Libbox.xcframework' -type d 2>/dev/null || true
+# It cannot be stale because all accepted candidate paths were removed immediately before build.
+CANDIDATE_MTIME="$(stat -f %m "${CANDIDATE}" 2>/dev/null || stat -c %Y "${CANDIDATE}")"
+if (( CANDIDATE_MTIME < BUILD_START_EPOCH )); then
+  echo "error: candidate framework predates current build invocation" >&2
   exit 1
 fi
 
-# Fail closed: requested platforms must appear as xcframework slice dirs + Info.plist Library entries.
-FOUND_SLICES="$(find "${CANDIDATE}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort | tr '\n' ' ')"
-PLIST_BLOB=""
-if [[ -f "${CANDIDATE}/Info.plist" ]]; then
-  PLIST_BLOB="$(plutil -p "${CANDIDATE}/Info.plist" 2>/dev/null || true)"
-fi
-REQUIRED_FAMILIES=()
-MISSING_FAMILIES=()
-NEED_TVOS=0
-NEED_IOS=0
-NEED_MACOS=0
-IFS=',' read -r -a _REQ_PLATFORMS <<< "${APPLE_PLATFORM}"
-for plat in "${_REQ_PLATFORMS[@]}"; do
-  plat="$(echo "${plat}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
-  [[ -z "${plat}" ]] && continue
-  case "${plat}" in
-    tvos|tvsimulator|tvossimulator) NEED_TVOS=1 ;;
-    ios|iossimulator) NEED_IOS=1 ;;
-    macos|maccatalyst) NEED_MACOS=1 ;;
+slice_names="$(find "${CANDIDATE}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)"
+require_slice() {
+  local platform="$1" pattern=""
+  case "${platform}" in
+    ios) pattern='^ios-[^-]+($|_[^-]+$)' ;;
+    iossimulator) pattern='^ios-.*-simulator$' ;;
+    macos) pattern='^macos-' ;;
+    maccatalyst) pattern='^ios-.*-maccatalyst$' ;;
+    tvos) pattern='^tvos-[^-]+($|_[^-]+$)' ;;
+    tvossimulator|tvsimulator) pattern='^tvos-.*-simulator$' ;;
+    *) echo "error: unsupported requested Apple platform '${platform}'" >&2; exit 1 ;;
   esac
-done
-[[ "${NEED_TVOS}" -eq 1 ]] && REQUIRED_FAMILIES+=("tvos")
-[[ "${NEED_IOS}" -eq 1 ]] && REQUIRED_FAMILIES+=("ios")
-[[ "${NEED_MACOS}" -eq 1 ]] && REQUIRED_FAMILIES+=("macos")
-for fam in "${REQUIRED_FAMILIES[@]}"; do
-  slice_ok=0
-  plist_ok=0
-  while IFS= read -r slice_dir; do
-    [[ -z "${slice_dir}" ]] && continue
-    base="$(basename "${slice_dir}")"
-    case "${fam}" in
-      ios)
-        # ios-* only (tvos-* must not count)
-        if [[ "${base}" == ios* ]]; then slice_ok=1; fi
-        ;;
-      tvos)
-        if [[ "${base}" == *tvos* ]]; then slice_ok=1; fi
-        ;;
-      macos)
-        if [[ "${base}" == *macos* ]]; then slice_ok=1; fi
-        ;;
-    esac
-  done < <(find "${CANDIDATE}" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
-  if [[ -n "${PLIST_BLOB}" ]]; then
-    case "${fam}" in
-      ios)
-        # Exact platform token; avoid matching "tvos"
-        if grep -Eq 'SupportedPlatform[[:space:]]*=>[[:space:]]*"ios"' <<< "${PLIST_BLOB}" \
-          || grep -Eq '"LibraryIdentifier"[[:space:]]*=>[[:space:]]*"ios' <<< "${PLIST_BLOB}"; then
-          plist_ok=1
-        fi
-        ;;
-      tvos)
-        if grep -Eqi 'tvos' <<< "${PLIST_BLOB}"; then plist_ok=1; fi
-        ;;
-      macos)
-        if grep -Eqi 'macos' <<< "${PLIST_BLOB}"; then plist_ok=1; fi
-        ;;
-    esac
-  else
-    # No parsable Info.plist — rely on slice dirs only
-    plist_ok="${slice_ok}"
+  if ! grep -Eq "${pattern}" <<< "${slice_names}"; then
+    echo "error: missing exact requested slice '${platform}'" >&2
+    echo "found slices:" >&2
+    sed 's/^/  /' <<< "${slice_names}" >&2
+    exit 1
   fi
-  if [[ "${slice_ok}" -ne 1 || "${plist_ok}" -ne 1 ]]; then
-    MISSING_FAMILIES+=("${fam}")
-  fi
+}
+IFS=',' read -r -a requested <<< "${APPLE_PLATFORM}"
+for platform in "${requested[@]}"; do
+  platform="$(tr -d '[:space:]' <<< "${platform}" | tr '[:upper:]' '[:lower:]')"
+  [[ -z "${platform}" ]] || require_slice "${platform}"
 done
-if [[ ${#MISSING_FAMILIES[@]} -gt 0 ]]; then
-  echo "error: Libbox.xcframework missing required platform Library slices" >&2
-  echo "  required: ${REQUIRED_FAMILIES[*]}" >&2
-  echo "  found:    ${FOUND_SLICES:-"(none)"}" >&2
-  echo "  missing:  ${MISSING_FAMILIES[*]}" >&2
-  exit 1
-fi
 
 if [[ "${CANDIDATE}" != "${OUT_FRAMEWORK}" ]]; then
-  rm -rf "${OUT_FRAMEWORK}"
   cp -R "${CANDIDATE}" "${OUT_FRAMEWORK}"
 fi
+[[ -f "${OUT_FRAMEWORK}/Info.plist" ]] || { echo "error: final xcframework missing Info.plist" >&2; exit 1; }
 
 BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-}"
-
-cat > "${ROOT}/Libbox.xcframework/VPNDirectCore.version" <<EOF
+DIRTY_HASH="$(printf '%s' "${SING_BOX_STATUS}" | shasum -a 256 | awk '{print $1}')"
+cat > "${OUT_FRAMEWORK}/VPNDirectCore.version" <<EOF
 CORE_NAME=${CORE_NAME:-VPNDirectCore}
 CORE_VERSION=${CORE_VERSION}
 BUILD_PROFILE=${BUILD_PROFILE}
 BUILD_TAGS=${BUILD_TAGS}
 BUILT_AT=${BUILT_AT}
 GO=$(go version)
-GOMOBILE_SHA=${GOMOBILE_SHA}
-SING_BOX_SHA=${SING_BOX_SHA}
-SING_BOX_TAG=${SING_BOX_TAG}
-SING_BOX_REV=${SING_BOX_TAG}
+GOMOBILE_MODULE=${GOMOBILE_MODULE}
+GOMOBILE_REV=${GOMOBILE_REV}
+GOBIND_REV=${GOBIND_REV}
+GOMOBILE_ACTUAL=${GOMOBILE_MOD_INFO}
+SING_BOX_REV=${SING_BOX_REV}
+SING_BOX_BASE_SHA=${SING_BOX_BASE_SHA}
+CORE_WORKTREE_STATUS_SHA256=${DIRTY_HASH}
+OVERLAY_SHA256=${OVERLAY_SHA256}
+GO_MOD_SHA256=${GO_MOD_SHA256}
+GO_SUM_SHA256=${GO_SUM_SHA256}
 UPSTREAM_VERSION=${UPSTREAM_VERSION:-}
 SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 EOF
