@@ -1,7 +1,7 @@
 import Foundation
 import Libbox
 
-/// Builds sing-box JSON from NormalizedSubscription (location urltest + global auto).
+/// Builds the exact final sing-box JSON that is handed to Libbox.
 enum SingBoxGraphBuilder {
     struct GraphResult {
         let json: String
@@ -10,36 +10,82 @@ enum SingBoxGraphBuilder {
         let firstName: String?
     }
 
+    private enum BuiltLeaf {
+        case outbound([String: Any])
+        case endpoint([String: Any])
+
+        var object: [String: Any] {
+            get {
+                switch self {
+                case .outbound(let object), .endpoint(let object): return object
+                }
+            }
+            set {
+                switch self {
+                case .outbound: self = .outbound(newValue)
+                case .endpoint: self = .endpoint(newValue)
+                }
+            }
+        }
+    }
+
     static func build(from subscription: NormalizedSubscription) throws -> GraphResult {
         var usedTags = Set<String>()
         var locationTags: [String] = []
         var builtLeafCount = 0
         var outbounds: [[String: Any]] = []
-        /// Endpoint provisional reference name → final sing-box selectable tag.
-        /// This is still a compatibility bridge until normalized graph IDs replace display-name references.
-        var nameToLeafTag: [String: String] = [:]
+        var endpoints: [[String: Any]] = []
+
+        // Compatibility reference map. Display-name identity is still being migrated to stable
+        // graph IDs; duplicate names are rejected instead of silently overwriting the target.
+        var referenceToTag: [String: String] = [:]
+        var duplicateReferences = Set<String>()
+
+        func registerReference(_ reference: String, tag: String) {
+            guard !reference.isEmpty else { return }
+            if let existing = referenceToTag[reference], existing != tag {
+                duplicateReferences.insert(reference)
+            } else {
+                referenceToTag[reference] = tag
+            }
+        }
 
         for location in subscription.locations {
             var leafTags: [String] = []
-            var leafOutbounds: [[String: Any]] = []
+            var leaves: [BuiltLeaf] = []
 
-            for (entryIndex, endpoint) in location.endpoints.enumerated() {
-                // Never silently drop a node that failed to build. A topology-aware partial-import
-                // policy belongs above this layer; the production graph itself must be fail-closed.
-                var outbound = try UniversalOutboundBuilder.build(from: endpoint)
+            for (entryIndex, node) in location.endpoints.enumerated() {
                 let leafTag = VPNDirectTagFactory.uniqueTag(
                     from: "\(location.id)-n\(entryIndex + 1)",
                     fallback: "leaf-\(locationTags.count + 1)-\(entryIndex + 1)",
                     used: &usedTags
                 )
-                outbound["tag"] = leafTag
-                if let detourName = endpoint.detour, !detourName.isEmpty {
-                    // Resolve only after every node has a final tag so forward references are valid.
-                    outbound["_vpndirect_detour_name"] = detourName
+
+                var built: BuiltLeaf
+                if node.protocolID == .wireguard || node.protocolID == .amneziawg {
+                    guard let model = node.wireguardEndpoint else {
+                        throw VPNDirectCoreError.malformedConfig(
+                            component: "wireguard",
+                            detail: "WireGuard/AWG node is missing typed endpoint model"
+                        )
+                    }
+                    built = .endpoint(try model.endpointJSON(tag: leafTag))
+                } else {
+                    var outbound = try UniversalOutboundBuilder.build(from: node)
+                    outbound["tag"] = leafTag
+                    built = .outbound(outbound)
                 }
-                nameToLeafTag[endpoint.name] = leafTag
+
+                if let detourName = node.detour, !detourName.isEmpty {
+                    var object = built.object
+                    object["_vpndirect_detour_ref"] = detourName
+                    built.object = object
+                }
+
+                registerReference(node.name, tag: leafTag)
+                registerReference("\(location.id)/\(entryIndex)", tag: leafTag)
                 leafTags.append(leafTag)
-                leafOutbounds.append(outbound)
+                leaves.append(built)
                 builtLeafCount += 1
             }
 
@@ -52,7 +98,15 @@ enum SingBoxGraphBuilder {
                     fallback: "loc-\(locationTags.count + 1)",
                     used: &usedTags
                 )
-                outbounds.append(contentsOf: leafOutbounds)
+                for leaf in leaves {
+                    switch leaf {
+                    case .outbound(let object): outbounds.append(object)
+                    case .endpoint(let object): endpoints.append(object)
+                    }
+                }
+                // Pinned lx OutboundManager.Outbound(tag) falls back to EndpointManager.Get(tag),
+                // and urltest resolves members through OutboundManager.Outbound; endpoint tags are
+                // therefore valid urltest members in v1.14.0-lx.35.
                 outbounds.append([
                     "type": "urltest",
                     "tag": locationTag,
@@ -63,53 +117,57 @@ enum SingBoxGraphBuilder {
                     "idle_timeout": "30m",
                 ])
                 locationTags.append(locationTag)
+                registerReference(location.id, tag: locationTag)
 
             case .single:
-                guard leafOutbounds.count == 1 else {
-                    throw NSError(
-                        domain: "VPNDirect.SingBoxGraphBuilder",
-                        code: 1001,
-                        userInfo: [
-                            NSLocalizedDescriptionKey: "Location '\(location.name)' is marked single but contains \(leafOutbounds.count) endpoints"
-                        ]
+                guard leaves.count == 1 else {
+                    throw VPNDirectCoreError.malformedConfig(
+                        component: "graph",
+                        detail: "Location '\(location.name)' is single but contains \(leaves.count) endpoints"
                     )
                 }
-                var only = leafOutbounds[0]
                 let locationTag = VPNDirectTagFactory.uniqueTag(
                     from: location.id.isEmpty ? location.name : location.id,
                     fallback: leafTags[0],
                     used: &usedTags
                 )
+                var only = leaves[0].object
                 only["tag"] = locationTag
-                outbounds.append(only)
+                switch leaves[0] {
+                case .outbound: outbounds.append(only)
+                case .endpoint: endpoints.append(only)
+                }
                 locationTags.append(locationTag)
-                nameToLeafTag[location.endpoints[0].name] = locationTag
+                registerReference(location.endpoints[0].name, tag: locationTag)
+                registerReference(location.id, tag: locationTag)
             }
         }
 
-        // Resolve all detours in a second pass, including single-node locations.
-        // Missing references are connection-critical and must never disappear silently.
-        for index in outbounds.indices {
-            guard let provisional = outbounds[index].removeValue(forKey: "_vpndirect_detour_name") as? String else {
-                continue
-            }
-            guard let detourTag = nameToLeafTag[provisional] else {
-                throw NSError(
-                    domain: "VPNDirect.SingBoxGraphBuilder",
-                    code: 1002,
-                    userInfo: [
-                        NSLocalizedDescriptionKey: "Missing detour target '\(provisional)'"
-                    ]
-                )
-            }
-            outbounds[index]["detour"] = detourTag
+        guard duplicateReferences.isEmpty else {
+            throw VPNDirectCoreError.malformedConfig(
+                component: "graph",
+                detail: "Ambiguous topology reference(s): \(duplicateReferences.sorted().joined(separator: ", "))"
+            )
         }
+
+        func resolveDetours(in values: inout [[String: Any]]) throws {
+            for index in values.indices {
+                guard let reference = values[index].removeValue(forKey: "_vpndirect_detour_ref") as? String else { continue }
+                guard let tag = referenceToTag[reference] else {
+                    throw VPNDirectCoreError.malformedConfig(component: "graph", detail: "Missing detour target '\(reference)'")
+                }
+                values[index]["detour"] = tag
+            }
+        }
+        try resolveDetours(in: &outbounds)
+        try resolveDetours(in: &endpoints)
 
         guard !locationTags.isEmpty else {
             throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks
         }
 
-        // Global Auto operates on semantic selectable roots, not every helper/leaf node.
+        // Pinned selector uses OutboundManager.Outbound(tag); the manager explicitly falls back to
+        // EndpointManager.Get(tag), so endpoint-backed single locations are valid selector members.
         let selectorOutbounds = ["auto"] + locationTags
         let urlTest: [String: Any] = [
             "type": "urltest",
@@ -127,73 +185,52 @@ enum SingBoxGraphBuilder {
             "default": "auto",
         ]
 
-        let config: [String: Any] = [
-            "log": [
-                "level": "info",
-                "timestamp": true,
-            ],
+        var config: [String: Any] = [
+            "log": ["level": "info", "timestamp": true],
             "dns": [
                 "servers": [
-                    [
-                        "type": "udp",
-                        "tag": "dns-remote",
-                        "server": "1.1.1.1",
-                    ],
-                    [
-                        "type": "local",
-                        "tag": "dns-local",
-                    ],
+                    ["type": "udp", "tag": "dns-remote", "server": "1.1.1.1"],
+                    ["type": "local", "tag": "dns-local"],
                 ],
                 "final": "dns-remote",
                 "strategy": "prefer_ipv4",
             ],
-            "inbounds": [
-                [
-                    "type": "tun",
-                    "tag": "tun-in",
-                    "address": ["172.19.0.1/30"],
-                    "mtu": 9000,
-                    "auto_route": true,
-                    "strict_route": true,
-                    "stack": "gvisor",
-                ],
-            ],
-            "outbounds": [selector, urlTest] + outbounds + [[
-                "type": "direct",
-                "tag": "direct",
+            "inbounds": [[
+                "type": "tun",
+                "tag": "tun-in",
+                "address": ["172.19.0.1/30"],
+                "mtu": 9000,
+                "auto_route": true,
+                "strict_route": true,
+                "stack": "gvisor",
             ]],
+            "outbounds": [selector, urlTest] + outbounds + [["type": "direct", "tag": "direct"]],
             "route": [
                 "auto_detect_interface": true,
-                "default_domain_resolver": [
-                    "server": "dns-remote",
-                    "strategy": "prefer_ipv4",
-                ],
+                "default_domain_resolver": ["server": "dns-remote", "strategy": "prefer_ipv4"],
                 "rules": [
                     ["action": "sniff"],
-                    [
-                        "protocol": ["dns"],
-                        "action": "hijack-dns",
-                    ],
-                    [
-                        "ip_is_private": true,
-                        "outbound": "direct",
-                    ],
+                    ["protocol": ["dns"], "action": "hijack-dns"],
+                    ["ip_is_private": true, "outbound": "direct"],
                 ],
                 "final": "proxy",
             ],
         ]
+        if !endpoints.isEmpty {
+            config["endpoints"] = endpoints
+        }
 
         let data = try JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys])
         guard let json = String(data: data, encoding: .utf8) else {
             throw SubscriptionConfigBuilder.SubscriptionError.serializationFailed
         }
 
-        // The exact JSON that will be returned/launched must be the JSON Core validates.
+        // Migrate first, then validate the exact JSON that is returned/launched.
         let migrated = try SingBoxConfigMigrator.migrate(json)
         var error: NSError?
         LibboxCheckConfig(migrated, &error)
         if let error {
-            throw error
+            throw VPNDirectCoreError.malformedConfig(component: "libbox-check", detail: error.localizedDescription)
         }
 
         return GraphResult(
@@ -204,7 +241,6 @@ enum SingBoxGraphBuilder {
         )
     }
 
-    /// Share-link list → one selectable group per node, then same graph.
     static func build(fromShareNodes nodes: [NormalizedNode]) throws -> GraphResult {
         let locations: [NormalizedLocation] = nodes.enumerated().map { index, node in
             NormalizedLocation(
@@ -218,9 +254,6 @@ enum SingBoxGraphBuilder {
         guard !locations.isEmpty else {
             throw SubscriptionConfigBuilder.SubscriptionError.noSupportedLinks
         }
-        return try build(from: NormalizedSubscription(
-            name: locations.first?.name,
-            locations: locations
-        ))
+        return try build(from: NormalizedSubscription(name: locations.first?.name, locations: locations))
     }
 }
