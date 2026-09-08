@@ -21,7 +21,9 @@ If you enable a **public link** for an External testing group in App Store Conne
 | Build | **33** (widgets + DirectUI polish) |
 | Bundle ID | `com.vpndirect.vpndirectapp` |
 
-Build **32** was the first 1.0.11 binary uploaded for Internal testing (pre-widgets). Prefer **33+** when available in TestFlight.
+Build **33** is on TestFlight Internal (**VPN Direct Test Group**). Prefer **33+** (widgets). Build **32** remains available.
+
+**Public join link:** not enabled yet. To get a shareable `https://testflight.apple.com/join/…` URL, create an **External Testing** group in App Store Connect and turn on **Public Link** (see below). Until then, add people via Internal (team users) or External email invites.
 
 ## How to add testers (you / App Store Connect)
 
