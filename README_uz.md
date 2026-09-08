@@ -54,7 +54,7 @@ Subscription / Config → Content Detector → Universal Parser / Adapters
 
 ## Hozirgi Core holati
 
-**So‘nggi reliz:** [`v1.0.11`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11)
+**So‘nggi reliz:** [`v1.0.11.63`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.63) (marketing **1.0.11**, TestFlight build **63**)
 
 Builder/parser borligi — hali `tested` / production emas. Holat: [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md).
 
@@ -66,7 +66,8 @@ Builder/parser borligi — hali `tested` / production emas. Holat: [Protocol Mat
 | VLESS + XHTTP/PQ / HY2 / multi-scheme parsers | Parser+runtime; interop davom etmoqda |
 | Clash YAML + content detector + production gate | Tayyor |
 | Mieru | Parser + Core (`with_mieru`); interop planned |
-| CONNECT-UDP / Tailscale / OpenVPN | `out_of_scope` |
+| CONNECT-UDP / Tailscale / OpenVPN import | **1.0.10** da; device Libbox qualification davom etmoqda |
+| Home / Control Center widgetlar | **1.0.11**; in-place toggle **1.0.11.63** |
 
 ## Build profillari
 

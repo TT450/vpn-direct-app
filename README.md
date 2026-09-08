@@ -74,7 +74,7 @@ The Core remains intentionally close to upstream sing-box. Custom functionality 
 
 ## Current Core status
 
-Latest published: v1.0.11 · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
+Latest published: [`v1.0.11.63`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.63) (marketing **1.0.11**, TestFlight build **63**) · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
 
 A feature is not **production / `tested`** merely because a builder exists. Production requires:
 
@@ -99,7 +99,8 @@ Authoritative row-level status: [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) 
 | Content detector + production gate | Implemented (`make check-production-ready`) |
 | Mieru | Parser + Core runtime (`with_mieru`); interop planned |
 | Interop lab / iPhone `tested` evidence | Runnable templates + checklist; live evidence pending |
-| CONNECT-UDP / Tailscale / OpenVPN | `out_of_scope` for Core 1.x |
+| CONNECT-UDP / Tailscale / OpenVPN import | Shipped in **1.0.10** (parser + graph); device Libbox rebuild / qualification ongoing |
+| Home / Control Center widgets | Shipped in **1.0.11**; in-place toggle + status polish in **1.0.11.63** |
 
 ## Architecture
 
@@ -205,7 +206,7 @@ vpn-direct-app/
 | [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) | What is parsed, compiled, tested and production-ready |
 | [Release Blocker Ledger](docs/core/RELEASE_BLOCKER_LEDGER.md) | Open vs verified release blockers |
 | [Roadmap](ROADMAP.md) | Public product roadmap |
-| [What's New](WHATS_NEW.md) | Latest release notes (`v1.0.11`) |
+| [What's New](WHATS_NEW.md) | Latest release notes (`v1.0.11.63`) |
 | [Changelog](CHANGELOG.md) | Full version history |
 | [TestFlight](docs/TESTFLIGHT.md) | Beta install + how to invite testers |
 | [Donors](docs/core/DONORS.md) | Upstream and donor source tracking |

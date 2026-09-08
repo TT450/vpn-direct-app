@@ -223,11 +223,15 @@ public class ExtensionEnvironments: ObservableObject {
     }
 
     public func ensureExtensionProfileReady() async throws {
-        if extensionProfile != nil { return }
+        // Always reload from system prefs — after Settings delete / wipe the in-memory
+        // manager is stale and startVPNTunnel no-ops or dies immediately.
         await reload()
-        if extensionProfile != nil { return }
-        // Clear any broken leftover tunnel prefs before creating a new profile.
+        if extensionProfile != nil {
+            extensionProfile?.refreshStatus()
+            return
+        }
         await ExtensionProfile.disableAllSavedProfiles()
+        extensionProfile = nil
         try await ExtensionProfile.install()
         await reload()
         guard extensionProfile != nil else {

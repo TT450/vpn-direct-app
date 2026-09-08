@@ -7,7 +7,7 @@ How to install beta builds and invite people. **No signing secrets belong in thi
 | | |
 | --- | --- |
 | App Store (public) | https://apps.apple.com/app/id6807402257 |
-| TestFlight (Apple) | [TestFlight (Apple)](https://testflight.apple.com/join/yfCEbunt) |
+| TestFlight (Apple) | https://testflight.apple.com |
 | GitHub releases | https://github.com/TT450/vpn-direct-app/releases |
 | Latest notes | [`WHATS_NEW.md`](../WHATS_NEW.md) |
 
@@ -18,10 +18,11 @@ If you enable a **public link** for an External testing group in App Store Conne
 | Field | Value |
 | --- | --- |
 | Marketing version | **1.0.11** |
-| Build | **33** (widgets + DirectUI polish) |
+| Build | **63** (in-widget toggle, status labels, Control Center harden) |
 | Bundle ID | `com.vpndirect.vpndirectapp` |
+| GitHub tag | [`v1.0.11.63`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.63) |
 
-Build **33** is on TestFlight Internal (**VPN Direct Test Group**). Prefer **33+** (widgets). Build **32** remains available.
+Build **63** is on TestFlight Internal (**VPN Direct Test Group**) and finished App Store Connect processing on **2026-09-08**. Prefer **63+**. Older Internal builds (e.g. **33**) may still appear in history.
 
 **Public join link:** not enabled yet. To get a shareable `https://testflight.apple.com/join/…` URL, create an **External Testing** group in App Store Connect and turn on **Public Link** (see below). Until then, add people via Internal (team users) or External email invites.
 
@@ -34,7 +35,7 @@ Use [App Store Connect](https://appstoreconnect.apple.com) → **Apps** → **VP
 1. Open **Internal Testing**.
 2. Select the group (or create one).
 3. **Testers** → add Apple IDs that are already **Users** of your App Store Connect team (Users and Access).
-4. Assign the latest build (1.0.11 / 33+).
+4. Assign the latest build (1.0.11 / **63+**).
 5. Testers install the **TestFlight** app and accept the invite email / notification.
 
 Limits: up to **100** Internal testers; they must be on your ASC team.
@@ -50,9 +51,16 @@ Limits: up to **10_000** External testers per app (Apple’s current cap). Publi
 
 ### C) What testers need
 
-1. iPhone with a recent iOS (widgets need iOS 17+; Control Center toggle needs iOS 18+).
+1. iPhone with a recent iOS (home widgets need iOS 17+; Control Center toggle needs iOS 18+).
 2. [TestFlight](https://apps.apple.com/app/testflight/id899247664) installed.
 3. Invite accepted with the **same Apple ID** used on the device.
+
+### D) What to verify on 63
+
+1. Home Screen small widget: tap power → VPN toggles **without** opening the app; label **Включен** / **Включить**.
+2. Control Center: **Add a Control** → **VPN Direct** appears and can be added.
+3. Imported (third-party) subscription still connects after app relaunch.
+4. Russian bypass (Обход РФ) on/off does not break dial.
 
 ## Engineering upload (maintainers)
 
@@ -60,12 +68,13 @@ Release lane (credentials via local env / gitignored `.p8` only — never commit
 
 ```bash
 # Required env: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH, APP_STORE_APP_ID, FASTLANE_TEAM_ID
+# Optional: TESTFLIGHT_CHANGELOG
 fastlane ios release
 ```
 
-See `fastlane/SECRETS.example.md`. App Store provisioning profiles for app + extensions must exist before export.
+See `fastlane/SECRETS.example.md`. App Store provisioning profiles for app + extensions must exist before export (widget profile needs Network Extension for in-extension tunnel control).
 
 ## Support
 
-- Product / bot: [Telegram - vpndirectbot](https://t.me/vpndirectbot)
+- Product / bot: [Telegram @vpndirectbot](https://t.me/vpndirectbot)
 - Source issues: [GitHub Issues](https://github.com/TT450/vpn-direct-app/issues)

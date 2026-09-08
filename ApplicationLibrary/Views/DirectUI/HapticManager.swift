@@ -233,6 +233,8 @@ public struct HapticButtonStyle: ButtonStyle {
     public init() {}
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            // Full label bounds are tappable — not only the text glyphs.
+            .contentShape(Rectangle())
             .onChangeCompat(of: configuration.isPressed) { isPressed in
                 if isPressed { HapticManager.shared.play(.touchDown) }
             }

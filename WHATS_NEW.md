@@ -1,42 +1,50 @@
-# What's New — VPN Direct 1.0.11
+# What's New — VPN Direct 1.0.11 (63)
 
 Release date: 2026-09-08  
-Git tag: `v1.0.11`  
-App build: `33`
+Git tag: `v1.0.11.63`  
+App build: `63` (TestFlight)  
+Prior tag: `v1.0.11` (build 33)
 
 ## App Store / short What's New
 
-- Home / Control Center / Lock Screen widgets for quick VPN toggle
-- Connection mode rename: **5G** (was «Антиблокировка»)
-- Subscriptions & Profile: stable vertical scroll, unified page chrome
-- Home status row polish (kicker, status dot, typography)
-- Import: QR, clipboard, URL, file, paste config; offline/online ping
+- Home Screen widget toggles VPN **without opening the app**; larger power button on small size
+- Status labels: **Включен** / **Включить** (live NE status + timeline reload)
+- Control Center control hardened (safe value provider; App Store profile with Network Extension)
+- Imported subscriptions no longer gated as Free/Premium; Russian bypass routing stabilized
+- Tunnel / widget reliability: no WidgetKit reloads inside the packet tunnel; Control Center early-stop guard
 
 ## Product detail
 
-### Widgets
-- Control Center toggle branded **VPN Direct** (Подключено / Отключено)
-- Home Screen: small + medium status widgets with on/off action
-- Lock Screen: circular, rectangular, and inline accessories
+### Widgets (build 63)
 
-### Connection modes
-- Profile sheet label **5G** (legacy stored «Антиблокировка» migrates automatically)
+- Home Screen: `Button(intent:)` toggle — does **not** deep-link into the app
+- Small widget: larger Aladdin power medallion with balanced padding
+- Status text tracks connection: **Включен** when on, **Включить** when off
+- Control Center: `ServiceToggleControl` first in `WidgetBundle`; provider never throws
+- Widget extension signed with `packet-tunnel-provider` for live `NETunnelProviderManager` status
 
-### DirectUI polish
-- Shared page heading scale across Home / Subscriptions / Profile
-- Home kicker `КЛИЕНТ / VPN`; status indicator after the title
-- Subscriptions page vertical-only scroll (no horizontal “website” pan)
-- Server picker: full-width **Пинг**; TCP ping when offline, Libbox urlTest when connected
-- Metrics / action rows aligned; refresh subscription parity with TheTochka flow
+### Connection & access
 
-### Import & access
-- Add-subscription menu: QR, clipboard (link or raw config), manual URL, file, paste config
-- Local profile importer for file / text configs
+- Third-party / imported profiles keep access and are not expire-disconnected as Free/Premium
+- Russian bypass (Обход РФ): `http_client` detour via `proxy` (no conflicting `download_detour`)
+- Deep-link `vpndirect://toggle` remains available for accessory / legacy paths
+
+### Stability
+
+- Packet tunnel no longer calls `WidgetCenter` / Control Center reloads (was tearing down `command.sock`)
+- Control Center stale `SetValueIntent(false)` ignored for ~12s after dial
+- Widget status published from the app; home timelines reload on connect/disconnect
 
 ## TestFlight
 
-See [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md) for public join link guidance and how to invite testers (Internal / External).
+| Field | Value |
+| --- | --- |
+| Marketing | **1.0.11** |
+| Build | **63** |
+| Upload | App Store Connect — processed 2026-09-08 |
+
+See [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md). Prefer **63+**.
 
 ## Device note
 
-SFI Wi-Fi install/launch on physical iPhone remains available for engineering builds. Packet Tunnel connect still needs interactive VPN permission on device.
+SFI Debug Wi-Fi install remains available for engineering. Packet Tunnel still needs interactive VPN permission on first connect.

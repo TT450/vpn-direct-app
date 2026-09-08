@@ -182,23 +182,20 @@ public class ExtensionProfile: ObservableObject {
             connectedDate = Date()
             return
         }
-        guard let manager else { return }
+        guard let manager else {
+            throw NSError(domain: "ExtensionProfile", code: -2, userInfo: [
+                NSLocalizedDescriptionKey: "VPN manager unavailable",
+            ])
+        }
         try await fetchProfile()
         manager.isEnabled = true
-        let alwaysOn = await SharedPreferences.alwaysOn.get()
-        let onDemandEnabled = await SharedPreferences.onDemandEnabled.get()
-        if alwaysOn || onDemandEnabled {
-            manager.isOnDemandEnabled = true
-            await setOnDemandRules(useDefaultRules: alwaysOn)
-        } else {
-            manager.isOnDemandEnabled = false
-            manager.onDemandRules = []
-        }
+        // Manual dial must never race On-Demand / Always-On.
+        manager.isOnDemandEnabled = false
+        manager.onDemandRules = []
         if let proto = manager.protocolConfiguration as? NETunnelProviderProtocol {
             var config = proto.providerConfiguration ?? [:]
-            if config.removeValue(forKey: "wasOnDemandEnabled") != nil {
-                proto.providerConfiguration = config
-            }
+            config.removeValue(forKey: "wasOnDemandEnabled")
+            proto.providerConfiguration = config
         }
         #if !os(tvOS)
             if let protocolConfiguration = manager.protocolConfiguration {
@@ -216,11 +213,15 @@ public class ExtensionProfile: ObservableObject {
             }
         #endif
         try await manager.saveToPreferences()
-        // Preferences save can replace the connection object — re-bind observer.
+        // Required after save — otherwise startVPNTunnel often attaches to a stale session
+        // that connects for a second and dies (matches our OOM/stop breadcrumbs).
+        try await manager.loadFromPreferences()
         register()
         let options = try await prepareStartOptions()
+        VPNDebugLog.write("startVPNTunnel profile=\(await SharedPreferences.selectedProfileID.get()) optionsKeys=\(options.keys.sorted())")
         try manager.connection.startVPNTunnel(options: options)
         refreshStatus()
+        VPNDebugLog.write("after start status=\(status.rawValue)")
     }
 
     public func reloadService() async throws {
@@ -267,6 +268,7 @@ public class ExtensionProfile: ObservableObject {
         let bypassRU = await SharedPreferences.bypassRussianSites.get()
         let configContent = RussianBypassRouting.apply(to: migrated, enabled: bypassRU)
         options["configContent"] = NSString(string: configContent)
+        VPNDebugLog.write("prepareStartOptions bypass=\(bypassRU) profile=\(profileID) bytes=\(configContent.count)")
 
         #if !os(macOS)
             options["ignoreMemoryLimit"] = await NSNumber(value: SharedPreferences.ignoreMemoryLimit.get())

@@ -700,6 +700,7 @@ struct DirectConnectionProfilesView: View {
 
     private let profiles = [
         ("A", "Авто", "Баланс скорости и стабильности"),
+        ("M", "Пользовательский", "Только выбранный вручную сервер"),
         ("S", "Максимальная скорость", "Ближайший сервер с минимальным ping"),
         ("R", "Стабильный", "Надёжный маршрут и failover"),
         ("V", "Для видео", "Высокая пропускная способность"),
@@ -707,7 +708,7 @@ struct DirectConnectionProfilesView: View {
     ]
 
     var body: some View {
-        SheetScaffold(kicker: "ПРОФИЛИ / 05", title: "Режим подключения", close: { dismiss() }) {
+        SheetScaffold(kicker: "ПРОФИЛИ / \(String(format: "%02d", profiles.count))", title: "Режим подключения", close: { dismiss() }) {
             Text("Один профиль управляет сервером, протоколом и поведением при сбое.").font(.system(size: 10)).foregroundStyle(DS.muted).padding(.vertical, 12)
             ForEach(Array(profiles.enumerated()), id: \.element.1) { index, profile in
                 Button {

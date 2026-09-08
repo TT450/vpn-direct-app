@@ -83,6 +83,8 @@ public final class VPNConnectionModel: ObservableObject {
     private var lastSessionTrafficTotal: Int64 = 0
     private var skipAccessChoiceGate = false
     private var entitlementDisconnectInFlight = false
+    /// True after NE reports `.connecting` for the current dial — used to fail fast on drop.
+    private var connectSawConnecting = false
 
     private static let favoritesKey = "vpndirect.favorite.servers"
     private static let recentKey = "vpndirect.recent.servers"
@@ -193,9 +195,12 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public var isExternalAccessReady: Bool {
+        // Third-party imported subscriptions are independent of Free/Premium.
+        if let item = activeSubscription, !DirectBuiltinProfile.isBuiltin(item.profile.remoteURL) {
+            return true
+        }
         guard case let .imported(id) = activeAccess else { return false }
-        guard subscriptions.contains(where: { $0.id == id }) else { return false }
-        return activeSubscriptionID == id
+        return subscriptions.contains(where: { $0.id == id })
     }
 
     public var isActiveAccessReady: Bool {
@@ -206,7 +211,13 @@ public final class VPNConnectionModel: ObservableObject {
         }
     }
 
-    public var shouldShowAccessChoiceOnConnect: Bool { !isActiveAccessReady }
+    public var shouldShowAccessChoiceOnConnect: Bool {
+        // Selected third-party profile → never gate with Free/Premium chooser.
+        if let item = activeSubscription, !DirectBuiltinProfile.isBuiltin(item.profile.remoteURL) {
+            return false
+        }
+        return !isActiveAccessReady
+    }
 
     public var freeRemainingMinutes: Int {
         guard let expires = freeExpiresAt, expires > Date() else { return 0 }
@@ -442,27 +453,30 @@ public final class VPNConnectionModel: ObservableObject {
     public func refreshPublicIP() {
         publicIPLoading = true
         Task {
-            defer { publicIPLoading = false }
+            defer { Task { @MainActor in self.publicIPLoading = false } }
             do {
-                // Prefer a tiny plain-text endpoint that works both on WAN and through the tunnel.
-                guard let url = URL(string: "https://api.ipify.org") else {
-                    publicIPText = "—"
+                // Ephemeral session + cache-buster so server switches don't show a stale IP.
+                let stamp = Int(Date().timeIntervalSince1970 * 1000)
+                guard let url = URL(string: "https://api.ipify.org?_\(stamp)") else {
+                    await MainActor.run { publicIPText = "—" }
                     return
                 }
-                var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8)
+                var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 10)
                 request.setValue("text/plain", forHTTPHeaderField: "Accept")
-                let (data, response) = try await URLSession.shared.data(for: request)
+                request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+                let session = URLSession(configuration: .ephemeral)
+                let (data, response) = try await session.data(for: request)
                 guard let http = response as? HTTPURLResponse, (200 ... 299).contains(http.statusCode),
                       let text = String(data: data, encoding: .utf8)?
                       .trimmingCharacters(in: .whitespacesAndNewlines),
                       !text.isEmpty
                 else {
-                    publicIPText = "—"
+                    await MainActor.run { publicIPText = "—" }
                     return
                 }
-                publicIPText = text
+                await MainActor.run { publicIPText = text }
             } catch {
-                publicIPText = "—"
+                await MainActor.run { publicIPText = "—" }
             }
         }
     }
@@ -535,6 +549,18 @@ public final class VPNConnectionModel: ObservableObject {
         Task { await connectAfterAccessChoice() }
     }
 
+    /// Used by import UI — same path as handleImportedProfileActivated.
+    public func activateNewlyImportedSubscription(_ subscriptionID: Int64, connect: Bool = true) {
+        importFromAccessChoice = false
+        setActiveAccess(.imported(subscriptionID))
+        activate(subscriptionID: subscriptionID)
+        detailPage = nil
+        selectedTab = .home
+        if connect {
+            Task { await connectAfterAccessChoice() }
+        }
+    }
+
     private func connectAfterAccessChoice() async {
         try? await Task.sleep(nanoseconds: 400_000_000)
         skipAccessChoiceGate = true
@@ -561,7 +587,18 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     private func evaluateAccessEntitlements() {
-        guard isConnected || isStarting || phase == .connecting else { return }
+        // Never interrupt dial / teardown. Free/Premium expiry must not touch third-party.
+        guard isConnected, !isStarting,
+              phase != .connecting, phase != .disconnecting, phase != .switching
+        else { return }
+
+        if let item = activeSubscription, !DirectBuiltinProfile.isBuiltin(item.profile.remoteURL) {
+            if case .imported = activeAccess { return }
+            setActiveAccess(.imported(item.id))
+            return
+        }
+        if case .imported = activeAccess { return }
+
         guard isActiveAccessReady else {
             guard !entitlementDisconnectInFlight else { return }
             entitlementDisconnectInFlight = true
@@ -1255,15 +1292,28 @@ public final class VPNConnectionModel: ObservableObject {
         guard !didBind else { return }
         didBind = true
         Task {
-            // One-time cleanup from older kill-switch builds — never block later opens.
+            // Do NOT disable NE profiles on every cold start — that leaves status `.invalid`
+            // and dial silently no-ops on `guard profile.status.isEnabled`.
             await SharedPreferences.includeAllNetworks.set(false)
-            await ExtensionProfile.disableAllSavedProfiles()
+            let resetKey = "direct.neProfileReset.v51"
+            if !UserDefaults.standard.bool(forKey: resetKey) {
+                await ExtensionProfile.disableAllSavedProfiles()
+                environments.extensionProfile = nil
+                UserDefaults.standard.set(true, forKey: resetKey)
+            }
             await SingBoxConfigMigrator.migrateAllStoredProfiles()
             await loadSecuritySettings()
             autoConnect = false
             unknownWiFi = false
             await SharedPreferences.alwaysOn.set(false)
             await SharedPreferences.onDemandEnabled.set(false)
+            // Build 53 force-cleared this preference — restore default ON once.
+            let bypassRestoreKey = "direct.bypassRestore.v54"
+            if !UserDefaults.standard.bool(forKey: bypassRestoreKey) {
+                await SharedPreferences.bypassRussianSites.set(true)
+                bypassRussianSites = true
+                UserDefaults.standard.set(true, forKey: bypassRestoreKey)
+            }
             await refreshCurrentWifi()
             let stored = await SharedPreferences.preferredOutboundTag.get()
             selectedServerID = stored.isEmpty ? nil : stored
@@ -1293,6 +1343,7 @@ public final class VPNConnectionModel: ObservableObject {
         }
         switch status {
         case .connecting:
+            connectSawConnecting = true
             if phase == .idle { phase = .connecting }
             isConnected = false
         case .connected, .reasserting:
@@ -1301,6 +1352,7 @@ public final class VPNConnectionModel: ObservableObject {
             connectPollTask?.cancel()
             connectPollTask = nil
             isStarting = false
+            connectSawConnecting = false
             isConnected = true
             let shouldApplyMode = phase == .connecting
             phase = .idle
@@ -1315,13 +1367,16 @@ public final class VPNConnectionModel: ObservableObject {
             }
         case .disconnecting:
             if phase == .idle { phase = .disconnecting }
-            isConnected = true
+            isConnected = false
         case .disconnected:
             persistSessionTrafficDelta()
             sessionTrafficBaseline = 0
             lastSessionTrafficTotal = 0
             if isStarting || phase == .connecting {
-                // Stay in connecting UI — live status will flip; timeout handles failure.
+                // Do NOT kill the dial here. Extension start can take several seconds
+                // (rule-set download); a premature cancel stops a healthy tunnel
+                // (NEProviderStopReason.userInitiated) right after startService OK.
+                // Timeout / polling handles real failures.
                 break
             } else if phase != .switching {
                 isConnected = false
@@ -1335,13 +1390,31 @@ public final class VPNConnectionModel: ObservableObject {
         updateRuntime()
         updateTraffic()
 
+        // Keep home widget / Control Center in sync even when NE status is flaky there.
+        publishWidgetStatus(connected: isConnected)
+
         if isConnected, !wasConnected {
             HapticManager.shared.play(.vpnConnected)
+            // Fresh egress IP after tunnel is up (not the cached pre-connect WAN IP).
+            Task {
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                refreshPublicIP()
+            }
         } else if !isConnected, wasConnected, wasPhase != .switching, !isStarting,
                   environments?.extensionProfile?.status == .disconnected
         {
             HapticManager.shared.play(.vpnDisconnected)
+            refreshPublicIP()
         }
+    }
+
+    private func publishWidgetStatus(connected: Bool) {
+        let server = activeServer
+        DirectWidgetStatusBridge.publish(
+            connected: connected,
+            serverName: connected ? (server?.city ?? activeSubscription?.name ?? "VPN Direct") : "VPN Direct",
+            countryCode: connected ? (server?.countryCode ?? "") : ""
+        )
     }
 
     public func reloadSubscriptions() async {
@@ -1435,6 +1508,11 @@ public final class VPNConnectionModel: ObservableObject {
                 activeSubscriptionID = 0
                 await SharedPreferences.selectedProfileID.set(-1)
                 await disableVPNAutoConnect()
+            }
+            if let item = subscriptions.first(where: { $0.id == activeSubscriptionID }),
+               !DirectBuiltinProfile.isBuiltin(item.profile.remoteURL)
+            {
+                setActiveAccess(.imported(item.id))
             }
             await mergeLivePings()
         } catch {
@@ -1544,7 +1622,12 @@ public final class VPNConnectionModel: ObservableObject {
         HapticManager.shared.play(.selection)
         Task {
             await SharedPreferences.preferredOutboundTag.set(serverID ?? "")
-            guard isConnected else { return }
+            // Only switch live outbound when tunnel + command.sock are actually up.
+            guard isConnected,
+                  !isStarting,
+                  phase != .connecting,
+                  environments?.extensionProfile?.status.isConnectedStrict == true
+            else { return }
             phase = .switching
             HapticManager.shared.play(.vpnSwitching)
             do {
@@ -1563,6 +1646,9 @@ public final class VPNConnectionModel: ObservableObject {
                 phase = .idle
                 HapticManager.shared.play(.vpnSwitched)
                 await mergeLivePings()
+                // Give the new outbound a moment, then re-check egress IP.
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                refreshPublicIP()
             } catch {
                 phase = .idle
                 alert = AlertState(action: "switch server", error: error)
@@ -1734,10 +1820,12 @@ public final class VPNConnectionModel: ObservableObject {
             environments.postReload()
             return
         }
-        guard profile.status.isEnabled else { return }
+        // `.invalid` after a prefs wipe is normal — `start()` re-enables the manager.
+        // Never silent-return here; that made connect look completely broken.
 
         do {
-            if profile.status.isConnected {
+            // Disconnect only when actually up — `.connecting` must not take stop path.
+            if profile.status.isConnectedStrict {
                 persistSessionTrafficDelta()
                 connectTimeoutTask?.cancel()
                 HapticManager.shared.play(.vpnDisconnecting)
@@ -1746,26 +1834,61 @@ public final class VPNConnectionModel: ObservableObject {
                 isStarting = false
                 isConnected = false
                 phase = .idle
+            } else if profile.status == .connecting || isStarting || phase == .connecting {
+                await cancelPendingConnection(showError: false)
             } else {
+                // Align access with the selected profile before any Free/Premium gate.
+                if let item = activeSubscription, !DirectBuiltinProfile.isBuiltin(item.profile.remoteURL) {
+                    setActiveAccess(.imported(item.id))
+                }
                 if !skipAccessChoiceGate, shouldShowAccessChoiceOnConnect {
                     presentAccessChoice(reason: nil)
                     return
                 }
-                await ensureAutoConnectSettings()
+                // Do not save On-Demand prefs here — races saveToPreferences inside start().
+                await SharedPreferences.alwaysOn.set(false)
+                await SharedPreferences.onDemandEnabled.set(false)
                 connectAttemptID &+= 1
                 connectTimeoutExtended = false
+                connectSawConnecting = false
                 isStarting = true
                 phase = .connecting
                 HapticManager.shared.play(.vpnConnecting)
+                VPNDebugLog.write("dial begin selected=\(activeSubscriptionID) access=\(String(describing: activeAccess))")
                 scheduleConnectTimeout()
                 startConnectStatusPolling()
                 try await profile.start()
-                // Force a live read right after start — notifications can miss the transition.
+                // Give the extension a moment to finish startTunnel / startService
+                // before we decide the dial failed.
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
                 profile.refreshStatus()
                 syncFromExtension()
+                VPNDebugLog.write("dial afterStart status=\(profile.status.rawValue) isConnected=\(isConnected)")
+                if isConnected {
+                    return
+                }
+                // If still not up, keep polling — timeout handles hard failure.
             }
         } catch {
-            await cancelPendingConnection(showError: true, error: error)
+            VPNDebugLog.write("dial FAIL \(error.localizedDescription)")
+            var disconnectHint: String?
+            if #available(iOS 16.0, *) {
+                do {
+                    try await profile.fetchLastDisconnectError()
+                } catch {
+                    disconnectHint = error.localizedDescription
+                    VPNDebugLog.write("lastDisconnect \(error.localizedDescription)")
+                }
+            }
+            if let disconnectHint, !disconnectHint.isEmpty {
+                await cancelPendingConnection(showError: true, error: NSError(
+                    domain: "VPNConnection",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "\(error.localizedDescription)\n\(disconnectHint)"]
+                ))
+            } else {
+                await cancelPendingConnection(showError: true, error: error)
+            }
         }
     }
 
@@ -1819,7 +1942,12 @@ public final class VPNConnectionModel: ObservableObject {
             break
         }
 
-        await cancelPendingConnection(showError: true)
+        await cancelPendingConnection(
+            showError: true,
+            error: Self.readLastTunnelError(afterDialMarker: true).map {
+                NSError(domain: "VPNConnection", code: -4, userInfo: [NSLocalizedDescriptionKey: $0])
+            }
+        )
     }
 
     private func cancelPendingConnection(showError: Bool, error: Error? = nil) async {
@@ -1843,6 +1971,7 @@ public final class VPNConnectionModel: ObservableObject {
         connectPollTask = nil
         connectAttemptID &+= 1
         isStarting = false
+        connectSawConnecting = false
         isConnected = false
         phase = .idle
 
@@ -1857,12 +1986,40 @@ public final class VPNConnectionModel: ObservableObject {
         }
 
         if showError {
-            presentAccessChoice(
-                reason: error.map { "Не удалось подключиться: \($0.localizedDescription)" }
-                    ?? "Не удалось подключиться. Выберите другой способ доступа."
-            )
+            let text = error.map { "Не удалось подключиться: \($0.localizedDescription)" }
+                ?? "Не удалось подключиться. Проверьте подписку и сеть."
+            // Third-party imports must NOT bounce into Free/Premium access choice.
+            if let item = activeSubscription, !DirectBuiltinProfile.isBuiltin(item.profile.remoteURL) {
+                alert = AlertState(errorMessage: text)
+            } else {
+                presentAccessChoice(reason: text)
+            }
         }
         syncFromExtension()
+    }
+
+    /// Reads the last `startService FAIL` line written by the packet tunnel for this dial.
+    private static func readLastTunnelError(afterDialMarker: Bool = false) -> String? {
+        let url = FilePath.workingDirectory.appendingPathComponent("vpn-debug.log")
+        guard let data = try? Data(contentsOf: url),
+              let text = String(data: data, encoding: .utf8)
+        else { return nil }
+        let lines = text.split(separator: "\n").map(String.init)
+        let window: ArraySlice<String>
+        if afterDialMarker, let idx = lines.lastIndex(where: { $0.contains("dial begin") }) {
+            window = lines[(idx + 1)...]
+        } else {
+            window = lines[...]
+        }
+        for line in window.reversed() {
+            if line.contains("startService FAIL") {
+                if let range = line.range(of: "startService FAIL ") {
+                    return String(line[range.upperBound...])
+                }
+                return line
+            }
+        }
+        return nil
     }
 
     private func disableVPNAutoConnect() async {

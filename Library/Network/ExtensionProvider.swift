@@ -2,9 +2,6 @@ import Foundation
 import Libbox
 import NetworkExtension
 import os.log
-#if os(iOS)
-    import WidgetKit
-#endif
 #if os(macOS)
     import CoreLocation
 #endif
@@ -92,14 +89,14 @@ open class ExtensionProvider: NEPacketTunnelProvider {
                 workingPath = containerURL.appendingPathComponent("Working").path
                 tempPath = containerURL.appendingPathComponent("Temp").path
             } else {
-                basePath = FilePath.sharedDirectory.relativePath
-                workingPath = FilePath.workingDirectory.relativePath
-                tempPath = FilePath.cacheDirectory.relativePath
+                basePath = FilePath.sharedDirectory.path
+                workingPath = FilePath.workingDirectory.path
+                tempPath = FilePath.cacheDirectory.path
             }
         #else
-            basePath = FilePath.sharedDirectory.relativePath
-            workingPath = FilePath.workingDirectory.relativePath
-            tempPath = FilePath.cacheDirectory.relativePath
+            basePath = FilePath.sharedDirectory.path
+            workingPath = FilePath.workingDirectory.path
+            tempPath = FilePath.cacheDirectory.path
         #endif
 
         startOptionsURL = URL(fileURLWithPath: basePath).appendingPathComponent(ExtensionStartOptions.snapshotFileName)
@@ -118,9 +115,11 @@ open class ExtensionProvider: NEPacketTunnelProvider {
         if effectiveOptions["configContent"] == nil {
             throw ExtensionStartupError("(packet-tunnel) error: missing configContent in tunnel options")
         }
+        VPNDebugLog.write("startTunnel optionsOK configBytes=\((effectiveOptions["configContent"] as? String)?.count ?? -1)")
         do {
             try persistStartOptions(effectiveOptions)
         } catch {
+            VPNDebugLog.write("persistStartOptions FAIL \(error.localizedDescription)")
             throw ExtensionStartupError("(packet-tunnel) error: persist start options: \(error.localizedDescription)")
         }
 
@@ -176,7 +175,9 @@ open class ExtensionProvider: NEPacketTunnelProvider {
         writeMessage("(packet-tunnel): Here I stand")
         do {
             try await startService()
+            VPNDebugLog.write("startService OK")
         } catch {
+            VPNDebugLog.write("startService FAIL \(error.localizedDescription)")
             #if os(macOS)
                 if Variant.useSystemExtension {
                     xpcService.markServiceNotReady(error)
@@ -189,12 +190,8 @@ open class ExtensionProvider: NEPacketTunnelProvider {
                 xpcService.markServiceReady()
             }
         #endif
-        #if os(iOS)
-            if #available(iOS 18.0, *) {
-                ControlCenter.shared.reloadControls(ofKind: ExtensionProfile.controlKind)
-            }
-            WidgetCenter.shared.reloadAllTimelines()
-        #endif
+        // Do not reload WidgetKit / Control Center from the packet tunnel —
+        // it can tear down Libbox command.sock after NE reports Connected.
     }
 
     func writeMessage(_ message: String) {
@@ -255,6 +252,7 @@ open class ExtensionProvider: NEPacketTunnelProvider {
     }
 
     override open func stopTunnel(with reason: NEProviderStopReason) async {
+        VPNDebugLog.write("stopTunnel reason=\(reason.rawValue)")
         writeMessage("(packet-tunnel) stopping, reason: \(reason)")
         stopService()
         if let server = commandServer {
@@ -275,12 +273,6 @@ open class ExtensionProvider: NEPacketTunnelProvider {
             }
             locationManager = nil
             locationDelegate = nil
-        #endif
-        #if os(iOS)
-            if #available(iOS 18.0, *) {
-                ControlCenter.shared.reloadControls(ofKind: ExtensionProfile.controlKind)
-            }
-            WidgetCenter.shared.reloadAllTimelines()
         #endif
     }
 

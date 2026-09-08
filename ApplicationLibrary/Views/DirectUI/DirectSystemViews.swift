@@ -817,11 +817,10 @@ struct DirectNewConfigurationView: View {
                     if model.importFromAccessChoice {
                         model.handleImportedProfileActivated(subscriptionID: profile.mustID)
                     } else {
+                        model.activateNewlyImportedSubscription(profile.mustID)
                         resultOK = true
-                        resultMessage = "Конфигурация создана и готова к подключению"
+                        resultMessage = "Конфигурация создана и активирована"
                         HapticManager.shared.play(.imported)
-                        model.detailPage = nil
-                        model.selectedTab = .subscriptions
                     }
                 }
             )

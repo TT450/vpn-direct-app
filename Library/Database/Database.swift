@@ -7,7 +7,7 @@ enum Database {
     private static func makeShared() -> any DatabaseWriter {
         do {
             try FileManager.default.createDirectory(at: FilePath.sharedDirectory, withIntermediateDirectories: true)
-            let database = try DatabasePool(path: FilePath.sharedDirectory.appendingPathComponent("settings.db").relativePath)
+            let database = try DatabasePool(path: FilePath.sharedDirectory.appendingPathComponent("settings.db").path)
             var migrator = DatabaseMigrator().disablingDeferredForeignKeyChecks()
             migrator.registerMigration("initialize") { db in
                 try db.create(table: "profiles") { t in

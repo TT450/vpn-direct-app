@@ -73,7 +73,7 @@ Core намеренно близок к upstream sing-box. Кастомные в
 
 ## Текущий статус Core
 
-**Последний релиз:** [`v1.0.11`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11) · pin Core: [`core/VERSION`](core/VERSION).
+**Последний релиз:** [`v1.0.11.63`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.63) (маркетинг **1.0.11**, TestFlight build **63**) · pin Core: [`core/VERSION`](core/VERSION).
 
 Фича не считается **production / `tested`** только из‑за builder. Нужен полный путь:
 
@@ -96,7 +96,8 @@ Core намеренно близок к upstream sing-box. Кастомные в
 | Content detector + production gate | Реализован (`make check-production-ready`) |
 | Mieru | Parser + Core (`with_mieru`); interop planned |
 | Interop lab / evidence `tested` | Каркасы + checklist; live evidence pending |
-| CONNECT-UDP / Tailscale / OpenVPN | `out_of_scope` для Core 1.x |
+| CONNECT-UDP / Tailscale / OpenVPN import | В **1.0.10** (parser + graph); device Libbox / квалификация в процессе |
+| Виджеты Home / Пункт управления | В **1.0.11**; toggle без открытия приложения в **1.0.11.63** |
 
 ## Архитектура
 
@@ -196,7 +197,7 @@ vpn-direct-app/
 | [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) | Что парсится, компилируется, тестируется |
 | [Release Blocker Ledger](docs/core/RELEASE_BLOCKER_LEDGER.md) | Блокеры релиза |
 | [Roadmap](ROADMAP.md) | Публичный roadmap |
-| [What's New](WHATS_NEW.md) | Релизные заметки последнего тега (`v1.0.11`) |
+| [What's New](WHATS_NEW.md) | Релизные заметки последнего тега (`v1.0.11.63`) |
 | [iPhone Qualification](docs/device/IPHONE_QUALIFICATION.md) | Чеклист device evidence |
 
 ## Публичные идентификаторы

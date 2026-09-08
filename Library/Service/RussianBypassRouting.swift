@@ -1,6 +1,8 @@
 import Foundation
 
 /// Injects sing-box `rule_set` rules so Russian domains/IPs go `direct` (no VPN).
+/// Same rule URLs as TheTochka. On Libbox 1.14 use ONLY `http_client` (not `download_detour`) —
+/// emitting both causes: "http_client is conflict with deprecated download_detour field".
 public enum RussianBypassRouting {
     private static let managedTags = [
         "vpndirect-geosite-category-ru",
@@ -8,43 +10,45 @@ public enum RussianBypassRouting {
         "vpndirect-geosite-ru-available-only-inside",
     ]
 
-    /// Shared HTTP client tag for remote rule-set downloads (sing-box 1.14+; replaces `download_detour`).
     private static let httpClientTag = "vpndirect-ruleset-http"
 
-    private static let ruleSets: [[String: Any]] = [
+    private static func makeRuleSets() -> [[String: Any]] {
         [
-            "tag": "vpndirect-geosite-category-ru",
-            "type": "remote",
-            "format": "binary",
-            "url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geosite/geosite-category-ru.srs",
-            "http_client": httpClientTag,
-            "update_interval": "24h",
-        ],
-        [
-            "tag": "vpndirect-geoip-ru",
-            "type": "remote",
-            "format": "binary",
-            "url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geoip/geoip-ru.srs",
-            "http_client": httpClientTag,
-            "update_interval": "24h",
-        ],
-        [
-            "tag": "vpndirect-geosite-ru-available-only-inside",
-            "type": "remote",
-            "format": "binary",
-            "url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geosite/geosite-ru-available-only-inside.srs",
-            "http_client": httpClientTag,
-            "update_interval": "24h",
-        ],
-    ]
+            [
+                "tag": "vpndirect-geosite-category-ru",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geosite/geosite-category-ru.srs",
+                "http_client": httpClientTag,
+                "update_interval": "24h",
+            ],
+            [
+                "tag": "vpndirect-geoip-ru",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geoip/geoip-ru.srs",
+                "http_client": httpClientTag,
+                "update_interval": "24h",
+            ],
+            [
+                "tag": "vpndirect-geosite-ru-available-only-inside",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geosite/geosite-ru-available-only-inside.srs",
+                "http_client": httpClientTag,
+                "update_interval": "24h",
+            ],
+        ]
+    }
 
-    /// Applies or removes managed RU→direct rules. Safe to call repeatedly.
     public static func apply(to json: String, enabled: Bool) -> String {
         guard let data = json.data(using: .utf8),
               var root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
             return json
         }
+
+        ensureUsableDirectOutbound(root: &root)
 
         var route = root["route"] as? [String: Any] ?? [:]
         var sets = route["rule_set"] as? [[String: Any]] ?? []
@@ -53,43 +57,58 @@ public enum RussianBypassRouting {
         sets.removeAll { set in
             guard let tag = set["tag"] as? String else { return false }
             return managedTags.contains(tag)
+                || tag.hasPrefix("aladdin-geosite")
+                || tag.hasPrefix("aladdin-geoip")
         }
         rules.removeAll { rule in
             if let tag = rule["rule_set"] as? String {
-                return managedTags.contains(tag)
+                return managedTags.contains(tag) || tag.hasPrefix("aladdin-")
             }
             if let tags = rule["rule_set"] as? [String] {
-                return tags.contains(where: { managedTags.contains($0) })
+                return tags.contains(where: { managedTags.contains($0) || $0.hasPrefix("aladdin-") })
             }
             return false
         }
 
-        // Always scrub legacy `download_detour` so sing-box 1.14+ does not warn.
-        sets = sets.map(migrateLegacyDownloadDetour)
-        scrubLegacyGeoDownloadDetour(route: &route)
-
-        if enabled {
-            sets.append(contentsOf: ruleSets)
-            let insertIndex = rules.firstIndex { rule in
-                (rule["ip_is_private"] as? Bool) == true
-            }.map { $0 + 1 } ?? rules.count
-            let bypassRule: [String: Any] = [
-                "rule_set": managedTags,
-                "outbound": "direct",
-            ]
-            rules.insert(bypassRule, at: min(insertIndex, rules.count))
+        // Always strip deprecated download_detour — conflicts with http_client on 1.14.
+        sets = sets.map { set in
+            var next = set
+            next.removeValue(forKey: "download_detour")
+            return next
+        }
+        for key in ["geoip", "geosite"] {
+            guard var block = route[key] as? [String: Any] else { continue }
+            block.removeValue(forKey: "download_detour")
+            route[key] = block
         }
 
-        let needsHTTPClient = enabled || sets.contains { ($0["type"] as? String) == "remote" }
-        if needsHTTPClient {
-            ensureSharedHTTPClient(root: &root, route: &route)
-            // Point any remote set still missing http_client at the shared client.
+        let downloadVia = preferredDownloadDetour(root: root)
+
+        if enabled {
+            if downloadVia == "direct" {
+                // No proxy outbound — skip injection rather than break dial.
+                root.removeValue(forKey: "http_clients")
+                route.removeValue(forKey: "default_http_client")
+            } else {
+                ensureSharedHTTPClient(root: &root, route: &route, detour: downloadVia)
+                sets.append(contentsOf: makeRuleSets())
+                let insertIndex = rules.firstIndex { rule in
+                    (rule["ip_is_private"] as? Bool) == true
+                }.map { $0 + 1 } ?? rules.count
+                rules.insert(
+                    [
+                        "rule_set": managedTags,
+                        "outbound": "direct",
+                    ],
+                    at: min(insertIndex, rules.count)
+                )
+            }
+        } else {
+            root.removeValue(forKey: "http_clients")
+            route.removeValue(forKey: "default_http_client")
             sets = sets.map { set in
                 var next = set
-                guard (next["type"] as? String) == "remote" else { return next }
-                if next["http_client"] == nil {
-                    next["http_client"] = httpClientTag
-                }
+                next.removeValue(forKey: "http_client")
                 return next
             }
         }
@@ -112,36 +131,32 @@ public enum RussianBypassRouting {
         return text
     }
 
-    /// `download_detour` → `http_client` tag/object (sing-box 1.14+). Always drops the legacy key.
-    private static func migrateLegacyDownloadDetour(_ set: [String: Any]) -> [String: Any] {
-        var next = set
-        let legacy = next.removeValue(forKey: "download_detour") as? String
-        if next["http_client"] == nil {
-            if let legacy, !legacy.isEmpty {
-                next["http_client"] = ["detour": legacy]
-            } else if (next["type"] as? String) == "remote" {
-                next["http_client"] = httpClientTag
+    private static func preferredDownloadDetour(root: [String: Any]) -> String {
+        let outbounds = root["outbounds"] as? [[String: Any]] ?? []
+        let tags = Set(outbounds.compactMap { $0["tag"] as? String })
+        if tags.contains("proxy") { return "proxy" }
+        if tags.contains("auto") { return "auto" }
+        return "direct"
+    }
+
+    private static func ensureUsableDirectOutbound(root: inout [String: Any]) {
+        var outbounds = root["outbounds"] as? [[String: Any]] ?? []
+        if let idx = outbounds.firstIndex(where: { ($0["tag"] as? String) == "direct" }) {
+            if (outbounds[idx]["type"] as? String) != "direct" {
+                outbounds[idx] = ["type": "direct", "tag": "direct"]
             }
+        } else {
+            outbounds.append(["type": "direct", "tag": "direct"])
         }
-        return next
+        root["outbounds"] = outbounds
     }
 
-    private static func scrubLegacyGeoDownloadDetour(route: inout [String: Any]) {
-        for key in ["geoip", "geosite"] {
-            guard var block = route[key] as? [String: Any] else { continue }
-            block.removeValue(forKey: "download_detour")
-            route[key] = block
-        }
-    }
-
-    /// Explicit shared client so remote rule-sets do not need legacy `download_detour`.
-    /// Uses `direct` so rule-set files can download before the VPN tunnel is fully selected.
-    private static func ensureSharedHTTPClient(root: inout [String: Any], route: inout [String: Any]) {
+    private static func ensureSharedHTTPClient(root: inout [String: Any], route: inout [String: Any], detour: String) {
         var clients = root["http_clients"] as? [[String: Any]] ?? []
         clients.removeAll { ($0["tag"] as? String) == httpClientTag }
         clients.append([
             "tag": httpClientTag,
-            "detour": "direct",
+            "detour": detour,
         ])
         root["http_clients"] = clients
         route["default_http_client"] = httpClientTag

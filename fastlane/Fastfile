@@ -99,7 +99,7 @@ platform :ios do
       apple_id: ENV.fetch("APP_STORE_APP_ID"),
       skip_waiting_for_build_processing: true,
       distribute_external: false,
-      changelog: ENV["TESTFLIGHT_CHANGELOG"] || "VPN Direct 1.0.11 (32)"
+      changelog: ENV["TESTFLIGHT_CHANGELOG"] || "VPN Direct 1.0.11 (63)"
     )
   end
 

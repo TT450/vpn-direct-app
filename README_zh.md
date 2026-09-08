@@ -54,7 +54,7 @@ Subscription / Config → Content Detector → Universal Parser / Adapters
 
 ## 当前 Core 状态
 
-**最新发布：** [`v1.0.11`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11)
+**最新发布：** [`v1.0.11.63`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.63)（营销版本 **1.0.11**，TestFlight build **63**）
 
 仅有 builder / parser **不等于** `tested` / production。权威状态见 [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md)。
 
@@ -69,7 +69,8 @@ Subscription / Config → Content Detector → Universal Parser / Adapters
 | Clash YAML（仅 proxies）+ content detector | 已实现 |
 | `make check-production-ready` | 已实现 |
 | Mieru | Parser + Core（`with_mieru`）；interop 仍为 planned |
-| CONNECT-UDP / Tailscale / OpenVPN | `out_of_scope` |
+| CONNECT-UDP / Tailscale / OpenVPN 导入 | **1.0.10** 已交付；设备端 Libbox 资格认证进行中 |
+| 主屏 / 控制中心小组件 | **1.0.11**；**1.0.11.63** 原地开关 |
 
 ## 构建配置
 

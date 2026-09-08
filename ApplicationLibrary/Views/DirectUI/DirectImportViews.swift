@@ -160,11 +160,10 @@ struct DirectImportFileView: View {
                 if model.importFromAccessChoice {
                     model.handleImportedProfileActivated(subscriptionID: profile.mustID)
                 } else {
+                    model.activateNewlyImportedSubscription(profile.mustID)
                     resultOK = true
-                    resultMessage = "Файл импортирован"
+                    resultMessage = "Файл импортирован и активирован"
                     HapticManager.shared.play(.imported)
-                    model.detailPage = nil
-                    model.selectedTab = .subscriptions
                 }
             } catch {
                 resultOK = false
@@ -304,11 +303,10 @@ struct DirectImportConfigTextView: View {
                 if model.importFromAccessChoice {
                     model.handleImportedProfileActivated(subscriptionID: profile.mustID)
                 } else {
+                    model.activateNewlyImportedSubscription(profile.mustID)
                     resultOK = true
-                    resultMessage = "Конфигурация создана"
+                    resultMessage = "Конфигурация создана и активирована"
                     HapticManager.shared.play(.imported)
-                    model.detailPage = nil
-                    model.selectedTab = .subscriptions
                 }
             } catch {
                 resultOK = false

@@ -1,14 +1,14 @@
 # VPN Direct Documentation
 
-Engineering docs map for **v1.0.11**. Keep in sync with the GitHub README quick links.
+Engineering docs map for **v1.0.11.63** (marketing **1.0.11**, TestFlight build **63**). Keep in sync with the GitHub README quick links.
 
 ## Start here
 
 | Document | Use it for |
 | --- | --- |
-| [`../WHATS_NEW.md`](../WHATS_NEW.md) | Latest release notes (`v1.0.11`) |
+| [`../WHATS_NEW.md`](../WHATS_NEW.md) | Latest release notes (`v1.0.11.63`) |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | Full version history |
-| [`TESTFLIGHT.md`](TESTFLIGHT.md) | TestFlight beta + inviting testers |
+| [`TESTFLIGHT.md`](TESTFLIGHT.md) | TestFlight beta + inviting testers (build **63**) |
 | [`core/ARCHITECTURE.md`](core/ARCHITECTURE.md) | Core + Apple import pipeline (current) |
 | [`core/BUILDING.md`](core/BUILDING.md) | Reproducing Libbox and Apple builds |
 | [`core/PROTOCOL_MATRIX.md`](core/PROTOCOL_MATRIX.md) | Authoritative protocol status |
@@ -19,7 +19,8 @@ Engineering docs map for **v1.0.11**. Keep in sync with the GitHub README quick 
 | [`battle/BATTLE_SOURCE_PLAN.md`](battle/BATTLE_SOURCE_PLAN.md) | Public harvest catalog plan |
 | [`device/IPHONE_QUALIFICATION.md`](device/IPHONE_QUALIFICATION.md) | Device evidence checklist |
 | [`device/IPHONE_INSTALL_2026-09-07.md`](device/IPHONE_INSTALL_2026-09-07.md) | Wi-Fi install recipe (SFI + `devicectl`) |
-| [`device/IPHONE_INSTALL_2026-09-08.md`](device/IPHONE_INSTALL_2026-09-08.md) | Wi-Fi install evidence for v1.0.10 (build + launch) |
+| [`device/IPHONE_INSTALL_2026-09-08.md`](device/IPHONE_INSTALL_2026-09-08.md) | Wi-Fi install evidence (v1.0.10) |
+| [`device/IPHONE_INSTALL_2026-09-08_BUILD63.md`](device/IPHONE_INSTALL_2026-09-08_BUILD63.md) | TestFlight **1.0.11 (63)** upload evidence |
 | [`../interop/README.md`](../interop/README.md) | Interop lab scaffolds |
 | [`core/DONORS.md`](core/DONORS.md) | Upstream / donor source tracking |
 | [`core/LICENSE_AUDIT.md`](core/LICENSE_AUDIT.md) | Dependency / license notes |

@@ -2,6 +2,18 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.11.63] — 2026-09-08
+
+### Widgets + tunnel reliability (TestFlight build 63)
+
+- Home Screen widget toggles VPN in-place (`ToggleVPNWidgetIntent`) — no app open on tap
+- Small widget: larger power button with balanced padding; labels **Включен** / **Включить**
+- Live NE status in widget extension (`packet-tunnel` entitlement); timeline reload on connect/disconnect
+- Control Center control: non-throwing value provider; App Store widget profile refreshed with Network Extension
+- Imported subscriptions: no Free/Premium expire gate; Russian bypass uses `http_client` → `proxy` only
+- Packet tunnel: removed WidgetKit/Control Center reloads that killed `command.sock`
+- Guard against early Control Center stop right after dial
+
 ## [1.0.11] — 2026-09-08
 
 ### DirectUI + widgets

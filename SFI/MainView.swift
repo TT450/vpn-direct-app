@@ -63,6 +63,12 @@ struct MainView: View {
     }
 
     private func openURL(url: URL) {
+        // Home-screen widget tap — always works (opens app + toggles VPN).
+        if url.scheme?.lowercased() == "vpndirect", url.host?.lowercased() == VPNDirectDeepLink.toggleHost {
+            VPNDirectDeepLink.markPendingToggle()
+            NotificationCenter.default.post(name: .vpnDirectWidgetToggle, object: nil)
+            return
+        }
         let absolute = AutoSubscriptionImporter.normalizeImportURL(url.absoluteString)
         if VLESSConfigBuilder.isVLESSLink(absolute) || SubscriptionConfigBuilder.isHTTPURL(absolute) {
             Task {

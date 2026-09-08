@@ -148,12 +148,17 @@ public struct VPNHomeView: View {
             } else {
                 model.syncFromExtension()
             }
+            consumeWidgetToggleIfNeeded()
         }
         .onChangeCompat(of: scenePhase) { phase in
             if phase == .active {
                 environments.extensionProfile?.refreshStatus()
                 model.syncFromExtension()
+                consumeWidgetToggleIfNeeded()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .vpnDirectWidgetToggle)) { _ in
+            consumeWidgetToggleIfNeeded()
         }
         .onReceive(environments.$extensionProfile) { _ in
             model.syncFromExtension()
@@ -207,6 +212,8 @@ public struct VPNHomeView: View {
                     importRequest = nil
                     if model.importFromAccessChoice {
                         model.handleImportedProfileActivated(subscriptionID: profile.mustID)
+                    } else {
+                        model.activateNewlyImportedSubscription(profile.mustID)
                     }
                 })
                 .environmentObject(environments)
@@ -222,6 +229,8 @@ public struct VPNHomeView: View {
                     await model.reloadSubscriptions()
                     if model.importFromAccessChoice {
                         model.handleImportedProfileActivated(subscriptionID: profile.mustID)
+                    } else {
+                        model.activateNewlyImportedSubscription(profile.mustID)
                     }
                 })
                 .environmentObject(environments)
@@ -343,12 +352,14 @@ public struct VPNHomeView: View {
                             .font(.system(size: 11, weight: model.selectedTab == tab ? .semibold : .regular))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
                     .background(model.selectedTab == tab ? DS.acid.opacity(0.14) : .clear)
                 }
                 .buttonStyle(HapticButtonStyle())
             }
         }
         .frame(height: DirectChrome.tabBarHeight)
+        .contentShape(Rectangle())
         .overlay(alignment: .top) { Hairline() }
     }
 
@@ -416,6 +427,15 @@ public struct VPNHomeView: View {
 
     private func normalizeImportString(_ raw: String) -> String {
         AutoSubscriptionImporter.normalizeImportURL(raw)
+    }
+
+    private func consumeWidgetToggleIfNeeded() {
+        guard VPNDirectDeepLink.consumePendingToggle() else { return }
+        // Let NE profile finish binding after cold start from widget.
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            model.toggleConnection()
+        }
     }
 }
 

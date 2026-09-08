@@ -2,6 +2,14 @@
 
 Public roadmap for VPN Direct (Apple client + VPN Direct Core). Status language matches [`docs/core/PROTOCOL_MATRIX.md`](docs/core/PROTOCOL_MATRIX.md) and [`docs/core/RELEASE_BLOCKER_LEDGER.md`](docs/core/RELEASE_BLOCKER_LEDGER.md).
 
+## Shipped in 1.0.11 / 1.0.11.63
+
+- [x] Home Screen / Lock Screen / Control Center widgets (VPN Direct)
+- [x] In-widget VPN toggle without opening the app (build **63**)
+- [x] Widget status labels **Включен** / **Включить** + live NE status
+- [x] Connection mode **5G**; DirectUI import menu / ping polish
+- [x] TestFlight **1.0.11 (63)** + Asc/`fastlane ios release` docs
+
 ## Shipped in 1.0.10
 
 - [x] OpenVPN / OpenConnect / Tailscale file+JSON import → graph endpoints
