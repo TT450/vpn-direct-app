@@ -22,15 +22,30 @@ public enum ClashYAMLAdapter {
         }
 
         var nodeByName: [String: NormalizedNode] = [:]
-        var orderedNames: [String] = []
+        var flatEndpoints: [NormalizedNode] = []
+        var usedFlatNames = Set<String>()
         var failures: [String] = []
         for proxy in proxies {
             do {
-                let node = try mapProxy(proxy)
-                if nodeByName[node.name] == nil {
-                    orderedNames.append(node.name)
-                }
+                var node = try mapProxy(proxy)
+                // Clash proxy-groups address members by display name (last write wins for group lookup).
                 nodeByName[node.name] = node
+
+                // Flat import (no groups): TheTochka/Happ policy — never drop a leaf on name collision;
+                // uniquify the display name so UI/tags become Germany / Germany-2.
+                var flatName = node.name
+                if usedFlatNames.contains(flatName) {
+                    var index = 2
+                    var candidate = "\(node.name)-\(index)"
+                    while usedFlatNames.contains(candidate) {
+                        index += 1
+                        candidate = "\(node.name)-\(index)"
+                    }
+                    flatName = candidate
+                    node.name = flatName
+                }
+                usedFlatNames.insert(flatName)
+                flatEndpoints.append(node)
             } catch {
                 let label = proxy["name"] ?? proxy["type"] ?? "?"
                 let detail: String
@@ -44,7 +59,7 @@ public enum ClashYAMLAdapter {
                 failures.append("\(label):\(detail)")
             }
         }
-        if nodeByName.isEmpty {
+        if flatEndpoints.isEmpty {
             let preview = failures.prefix(8).joined(separator: "; ")
             throw VPNDirectCoreError.unsupportedFeature(
                 component: "clash",
@@ -55,13 +70,12 @@ public enum ClashYAMLAdapter {
         let groups = extractProxyGroupsViaYams(from: text)
         if groups.isEmpty {
             // Flat list: one selectable group of independent leaves (stable proxy order).
-            let endpoints = orderedNames.compactMap { nodeByName[$0] }
             let location = NormalizedLocation(
                 id: "clash",
                 name: "Clash",
                 kind: .group,
-                strategy: endpoints.count > 1 ? .select : .single,
-                endpoints: endpoints
+                strategy: flatEndpoints.count > 1 ? .select : .single,
+                endpoints: flatEndpoints
             )
             return NormalizedSubscription(name: "Clash", locations: [location])
         }
@@ -256,6 +270,14 @@ public enum ClashYAMLAdapter {
             attrs["method"] = attrs["cipher"] ?? attrs["method"] ?? ""
             attrs["password"] = attrs["password"] ?? ""
             return NormalizedNode(name: name, protocolID: .shadowsocks, server: server, port: port, attributes: attrs)
+        case "ssr", "shadowsocksr":
+            attrs["method"] = attrs["cipher"] ?? attrs["method"] ?? ""
+            attrs["password"] = attrs["password"] ?? ""
+            attrs["protocol"] = attrs["protocol"] ?? attrs["ssr-protocol"] ?? "origin"
+            attrs["obfs"] = attrs["obfs"] ?? "plain"
+            if let pp = attrs["protocol-param"] ?? attrs["protocol_param"] { attrs["protocol_param"] = pp }
+            if let op = attrs["obfs-param"] ?? attrs["obfs_param"] { attrs["obfs_param"] = op }
+            return NormalizedNode(name: name, protocolID: .shadowsocksr, server: server, port: port, attributes: attrs)
         case "hysteria2", "hy2":
             attrs["password"] = attrs["password"] ?? attrs["auth"] ?? ""
             return NormalizedNode(name: name, protocolID: .hysteria2, server: server, port: port, transport: .quic, security: .tls, attributes: attrs)

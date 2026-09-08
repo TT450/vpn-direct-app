@@ -57,8 +57,8 @@ func VPNDirectSupportsAWG() bool { return vpnDirectTagAWG }
 // VPNDirectSupportsMASQUEConnectIP reports CONNECT-IP MASQUE outbound support.
 func VPNDirectSupportsMASQUEConnectIP() bool { return vpnDirectTagMASQUE }
 
-// VPNDirectSupportsMASQUEConnectUDP is always false in Core 0.1 (not invented / not upstream).
-func VPNDirectSupportsMASQUEConnectUDP() bool { return false }
+// VPNDirectSupportsMASQUEConnectUDP reports RFC 9298 CONNECT-UDP outbound support.
+func VPNDirectSupportsMASQUEConnectUDP() bool { return true }
 
 // VPNDirectSupportsVLESSEncryption reports VLESS encryption / PQ string support.
 func VPNDirectSupportsVLESSEncryption() bool { return vpnDirectTagVLESSEnc }

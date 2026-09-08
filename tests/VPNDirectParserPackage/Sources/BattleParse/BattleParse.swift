@@ -9,7 +9,7 @@ private let capabilityJSON = """
 """
 
 private let shareSchemes: Set<String> = [
-    "vless", "vmess", "trojan", "ss",
+    "vless", "vmess", "trojan", "ss", "ssr",
     "hysteria", "hysteria2", "hy2", "tuic", "anytls",
     "wireguard", "wg", "awg", "socks", "socks5", "socks4",
     "ssh", "shadowtls",
@@ -487,6 +487,18 @@ enum BattleParseCLI {
             nodes = sub.allEndpoints
         case .wireGuardConf:
             let sub = try WireGuardConfAdapter.parse(detection.text)
+            nodes = sub.allEndpoints
+        case .openVPNConfig:
+            let sub = try OpenVPNConfigAdapter.parse(detection.text)
+            nodes = sub.allEndpoints
+        case .openConnectConfig:
+            let sub = try OpenConnectConfigAdapter.parse(detection.text)
+            nodes = sub.allEndpoints
+        case .tailscaleJSON:
+            let sub = try TailscaleConfigAdapter.parse(detection.text)
+            nodes = sub.allEndpoints
+        case .masqueConnectUDPJSON:
+            let sub = try MasqueConnectUDPAdapter.parse(detection.text)
             nodes = sub.allEndpoints
         case .singBoxJSON, .unknown:
             break

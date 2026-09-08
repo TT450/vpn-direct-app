@@ -24,18 +24,30 @@ public struct HysteriaShareLinkParser: VPNDirectParser {
         }
         let name = (outbound["tag"] as? String) ?? "Hysteria"
         var attributes: [String: String] = [:]
-        if let password = outbound["password"] as? String {
-            attributes["password"] = password
+        if let password = outbound["password"] as? String { attributes["password"] = password }
+        if let auth = outbound["auth_str"] as? String { attributes["auth"] = auth }
+        if let value = outbound["up_mbps"] as? Int { attributes["up"] = String(value) }
+        if let value = outbound["down_mbps"] as? Int { attributes["down"] = String(value) }
+        if let values = outbound["server_ports"] as? [String], !values.isEmpty {
+            attributes["server_ports"] = values.joined(separator: ",")
         }
-        if let auth = outbound["auth_str"] as? String {
-            attributes["auth"] = auth
-        }
-        if let tls = outbound["tls"] as? [String: Any], let sni = tls["server_name"] as? String {
-            attributes["sni"] = sni
+        if let value = outbound["hop_interval"] as? String { attributes["hop_interval"] = value }
+        if let value = outbound["hop_interval_max"] as? String { attributes["hop_interval_max"] = value }
+        if let value = outbound["network"] as? String { attributes["outbound_network"] = value }
+        if let value = outbound["bbr_profile"] as? String { attributes["bbr_profile"] = value }
+        if let value = outbound["brutal_debug"] as? Bool { attributes["brutal_debug"] = value ? "true" : "false" }
+        if let value = outbound["disable_chrome_parrot"] as? Bool { attributes["disable_chrome_parrot"] = value ? "true" : "false" }
+
+        if let tls = outbound["tls"] as? [String: Any] {
+            if let sni = tls["server_name"] as? String { attributes["sni"] = sni }
+            if let insecure = tls["insecure"] as? Bool { attributes["insecure"] = insecure ? "true" : "false" }
+            if let alpn = tls["alpn"] as? [String], !alpn.isEmpty { attributes["alpn"] = alpn.joined(separator: ",") }
         }
         if let obfs = outbound["obfs"] as? [String: Any], let t = obfs["type"] as? String {
             attributes["obfs"] = t
             if let p = obfs["password"] as? String { attributes["obfs_password"] = p }
+            if let p = obfs["min_packet_size"] as? Int { attributes["obfs_min_packet_size"] = String(p) }
+            if let p = obfs["max_packet_size"] as? Int { attributes["obfs_max_packet_size"] = String(p) }
         } else if let obfs = outbound["obfs"] as? String {
             attributes["obfs"] = obfs
         }
@@ -49,7 +61,6 @@ public struct HysteriaShareLinkParser: VPNDirectParser {
             obfuscation: attributes["obfs"].map { VPNDirectObfuscationID(rawValue: $0) },
             attributes: attributes,
             source: link
-            // attributes-only — HysteriaOutboundFactory.fromAttributes rebuilds outbound
         )
     }
 }
@@ -61,52 +72,55 @@ enum HysteriaOutboundFactory {
         let lower = trimmed.lowercased()
         let isV2 = lower.hasPrefix("hysteria2://") || lower.hasPrefix("hy2://")
         guard lower.hasPrefix("hysteria://") || isV2 else { return nil }
-        guard let url = URL(string: trimmed) else { return nil }
 
-        let host = url.host?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !host.isEmpty, !EndpointValidator.isBlockedLoopbackHost(host) else { return nil }
-        let port = url.port ?? 443
-        let user = url.user.map { $0.removingPercentEncoding ?? $0 } ?? ""
-        let passwordPart = url.password.map { $0.removingPercentEncoding ?? $0 } ?? ""
-        let auth: String
-        if !user.isEmpty, !passwordPart.isEmpty {
-            auth = "\(user):\(passwordPart)"
-        } else if !user.isEmpty {
-            auth = user
-        } else if !passwordPart.isEmpty {
-            auth = passwordPart
+        // Prefer slash-tolerant authority parse — public feeds often leave `/` unencoded in passwords.
+        let defaultPort = isV2 ? 443 : 0
+        guard let authority = ShareLinkURI.splitUserInfoHostPort(from: trimmed, defaultPort: defaultPort),
+              !authority.host.isEmpty,
+              !EndpointValidator.isBlockedLoopbackHost(authority.host)
+        else { return nil }
+        let host = authority.host
+        let port: Int
+        if authority.port > 0 {
+            port = authority.port
+        } else if isV2 {
+            port = 443
         } else {
-            auth = ""
+            return nil
         }
-        guard !auth.isEmpty else { return nil }
 
-        let items = URLComponents(string: trimmed)?.queryItems ?? []
-        var query: [String: String] = [:]
-        for item in items {
-            if let value = item.value {
-                query[item.name.lowercased()] = value
+        var query = ShareLinkURI.queryMap(from: trimmed)
+        // `mport` (Happ / some panels) aliases hop port ranges.
+        if query["server_ports"] == nil, let mport = query["mport"], !mport.isEmpty {
+            query["server_ports"] = mport
+        }
+
+        let userInfoAuth: String = {
+            guard let raw = authority.userInfo, !raw.isEmpty else { return "" }
+            return raw
+        }()
+        // Hysteria v1 commonly carries auth in the query. HY2 uses URI userinfo, while realm-style
+        // and some ecosystem exports use `auth=`; preserve it instead of inventing credentials.
+        let auth = query["auth"]?.removingPercentEncoding ?? userInfoAuth
+
+        var tls: [String: Any] = ["enabled": true]
+        if let sni = query["sni"] ?? query["peer"], !sni.isEmpty { tls["server_name"] = sni }
+        if let raw = query["insecure"] ?? query["allowinsecure"] {
+            switch raw.lowercased() {
+            case "1", "true", "yes": tls["insecure"] = true
+            case "0", "false", "no": tls["insecure"] = false
+            default: return nil
             }
         }
-
-        let sni = query["sni"] ?? query["peer"] ?? host
-        var tls: [String: Any] = [
-            "enabled": true,
-            "server_name": sni,
-        ]
-        if query["insecure"] == "1" || query["allowinsecure"] == "1" {
-            tls["insecure"] = true
-        }
-        // QUIC / Hysteria cannot use uTLS — ignore fp= from share links.
+        // QUIC / Hysteria cannot use uTLS; `fp=` is not translated into a different TLS feature.
         if let alpn = query["alpn"], !alpn.isEmpty {
-            tls["alpn"] = alpn.split(separator: ",").map { String($0) }
-        } else if isV2 {
-            tls["alpn"] = ["h3"]
+            tls["alpn"] = alpn.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         }
 
         let fragmentName: String = {
-            guard let raw = url.fragment else { return fallbackTag }
-            let decoded = (raw.removingPercentEncoding ?? raw)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let hash = trimmed.firstIndex(of: "#") else { return fallbackTag }
+            let raw = String(trimmed[trimmed.index(after: hash)...])
+            let decoded = (raw.removingPercentEncoding ?? raw).trimmingCharacters(in: .whitespacesAndNewlines)
             return decoded.isEmpty ? fallbackTag : decoded
         }()
 
@@ -116,44 +130,71 @@ enum HysteriaOutboundFactory {
                 "tag": fragmentName,
                 "server": host,
                 "server_port": port,
-                "password": auth,
                 "tls": tls,
             ]
-            let obfsPass = query["obfs-password"] ?? query["obfs_password"] ?? query["obfspassword"]
-            let obfs = query["obfs"]
-            if let obfsPass, !obfsPass.isEmpty {
-                outbound["obfs"] = [
-                    "type": (obfs?.isEmpty == false ? obfs! : "salamander"),
-                    "password": obfsPass,
-                ]
-            } else if let obfs, !obfs.isEmpty, obfs.lowercased() != "salamander", obfs.lowercased() != "none" {
-                outbound["obfs"] = [
-                    "type": "salamander",
-                    "password": obfs,
-                ]
+            if !auth.isEmpty { outbound["password"] = auth }
+
+            if let obfs = query["obfs"], !obfs.isEmpty, obfs.lowercased() != "none" {
+                let typeName = obfs.lowercased()
+                guard typeName == "salamander" || typeName == "gecko" else { return nil }
+                if typeName == "gecko", !VPNDirectCoreCapabilities.current.hysteria2Obfuscations.contains("gecko") { return nil }
+                var object: [String: Any] = ["type": typeName]
+                if let password = query["obfs-password"] ?? query["obfs_password"], !password.isEmpty {
+                    object["password"] = password
+                }
+                if typeName == "gecko" {
+                    if let raw = query["obfs-min-packet-size"] ?? query["obfs_min_packet_size"], let value = Int(raw) { object["min_packet_size"] = value }
+                    if let raw = query["obfs-max-packet-size"] ?? query["obfs_max_packet_size"], let value = Int(raw) { object["max_packet_size"] = value }
+                }
+                outbound["obfs"] = object
+            } else if let fmObfs = parseHysteria2FMObfs(from: query["fm"] ?? extractFMJSON(from: trimmed)) {
+                outbound["obfs"] = fmObfs
+            } else if let password = query["obfs-password"] ?? query["obfs_password"], !password.isEmpty {
+                // Official HY2 URI requires an explicit `obfs=` selector. A password alone is ambiguous.
+                return nil
             }
-            if let up = Int(query["upmbps"] ?? query["up_mbps"] ?? "") {
-                outbound["up_mbps"] = up
+
+            if let up = query["upmbps"] ?? query["up_mbps"] {
+                guard let value = Int(up), value >= 0 else { return nil }
+                outbound["up_mbps"] = value
             }
-            if let down = Int(query["downmbps"] ?? query["down_mbps"] ?? "") {
-                outbound["down_mbps"] = down
+            if let down = query["downmbps"] ?? query["down_mbps"] {
+                guard let value = Int(down), value >= 0 else { return nil }
+                outbound["down_mbps"] = value
             }
+            if let value = query["server_ports"] ?? query["ports"], !value.isEmpty {
+                outbound["server_ports"] = value.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            }
+            if let value = query["hop_interval"] ?? query["hop-interval"], !value.isEmpty { outbound["hop_interval"] = value }
+            if let value = query["hop_interval_max"] ?? query["hop-interval-max"], !value.isEmpty { outbound["hop_interval_max"] = value }
+            if let value = query["network"], !value.isEmpty { outbound["network"] = value }
+            if let value = query["bbr_profile"] ?? query["bbr-profile"], !value.isEmpty { outbound["bbr_profile"] = value }
+            if let raw = query["brutal_debug"] ?? query["brutal-debug"] { outbound["brutal_debug"] = ["1", "true", "yes"].contains(raw.lowercased()) }
+            if let raw = query["disable_chrome_parrot"] ?? query["disable-chrome-parrot"] { outbound["disable_chrome_parrot"] = ["1", "true", "yes"].contains(raw.lowercased()) }
             return outbound
         }
+
+        // Hysteria v1 URI requires bandwidth values. Do not fabricate 100 Mbps when absent.
+        guard let upRaw = query["upmbps"] ?? query["up_mbps"], let up = Int(upRaw), up > 0,
+              let downRaw = query["downmbps"] ?? query["down_mbps"], let down = Int(downRaw), down > 0
+        else { return nil }
 
         var outbound: [String: Any] = [
             "type": "hysteria",
             "tag": fragmentName,
             "server": host,
             "server_port": port,
-            "auth_str": auth,
-            "up_mbps": Int(query["upmbps"] ?? query["up_mbps"] ?? "") ?? 100,
-            "down_mbps": Int(query["downmbps"] ?? query["down_mbps"] ?? "") ?? 100,
+            "up_mbps": up,
+            "down_mbps": down,
             "tls": tls,
         ]
-        if let obfs = query["obfs"], !obfs.isEmpty {
-            outbound["obfs"] = obfs
+        if !auth.isEmpty { outbound["auth_str"] = auth }
+        if let obfs = query["obfs"], !obfs.isEmpty { outbound["obfs"] = obfs }
+        if let value = query["server_ports"], !value.isEmpty {
+            outbound["server_ports"] = value.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         }
+        if let value = query["hop_interval"] ?? query["hop-interval"], !value.isEmpty { outbound["hop_interval"] = value }
+        if let value = query["network"], !value.isEmpty { outbound["network"] = value }
         return outbound
     }
 
@@ -166,7 +207,7 @@ enum HysteriaOutboundFactory {
 
         let address = ((settings["address"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !address.isEmpty, !EndpointValidator.isBlockedLoopbackHost(address) else { return nil }
-        let port = intValue(settings["port"]) ?? 443
+        guard let port = intValue(settings["port"]), (1...65535).contains(port) else { return nil }
 
         let versionHint = intValue(settings["version"])
             ?? intValue(hy["version"])
@@ -179,104 +220,82 @@ enum HysteriaOutboundFactory {
             ?? stringValue(settings["auth"])
             ?? stringValue(settings["auth_str"])
             ?? stringValue(settings["password"])
-            ?? ""
-        guard !auth.isEmpty else { return nil }
 
         var obfsType: String?
         var obfsPassword: String?
+        var obfsMinPacketSize: Int?
+        var obfsMaxPacketSize: Int?
         if let finalmask = stream["finalmask"] as? [String: Any] {
             let udpList = (finalmask["udp"] as? [[String: Any]]) ?? []
             if let first = udpList.first {
                 obfsType = ((first["type"] as? String) ?? "").lowercased()
                 let obfsSettings = (first["settings"] as? [String: Any]) ?? [:]
                 obfsPassword = stringValue(obfsSettings["password"])
+                obfsMinPacketSize = intValue(obfsSettings["min_packet_size"])
+                obfsMaxPacketSize = intValue(obfsSettings["max_packet_size"])
             }
         }
-        if obfsPassword == nil || obfsPassword?.isEmpty == true {
-            obfsPassword = stringValue(hy["obfsPassword"])
-                ?? stringValue(hy["obfs_password"])
-                ?? stringValue(settings["obfsPassword"])
-            if obfsType == nil || obfsType?.isEmpty == true {
-                let rawObfs = stringValue(hy["obfs"]) ?? stringValue(settings["obfs"])
-                if let rawObfs, rawObfs.lowercased() == "salamander" {
-                    obfsType = "salamander"
-                } else if let rawObfs, obfsPassword == nil {
-                    obfsPassword = rawObfs
-                    obfsType = "salamander"
-                }
-            }
+        if obfsPassword == nil {
+            obfsPassword = stringValue(hy["obfsPassword"]) ?? stringValue(hy["obfs_password"]) ?? stringValue(settings["obfsPassword"])
         }
+        if obfsType == nil || obfsType?.isEmpty == true {
+            obfsType = stringValue(hy["obfs"])?.lowercased() ?? stringValue(settings["obfs"])?.lowercased()
+        }
+        obfsMinPacketSize = obfsMinPacketSize ?? intValue(hy["obfs_min_packet_size"]) ?? intValue(settings["obfs_min_packet_size"])
+        obfsMaxPacketSize = obfsMaxPacketSize ?? intValue(hy["obfs_max_packet_size"]) ?? intValue(settings["obfs_max_packet_size"])
 
-        if let typeName = obfsType, typeName == "gecko",
-           !VPNDirectCoreCapabilities.current.hysteria2Obfuscations.contains("gecko")
-        {
-            return nil
+        if let typeName = obfsType, !typeName.isEmpty {
+            if isV2 {
+                guard typeName == "salamander" || typeName == "gecko" else { return nil }
+                if typeName == "gecko", !VPNDirectCoreCapabilities.current.hysteria2Obfuscations.contains("gecko") { return nil }
+            }
         }
 
         let tlsSettings = (stream["tlsSettings"] as? [String: Any]) ?? [:]
         let realitySettings = (stream["realitySettings"] as? [String: Any]) ?? [:]
-        let sni = stringValue(tlsSettings["serverName"])
-            ?? stringValue(realitySettings["serverName"])
-            ?? address
-        var tls: [String: Any] = [
-            "enabled": true,
-            "server_name": sni,
-        ]
-        if let insecure = tlsSettings["allowInsecure"] as? Bool {
-            tls["insecure"] = insecure
-        }
-        // Hysteria uses QUIC — ignore Remnawave fingerprint / uTLS.
+        var tls: [String: Any] = ["enabled": true]
+        if let sni = stringValue(tlsSettings["serverName"]) ?? stringValue(realitySettings["serverName"]), !sni.isEmpty { tls["server_name"] = sni }
+        if let insecure = tlsSettings["allowInsecure"] as? Bool { tls["insecure"] = insecure }
         if let alpn = tlsSettings["alpn"] as? [String], !alpn.isEmpty {
             tls["alpn"] = alpn
         } else if let alpn = tlsSettings["alpn"] as? String, !alpn.isEmpty {
-            tls["alpn"] = alpn.split(separator: ",").map {
-                String($0).trimmingCharacters(in: .whitespaces)
-            }.filter { !$0.isEmpty }
-        } else if isV2 {
-            tls["alpn"] = ["h3"]
+            tls["alpn"] = alpn.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         }
 
         let tag = (xray["tag"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? fallbackTag
-
-        if isV2 {
-            var outbound: [String: Any] = [
-                "type": "hysteria2",
-                "tag": tag,
-                "server": address,
-                "server_port": port,
-                "password": auth,
-                "tls": tls,
-            ]
-            if let obfsPassword, !obfsPassword.isEmpty {
-                let typeName = (obfsType?.isEmpty == false) ? obfsType! : "salamander"
-                outbound["obfs"] = [
-                    "type": typeName,
-                    "password": obfsPassword,
-                ]
-            }
-            if let up = intValue(hy["up_mbps"]) ?? intValue(settings["up_mbps"]) {
-                outbound["up_mbps"] = up
-            }
-            if let down = intValue(hy["down_mbps"]) ?? intValue(settings["down_mbps"]) {
-                outbound["down_mbps"] = down
-            }
-            if outbound["up_mbps"] == nil { outbound["up_mbps"] = 100 }
-            if outbound["down_mbps"] == nil { outbound["down_mbps"] = 100 }
-            return outbound
-        }
-
         var outbound: [String: Any] = [
-            "type": "hysteria",
+            "type": isV2 ? "hysteria2" : "hysteria",
             "tag": tag,
             "server": address,
             "server_port": port,
-            "auth_str": auth,
-            "up_mbps": intValue(hy["up_mbps"]) ?? intValue(settings["up_mbps"]) ?? 100,
-            "down_mbps": intValue(hy["down_mbps"]) ?? intValue(settings["down_mbps"]) ?? 100,
             "tls": tls,
         ]
-        if let obfsPassword, !obfsPassword.isEmpty {
+        if let auth, !auth.isEmpty { outbound[isV2 ? "password" : "auth_str"] = auth }
+
+        if let up = intValue(hy["up_mbps"]) ?? intValue(settings["up_mbps"]) { outbound["up_mbps"] = up }
+        if let down = intValue(hy["down_mbps"]) ?? intValue(settings["down_mbps"]) { outbound["down_mbps"] = down }
+        if let ports = stringListValue(hy["server_ports"] ?? settings["server_ports"]), !ports.isEmpty { outbound["server_ports"] = ports }
+        if let value = stringValue(hy["hop_interval"] ?? settings["hop_interval"]) { outbound["hop_interval"] = value }
+        if isV2, let value = stringValue(hy["hop_interval_max"] ?? settings["hop_interval_max"]) { outbound["hop_interval_max"] = value }
+        if let value = stringValue(hy["network"] ?? settings["network"]) { outbound["network"] = value }
+
+        if isV2 {
+            if let typeName = obfsType, !typeName.isEmpty {
+                var object: [String: Any] = ["type": typeName]
+                if let obfsPassword, !obfsPassword.isEmpty { object["password"] = obfsPassword }
+                if typeName == "gecko" {
+                    if let obfsMinPacketSize { object["min_packet_size"] = obfsMinPacketSize }
+                    if let obfsMaxPacketSize { object["max_packet_size"] = obfsMaxPacketSize }
+                }
+                outbound["obfs"] = object
+            }
+            if let value = stringValue(hy["bbr_profile"] ?? settings["bbr_profile"]) { outbound["bbr_profile"] = value }
+            if let value = boolValue(hy["brutal_debug"] ?? settings["brutal_debug"]) { outbound["brutal_debug"] = value }
+            if let value = boolValue(hy["disable_chrome_parrot"] ?? settings["disable_chrome_parrot"]) { outbound["disable_chrome_parrot"] = value }
+        } else if let obfsPassword, !obfsPassword.isEmpty {
             outbound["obfs"] = obfsPassword
+        } else if let obfsType, !obfsType.isEmpty {
+            outbound["obfs"] = obfsType
         }
         return outbound
     }
@@ -285,8 +304,19 @@ enum HysteriaOutboundFactory {
         if let value = raw as? Int { return value }
         if let value = raw as? Double { return Int(value) }
         if let value = raw as? NSNumber { return value.intValue }
+        if let value = raw as? String { return Int(value.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        return nil
+    }
+
+    private static func boolValue(_ raw: Any?) -> Bool? {
+        if let value = raw as? Bool { return value }
+        if let value = raw as? NSNumber { return value.boolValue }
         if let value = raw as? String {
-            return Int(value.trimmingCharacters(in: .whitespacesAndNewlines))
+            switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "1", "true", "yes", "on": return true
+            case "0", "false", "no", "off": return false
+            default: return nil
+            }
         }
         return nil
     }
@@ -296,8 +326,66 @@ enum HysteriaOutboundFactory {
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
         }
-        if let value = raw as? NSNumber {
-            return value.stringValue
+        if let value = raw as? NSNumber { return value.stringValue }
+        return nil
+    }
+
+    private static func stringListValue(_ raw: Any?) -> [String]? {
+        if let values = raw as? [String] { return values.filter { !$0.isEmpty } }
+        if let values = raw as? [Any] {
+            let mapped = values.compactMap(stringValue)
+            return mapped.isEmpty ? nil : mapped
+        }
+        if let value = stringValue(raw) {
+            let mapped = value.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            return mapped.isEmpty ? nil : mapped
+        }
+        return nil
+    }
+
+    /// Happ / Clash-meta sometimes encode salamander via `fm={"udp":[{"type":"salamander","settings":{"password":"…"}}]}`.
+    private static func extractFMJSON(from link: String) -> String? {
+        let lower = link.lowercased()
+        guard let range = lower.range(of: "fm=") else { return nil }
+        let from = link[range.upperBound...]
+        guard let start = from.firstIndex(of: "{") else { return nil }
+        var depth = 0
+        var end = start
+        for idx in from[start...].indices {
+            let ch = from[idx]
+            if ch == "{" { depth += 1 }
+            if ch == "}" {
+                depth -= 1
+                if depth == 0 {
+                    end = idx
+                    break
+                }
+            }
+        }
+        guard depth == 0 else { return nil }
+        return String(from[start...end])
+    }
+
+    private static func parseHysteria2FMObfs(from raw: String?) -> [String: Any]? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let decoded = raw.removingPercentEncoding ?? raw
+        guard let data = decoded.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        let udp = obj["udp"] as? [[String: Any]] ?? []
+        let tcp = obj["tcp"] as? [[String: Any]] ?? []
+        for entry in udp + tcp {
+            let typeName = ((entry["type"] as? String) ?? "").lowercased()
+            guard typeName == "salamander" || typeName == "gecko" else { continue }
+            if typeName == "gecko", !VPNDirectCoreCapabilities.current.hysteria2Obfuscations.contains("gecko") {
+                continue
+            }
+            var object: [String: Any] = ["type": typeName]
+            let settings = (entry["settings"] as? [String: Any]) ?? [:]
+            if let password = stringValue(settings["password"]) {
+                object["password"] = password
+            }
+            return object
         }
         return nil
     }

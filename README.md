@@ -73,7 +73,7 @@ The Core remains intentionally close to upstream sing-box. Custom functionality 
 
 ## Current Core status
 
-Latest published: v1.0.9 · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
+Latest published: v1.0.10 · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
 
 A feature is not **production / `tested`** merely because a builder exists. Production requires:
 
@@ -199,16 +199,15 @@ vpn-direct-app/
 | Document | Purpose |
 | --- | --- |
 | [Compatibility & Providers](docs/compatibility/README.md) | Panel / subscription / protocol knowledge base |
-| [Architecture](docs/core/ARCHITECTURE.md) | Core design and Apple integration |
-| [Current Architecture](docs/core/CURRENT_ARCHITECTURE.md) | Current repository architecture |
+| [Architecture](docs/core/ARCHITECTURE.md) | Core design and Apple import pipeline |
 | [Build Guide](docs/core/BUILDING.md) | Reproduce Libbox and Apple builds |
 | [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) | What is parsed, compiled, tested and production-ready |
-| [Production Audit](docs/core/PRODUCTION_READINESS_AUDIT.md) | Honest readiness vs code |
+| [Release Blocker Ledger](docs/core/RELEASE_BLOCKER_LEDGER.md) | Open vs verified release blockers |
 | [Roadmap](ROADMAP.md) | Public product roadmap |
-| [What's New](WHATS_NEW.md) | Latest release notes |
+| [What's New](WHATS_NEW.md) | Latest release notes (`v1.0.10`) |
+| [Changelog](CHANGELOG.md) | Full version history |
 | [Donors](docs/core/DONORS.md) | Upstream and donor source tracking |
 | [License Audit](docs/core/LICENSE_AUDIT.md) | Dependency/license engineering notes |
-| [Mieru Status](docs/core/MIERU_DEFERRED.md) | Mieru integration status |
 | [iPhone Qualification](docs/device/IPHONE_QUALIFICATION.md) | Device evidence checklist |
 
 ## Public identifiers

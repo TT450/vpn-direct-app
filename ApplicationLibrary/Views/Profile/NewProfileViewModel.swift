@@ -54,21 +54,22 @@ public final class NewProfileViewModel: BaseViewModel {
         defer { isSaving = false }
 
         let isVLESS = VLESSConfigBuilder.isVLESSLink(remotePath)
+        let isShareLink = SubscriptionConfigBuilder.isShareLinkContent(remotePath)
         let isSubscriptionURL = SubscriptionConfigBuilder.isHTTPURL(remotePath)
 
-        if (isVLESS || isSubscriptionURL), profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if (isVLESS || isShareLink || isSubscriptionURL), profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             // Name is filled from the link / host during parse.
         } else if profileName.isEmpty {
             alert = AlertState(errorMessage: String(localized: "Missing profile name"))
             return
         }
 
-        if !isVLESS, !isSubscriptionURL, profileType == .icloud, remotePath.isEmpty {
+        if !isVLESS, !isShareLink, !isSubscriptionURL, profileType == .icloud, remotePath.isEmpty {
             alert = AlertState(errorMessage: String(localized: "Missing path"))
             return
         }
 
-        if !isVLESS, !isSubscriptionURL, profileType == .remote, remotePath.isEmpty {
+        if !isVLESS, !isShareLink, !isSubscriptionURL, profileType == .remote, remotePath.isEmpty {
             alert = AlertState(errorMessage: String(localized: "Missing URL"))
             return
         }
@@ -135,6 +136,33 @@ public final class NewProfileViewModel: BaseViewModel {
             )
             try await ProfileManager.create(profile)
             return profile
+        } else if SubscriptionConfigBuilder.isShareLinkContent(remotePath) {
+            let links = SubscriptionConfigBuilder.decodeShareLinks(remotePath)
+            let built = try SubscriptionConfigBuilder.buildConfig(from: links)
+            var resolvedName = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if resolvedName.isEmpty {
+                resolvedName = built.name
+                    ?? SubscriptionConfigBuilder.suggestedName(forShareContent: remotePath)
+            }
+            let profileConfigDirectory = FilePath.sharedDirectory.appendingPathComponent("configs", isDirectory: true)
+            let profileConfig = profileConfigDirectory.appendingPathComponent("config_\(nextProfileID).json")
+            try await BlockingIO.run {
+                try FileManager.default.createDirectory(at: profileConfigDirectory, withIntermediateDirectories: true)
+                try built.json.write(to: profileConfig, atomically: true, encoding: .utf8)
+            }
+            savePath = profileConfig.relativePath
+            let uniqueProfileName = try await ProfileManager.uniqueName(resolvedName.isEmpty ? "Share link" : resolvedName)
+            let profile = Profile(
+                name: uniqueProfileName,
+                type: .local,
+                path: savePath,
+                remoteURL: nil,
+                autoUpdate: false,
+                autoUpdateInterval: autoUpdateInterval,
+                lastUpdated: nil
+            )
+            try await ProfileManager.create(profile)
+            return profile
         } else if SubscriptionConfigBuilder.isHTTPURL(remotePath) || profileType == .remote {
             let sourceURL = remotePath
             let normalized = try await SubscriptionConfigBuilder.fetchAndNormalize(url: sourceURL)
@@ -187,7 +215,14 @@ public final class NewProfileViewModel: BaseViewModel {
                     try fileURL.withRequiredSecurityScopedAccess(
                         or: NSError(domain: "NewProfileViewModel", code: 0, userInfo: [NSLocalizedDescriptionKey: String(localized: "Missing access to selected file")])
                     ) {
-                        try String(contentsOf: fileURL).write(to: profileConfig, atomically: true, encoding: .utf8)
+                        let raw = try String(contentsOf: fileURL, encoding: .utf8)
+                        // Prefer VPN Direct normalize (.ovpn / OpenConnect / Tailscale / share JSON).
+                        // Fall back to raw write only for opaque Libbox profile JSON that already validates.
+                        if let normalized = try? SubscriptionConfigBuilder.normalizeRemoteContent(raw) {
+                            try normalized.json.write(to: profileConfig, atomically: true, encoding: .utf8)
+                        } else {
+                            try raw.write(to: profileConfig, atomically: true, encoding: .utf8)
+                        }
                     }
                 } else {
                     try "{}".write(to: profileConfig, atomically: true, encoding: .utf8)

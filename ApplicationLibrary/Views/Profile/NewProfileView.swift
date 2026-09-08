@@ -2,6 +2,7 @@ import Foundation
 import Libbox
 import Library
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 public struct NewProfileView: View {
@@ -63,15 +64,15 @@ public struct NewProfileView: View {
                     #endif
                 }
             } footer: {
-                Text("Paste a vless:// share link or an https:// subscription URL.")
+                Text("Paste a vless:// / vmess:// / trojan:// share link or an https:// subscription URL.")
             }
 
             Section {
                 FormItem(String(localized: "Name")) {
-                    TextField("Name", text: $viewModel.profileName, prompt: Text((VLESSConfigBuilder.isVLESSLink(viewModel.remotePath) || SubscriptionConfigBuilder.isHTTPURL(viewModel.remotePath)) ? "Optional" : "Required"))
+                    TextField("Name", text: $viewModel.profileName, prompt: Text((VLESSConfigBuilder.isVLESSLink(viewModel.remotePath) || SubscriptionConfigBuilder.isShareLinkContent(viewModel.remotePath) || SubscriptionConfigBuilder.isHTTPURL(viewModel.remotePath)) ? "Optional" : "Required"))
                         .multilineTextAlignment(.trailing)
                 }
-                if !VLESSConfigBuilder.isVLESSLink(viewModel.remotePath), !SubscriptionConfigBuilder.isHTTPURL(viewModel.remotePath) {
+                if !VLESSConfigBuilder.isVLESSLink(viewModel.remotePath), !SubscriptionConfigBuilder.isShareLinkContent(viewModel.remotePath), !SubscriptionConfigBuilder.isHTTPURL(viewModel.remotePath) {
                 Picker(selection: $viewModel.profileType) {
                     Text("Local").tag(ProfileType.local)
                     #if !os(tvOS)
@@ -133,7 +134,7 @@ public struct NewProfileView: View {
                 }
                 } // end non-VLESS
             } footer: {
-                if !VLESSConfigBuilder.isVLESSLink(viewModel.remotePath), !SubscriptionConfigBuilder.isHTTPURL(viewModel.remotePath), viewModel.profileType == .icloud {
+                if !VLESSConfigBuilder.isVLESSLink(viewModel.remotePath), !SubscriptionConfigBuilder.isShareLinkContent(viewModel.remotePath), !SubscriptionConfigBuilder.isHTTPURL(viewModel.remotePath), viewModel.profileType == .icloud {
                     let fileName = viewModel.remotePath.isEmpty ? String(localized: "FileName") : viewModel.remotePath
                     Text("File will be located at iCloud Drive/sing-box/\(fileName)")
                 }
@@ -199,7 +200,7 @@ public struct NewProfileView: View {
             .alert($viewModel.alert)
             .fileImporter(
                 isPresented: $viewModel.pickerPresented,
-                allowedContentTypes: [.json],
+                allowedContentTypes: VPNDirectImportContentTypes.localConfig,
                 allowsMultipleSelection: false
             ) { result in
                 do {
@@ -225,10 +226,13 @@ public struct NewProfileView: View {
                     }
                 }
                 .task {
-                    // QR / deep-link import: create immediately for vless:// and https:// subscriptions.
+                    // QR / deep-link import: create immediately for share links and https:// subscriptions.
                     guard viewModel.isImport, !viewModel.isSaving, !viewModel.createSucceeded else { return }
                     let path = viewModel.remotePath
-                    guard VLESSConfigBuilder.isVLESSLink(path) || SubscriptionConfigBuilder.isHTTPURL(path) else { return }
+                    guard VLESSConfigBuilder.isVLESSLink(path)
+                        || SubscriptionConfigBuilder.isShareLinkContent(path)
+                        || SubscriptionConfigBuilder.isHTTPURL(path)
+                    else { return }
                     viewModel.isSaving = true
                     await viewModel.createProfile(
                         environments: environments,
@@ -239,7 +243,7 @@ public struct NewProfileView: View {
             #if os(iOS)
                 .fileImporter(
                     isPresented: $viewModel.pickerPresented,
-                    allowedContentTypes: [.json],
+                    allowedContentTypes: VPNDirectImportContentTypes.localConfig,
                     allowsMultipleSelection: false
                 ) { result in
                     do {

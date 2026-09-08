@@ -50,6 +50,29 @@ public enum SubscriptionConfigBuilder {
         return trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")
     }
 
+    /// True when content contains at least one supported share-link scheme (vmess/trojan/…, not only vless).
+    public static func isShareLinkContent(_ raw: String) -> Bool {
+        !decodeShareLinks(raw).isEmpty
+    }
+
+    public static func suggestedName(forShareContent raw: String) -> String {
+        let links = decodeShareLinks(raw)
+        let parsed = VPNDirectParserRegistry.parseShareLinks(links)
+        if let name = parsed.nodes.first?.name.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            return name
+        }
+        return "Share link"
+    }
+
+    private static let shareLinkSchemePrefixes: [String] = [
+        "vless://", "vmess://", "ss://", "ssr://", "trojan://",
+        "hysteria://", "hysteria2://", "hy2://", "tuic://", "anytls://",
+        "wireguard://", "wg://", "awg://",
+        "socks://", "socks5://", "socks4://", "ssh://",
+        "http-proxy://", "https-proxy://", "shadowtls://",
+        "naive://", "naive+https://", "naive+quic://",
+    ]
+
     public static func suggestedName(for urlString: String, headers: [String: String] = [:]) -> String {
         resolveSubscriptionName(urlString: urlString, headers: headers, contentName: nil)
     }
@@ -247,6 +270,30 @@ public enum SubscriptionConfigBuilder {
             let meta = SubscriptionMetadata.parse(headers: headers, body: detection.text)
             return Result(name: graph.firstName ?? "Mieru", json: graph.json, nodeCount: graph.leafCount, metadata: meta)
 
+        case .openVPNConfig:
+            let subscription = try OpenVPNConfigAdapter.parse(detection.text)
+            let graph = try SingBoxGraphBuilder.build(from: subscription)
+            let meta = SubscriptionMetadata.parse(headers: headers, body: detection.text)
+            return Result(name: graph.firstName ?? "OpenVPN", json: graph.json, nodeCount: graph.leafCount, metadata: meta)
+
+        case .openConnectConfig:
+            let subscription = try OpenConnectConfigAdapter.parse(detection.text)
+            let graph = try SingBoxGraphBuilder.build(from: subscription)
+            let meta = SubscriptionMetadata.parse(headers: headers, body: detection.text)
+            return Result(name: graph.firstName ?? "OpenConnect", json: graph.json, nodeCount: graph.leafCount, metadata: meta)
+
+        case .tailscaleJSON:
+            let subscription = try TailscaleConfigAdapter.parse(detection.text)
+            let graph = try SingBoxGraphBuilder.build(from: subscription)
+            let meta = SubscriptionMetadata.parse(headers: headers, body: detection.text)
+            return Result(name: graph.firstName ?? "Tailscale", json: graph.json, nodeCount: graph.leafCount, metadata: meta)
+
+        case .masqueConnectUDPJSON:
+            let subscription = try MasqueConnectUDPAdapter.parse(detection.text)
+            let graph = try SingBoxGraphBuilder.build(from: subscription)
+            let meta = SubscriptionMetadata.parse(headers: headers, body: detection.text)
+            return Result(name: graph.firstName ?? "MASQUE CONNECT-UDP", json: graph.json, nodeCount: graph.leafCount, metadata: meta)
+
         case .uriList, .base64URIList:
             let links = extractLinks(from: detection.text)
             if links.isEmpty {
@@ -275,7 +322,8 @@ public enum SubscriptionConfigBuilder {
     }
 
     public static func decodeShareLinks(_ content: String) -> [String] {
-        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = VPNDirectContentDetector.normalizeImportMarkup(content)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         if let decoded = decodeBase64IfNeeded(trimmed) {
             return extractLinks(from: decoded)
         }
@@ -423,7 +471,14 @@ public enum SubscriptionConfigBuilder {
         text
             .components(separatedBy: CharacterSet.newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
             .flatMap { line -> [String] in
+                let lower = line.lowercased()
+                // Fragments often contain spaces / emoji (`#CA 🇨🇦 | @user`). Never whitespace-split
+                // a line that already starts with a known share scheme.
+                if shareLinkSchemePrefixes.contains(where: { lower.hasPrefix($0) }) {
+                    return [line]
+                }
                 if line.contains("://") {
                     return line.split(whereSeparator: { $0.isWhitespace }).map(String.init)
                 }
@@ -431,28 +486,7 @@ public enum SubscriptionConfigBuilder {
             }
             .filter { link in
                 let lower = link.lowercased()
-                return lower.hasPrefix("vless://")
-                    || lower.hasPrefix("vmess://")
-                    || lower.hasPrefix("ss://")
-                    || lower.hasPrefix("trojan://")
-                    || lower.hasPrefix("hysteria://")
-                    || lower.hasPrefix("hysteria2://")
-                    || lower.hasPrefix("hy2://")
-                    || lower.hasPrefix("tuic://")
-                    || lower.hasPrefix("anytls://")
-                    || lower.hasPrefix("wireguard://")
-                    || lower.hasPrefix("wg://")
-                    || lower.hasPrefix("awg://")
-                    || lower.hasPrefix("socks://")
-                    || lower.hasPrefix("socks5://")
-                    || lower.hasPrefix("socks4://")
-                    || lower.hasPrefix("ssh://")
-                    || lower.hasPrefix("http-proxy://")
-                    || lower.hasPrefix("https-proxy://")
-                    || lower.hasPrefix("shadowtls://")
-                    || lower.hasPrefix("naive://")
-                    || lower.hasPrefix("naive+https://")
-                    || lower.hasPrefix("naive+quic://")
+                return shareLinkSchemePrefixes.contains(where: { lower.hasPrefix($0) })
             }
     }
 

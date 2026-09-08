@@ -2,6 +2,17 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.10] — 2026-09-08
+
+### Tunnel import + CONNECT-UDP
+
+- OpenVPN `.ovpn` / OpenConnect / Tailscale endpoint JSON import (File + paste → graph `endpoints`)
+- MASQUE CONNECT-UDP (RFC 9298) Core outbound `masque-connect-udp` + Swift adapter/capability
+- Darwin `build_libbox`: re-enable `with_tailscale` (+ omit tags); CONNECT-UDP needs Libbox rebuild for capability flip
+- Public harvest: ML-KEM samples (barry-far); Code-Leafy configs still 404
+- Docs: architecture/matrix/compatibility refreshed; removed stale Core 0.1 audit/plan drafts
+- Tests: `TunnelEndpointImportTests`
+
 ## [1.0.9] — 2026-09-07
 
 ### Production remediation release

@@ -223,7 +223,9 @@ public enum VPNDirectSubscriptionHTTPClassifier {
             return .clash
         case .base64URIList:
             return .xrayBase64
-        case .uriList, .wireGuardConf, .mieruJSON, .recognizedUnsupported, .unknown:
+        case .uriList, .wireGuardConf, .mieruJSON,
+             .openVPNConfig, .openConnectConfig, .tailscaleJSON, .masqueConnectUDPJSON,
+             .recognizedUnsupported, .unknown:
             return .unknown
         }
     }

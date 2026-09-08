@@ -42,7 +42,7 @@ SING_BOX_REV=${DESC}
 UPSTREAM_VERSION=${UPSTREAM}
 GO_VERSION=${GOV}
 BUILD_PROFILE=vpn_direct_ios
-BUILD_TAGS=with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_naive_outbound,with_clash_api,with_xhttp,with_awg,with_lx_idle_suspend
+BUILD_TAGS=with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_naive_outbound,with_shadowsocksr,with_clash_api,with_xhttp,with_awg,with_lx_idle_suspend
 STOCK_LIBBOX_BACKUP=Libbox.xcframework.stock
 EOF
 

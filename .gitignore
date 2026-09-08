@@ -37,3 +37,6 @@ tests/VPNDirectParserPackage/.build/
 
 # Local agent ship logs / meta
 .ship_*
+
+.build/
+.build/**

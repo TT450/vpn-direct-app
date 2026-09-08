@@ -28,7 +28,10 @@ public enum AutoSubscriptionImporter {
 
     public static func importIfNeeded(url: String, environments: ExtensionEnvironments) async throws -> Profile? {
         let normalized = normalizeImportURL(url)
-        guard VLESSConfigBuilder.isVLESSLink(normalized) || SubscriptionConfigBuilder.isHTTPURL(normalized) else {
+        guard VLESSConfigBuilder.isVLESSLink(normalized)
+            || SubscriptionConfigBuilder.isShareLinkContent(normalized)
+            || SubscriptionConfigBuilder.isHTTPURL(normalized)
+        else {
             return nil
         }
 

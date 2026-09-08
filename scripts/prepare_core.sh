@@ -116,6 +116,10 @@ verify_core_overlays() {
     option/mieru.go \
     protocol/mieru/outbound.go \
     protocol/mieru/inbound.go \
+    include/shadowsocksr.go \
+    option/masque_connect_udp.go \
+    protocol/masque_connect_udp/outbound.go \
+    transport/masque/connect_udp.go \
     option/v2ray_xhttp.go \
     option/wireguard_awg.go
   do
@@ -130,6 +134,14 @@ verify_core_overlays() {
   fi
   if ! grep -q 'registerMieruOutbound' "${CORE}/include/registry.go" 2>/dev/null; then
     echo "MISSING registerMieruOutbound in include/registry.go" >&2
+    missing=1
+  fi
+  if ! grep -q 'TypeMASQUEConnectUDP' "${CORE}/constant/proxy.go" 2>/dev/null; then
+    echo "MISSING TypeMASQUEConnectUDP in constant/proxy.go" >&2
+    missing=1
+  fi
+  if ! grep -q 'registerShadowsocksROutbound' "${CORE}/include/registry.go" 2>/dev/null; then
+    echo "MISSING registerShadowsocksROutbound in include/registry.go" >&2
     missing=1
   fi
   if ! grep -q 'github.com/enfein/mieru/v3' "${CORE}/go.mod" 2>/dev/null; then
@@ -155,7 +167,7 @@ verify_core_overlays() {
     echo "prepare_core verify FAILED" >&2
     exit 1
   fi
-  echo "prepare_core verify OK (mieru/xhttp/awg overlays present)"
+  echo "prepare_core verify OK (mieru/connect-udp/ssr/xhttp/awg overlays present)"
 }
 
 if [[ ! -d "${CORE}" ]]; then

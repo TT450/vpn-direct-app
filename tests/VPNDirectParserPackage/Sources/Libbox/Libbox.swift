@@ -20,6 +20,6 @@ public func LibboxVPNDirectHysteria2ObfuscationsCSV() -> String { "salamander,ge
 public func LibboxVPNDirectSupportsXHTTP() -> Bool { true }
 public func LibboxVPNDirectSupportsAWG() -> Bool { true }
 public func LibboxVPNDirectSupportsMASQUEConnectIP() -> Bool { true }
-public func LibboxVPNDirectSupportsMASQUEConnectUDP() -> Bool { false }
+public func LibboxVPNDirectSupportsMASQUEConnectUDP() -> Bool { true }
 public func LibboxVPNDirectSupportsVLESSEncryption() -> Bool { true }
 public func LibboxVPNDirectSupportsMieru() -> Bool { true }

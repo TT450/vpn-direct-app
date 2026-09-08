@@ -53,12 +53,29 @@ final class DetectorAndShareLinkTests: XCTestCase {
         _ = try ParserTestSupport.singBoxCheck(data, label: "mieru")
     }
 
-    func testSSRDoesNotClassifyAsURIList() {
-        let text = "ssr://YWFhYmJiY2NjZGRkZWVlZg"
-        let detection = VPNDirectContentDetector.detect(text: text)
-        // SSR is recognized as intentionally unsupported — never misclassified as URI list.
-        XCTAssertEqual(detection.kind, .recognizedUnsupported)
-        XCTAssertEqual(detection.unsupportedProtocolID, "ssr")
+    func testSSRParsesAsURIListAndBuildsOutbound() throws {
+        let link =
+            "ssr://bGl2ZS5iaWxpYmlsaWNsb3VkMDEuY29tOjU0MTEyOmF1dGhfYWVzMTI4X3NoYTE6Y2hhY2hhMjAtaWV0ZjpwbGFpbjpUWFkwWlRCUlNGZFFkMlJpUzJsRFJnPT0vP29iZnNwYXJhbT0mcmVtYXJrcz04SiUyQkhyZkNmaDdCSVN5MHhPQzR4TmpZdU1UVTBMakk0TFRBeU16YyUzRCZwcm90b3BhcmFtPQ==#JP"
+        let detection = VPNDirectContentDetector.detect(text: link)
+        XCTAssertEqual(detection.kind, .uriList)
+
+        let node = try ShadowsocksRShareLinkParser().parseShareLink(link)
+        XCTAssertEqual(node.protocolID, .shadowsocksr)
+        XCTAssertEqual(node.server, "live.bilibilicloud01.com")
+        XCTAssertEqual(node.port, 54112)
+        XCTAssertEqual(node.attributes["method"], "chacha20-ietf")
+        XCTAssertEqual(node.attributes["protocol"], "auth_aes128_sha1")
+        XCTAssertEqual(node.attributes["obfs"], "plain")
+        XCTAssertEqual(node.attributes["password"], "Mv4e0QHWPwdbKiCF")
+
+        let outbound = try UniversalOutboundBuilder.build(from: node)
+        XCTAssertEqual(outbound["type"] as? String, "shadowsocksr")
+        XCTAssertEqual(outbound["method"] as? String, "chacha20-ietf")
+        XCTAssertEqual(outbound["protocol"] as? String, "auth_aes128_sha1")
+        XCTAssertEqual(outbound["obfs"] as? String, "plain")
+        XCTAssertEqual(outbound["password"] as? String, "Mv4e0QHWPwdbKiCF")
+        // Full `sing-box check` requires a Libbox/binary rebuilt with `with_shadowsocksr`.
+        _ = try ParserTestSupport.wrapOutbound(outbound)
     }
 
     func testBase64URIListFromPanel() throws {

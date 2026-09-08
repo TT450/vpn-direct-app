@@ -1,6 +1,6 @@
 # Protocol matrix — VPN Direct Core 0.1
 
-Last docs sync: **2026-09-07** (app release **v1.0.8**). Status legend: `planned` | `parser` | `runtime` | `parser+runtime` | `qualification_ready` | `tested` | `deferred` | `out_of_scope`
+Last docs sync: **2026-09-08** (app release **v1.0.8**). Status legend: `planned` | `parser` | `runtime` | `parser+runtime` | `qualification_ready` | `tested` | `deferred` | `out_of_scope`
 
 ## Support definition (`tested`)
 
@@ -40,6 +40,7 @@ Panel / format compatibility (URI × Xray × Clash × fixtures) lives in [`docs/
 | VMess | current | * | * | — | yes | yes | yes | planned | parser+runtime | sing-box |
 | Trojan | current | * | * | — | yes | yes | yes | planned | parser+runtime | sing-box |
 | Shadowsocks / 2022 | current | — | — | — | yes | yes | yes | planned | parser+runtime | sing-box |
+| ShadowsocksR | classic | — | — | protocol/obfs | yes | yes (`with_shadowsocksr`) | yes | planned | parser+runtime | sing-box-lx restored |
 | Hysteria / Hysteria2 | current | quic | tls | salamander/gecko* | yes | yes* | yes | planned | parser+runtime | sing-box / TheTochka harvest |
 | TUIC | v5 | quic | tls | — | yes | yes | yes | planned | parser+runtime | sing-box |
 | AnyTLS | current | — | — | — | yes | yes | yes | planned | parser+runtime | sing-box |
@@ -48,12 +49,12 @@ Panel / format compatibility (URI × Xray × Clash × fixtures) lives in [`docs/
 | WireGuard | current | udp | — | — | yes | yes | yes | planned | parser+runtime | sing-box |
 | AmneziaWG | 2 / 3.0 / 3.1 | udp | — | AWG fields | yes | yes | yes | planned | parser+runtime | sing-box-lx |
 | MASQUE | CONNECT-IP | h3/h2 | tls | — | yes | yes | yes | planned | parser+runtime | sing-box-lx |
-| MASQUE | CONNECT-UDP | — | — | — | — | no | — | — | out_of_scope | — |
+| MASQUE | CONNECT-UDP | h3 | tls | JSON import | yes | yes | yes (rebuild) | planned | parser+runtime | RFC 9298 `masque-connect-udp` |
 | WARP | via MASQUE | h3/h2 | pin | — | yes | yes | yes | planned | parser+runtime | sing-box-lx |
 | Mieru | TCP/UDP/LE | — | — | low entropy | yes | yes (`with_mieru`) | yes | planned | parser+runtime | mbox |
 | SSH/SOCKS/HTTP | current | — | — | — | yes | yes | yes | planned | parser+runtime | sing-box |
-| Tailscale | — | — | — | — | — | no (ios profile) | — | — | out_of_scope | — |
-| OpenVPN / OpenConnect | — | — | — | — | — | no (ios profile) | — | — | out_of_scope | — |
+| Tailscale | endpoint | — | — | auth_key JSON | yes | yes (rebuild `with_tailscale`) | yes | planned | parser+runtime | sing-box |
+| OpenVPN / OpenConnect | endpoint | — | — | .ovpn / XML / JSON | yes | yes | yes | planned | parser+runtime | sing-box |
 
 \* Update rows when `core/VERSION` and real device tests change.
 
@@ -63,4 +64,4 @@ Panel / format compatibility (URI × Xray × Clash × fixtures) lives in [`docs/
 
 Machine-readable: [`core/protocol-matrix.json`](../../core/protocol-matrix.json).
 
-See also: [`MIERU_DEFERRED.md`](MIERU_DEFERRED.md), [`PANIC_BOUNDARY.md`](PANIC_BOUNDARY.md), [`REMOTES.md`](REMOTES.md), [`BUILDING.md`](BUILDING.md), [`docs/device/IPHONE_QUALIFICATION.md`](../device/IPHONE_QUALIFICATION.md).
+See also: [`PANIC_BOUNDARY.md`](PANIC_BOUNDARY.md), [`REMOTES.md`](REMOTES.md), [`BUILDING.md`](BUILDING.md), [`docs/device/IPHONE_QUALIFICATION.md`](../device/IPHONE_QUALIFICATION.md).

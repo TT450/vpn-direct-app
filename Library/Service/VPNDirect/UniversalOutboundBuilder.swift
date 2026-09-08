@@ -52,6 +52,8 @@ public enum UniversalOutboundBuilder {
             return try buildTrojan(node)
         case .shadowsocks:
             return try buildShadowsocks(node)
+        case .shadowsocksr:
+            return try buildShadowsocksR(node)
         case .hysteria, .hysteria2:
             // Production builder must emit from normalized attributes, never re-parse `source`.
             guard let built = HysteriaOutboundFactory.fromAttributes(node) else {
@@ -64,6 +66,16 @@ public enum UniversalOutboundBuilder {
             return try buildAnyTLS(node)
         case .wireguard, .amneziawg:
             return try buildWireGuard(node)
+        case .openvpn, .openconnect, .tailscale, .masqueConnectUDP:
+            if let existing = node.outbound, !existing.isEmpty {
+                var copy = existing
+                if copy["tag"] == nil { copy["tag"] = node.name }
+                return copy
+            }
+            throw VPNDirectCoreError.malformedConfig(
+                component: node.protocolID.rawValue,
+                detail: "Missing prebuilt endpoint/outbound for \(node.protocolID.rawValue)"
+            )
         case .socks:
             return try buildSOCKS(node)
         case .http:
@@ -173,11 +185,20 @@ public enum UniversalOutboundBuilder {
             "enabled": true,
             "server_name": attr(node, "sni") ?? attr(node, "peer") ?? defaultSNI,
         ]
-        if attr(node, "insecure") == "1" || attr(node, "allowInsecure") == "1" {
+        if attr(node, "insecure") == "1" || attr(node, "allowInsecure") == "1"
+            || attr(node, "allowinsecure") == "1" || attr(node, "allow_insecure") == "1"
+            || boolAttr(node, "insecure") || boolAttr(node, "allowinsecure")
+        {
             tls["insecure"] = true
         }
         if let alpn = attr(node, "alpn") {
             tls["alpn"] = alpn.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        }
+        if let suites = attr(node, "cipher_suites") ?? attr(node, "cs"), !suites.isEmpty {
+            tls["cipher_suites"] = suites
+                .split(whereSeparator: { $0 == ":" || $0 == "," })
+                .map { String($0).trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
         }
         if let fp = attr(node, "fp"), !fp.isEmpty {
             tls["utls"] = ["enabled": true, "fingerprint": fp]
@@ -352,13 +373,19 @@ public enum UniversalOutboundBuilder {
         guard let uuid = node.uuid ?? attr(node, "id") ?? attr(node, "uuid"), !uuid.isEmpty else {
             throw VPNDirectCoreError.malformedConfig(component: "vmess", detail: "Missing id")
         }
+        // AEAD cipher: scy / encryption. Never reuse TLS `security=` (none|tls|reality) as cipher.
+        let cipherCandidates = [attr(node, "scy"), attr(node, "encryption")]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let tlsModes: Set<String> = ["none", "tls", "reality", ""]
+        let cipher = cipherCandidates.first { !tlsModes.contains($0.lowercased()) } ?? "auto"
         var outbound: [String: Any] = [
             "type": "vmess",
             "tag": node.name,
             "server": node.server,
             "server_port": node.port,
             "uuid": uuid,
-            "security": attr(node, "scy") ?? attr(node, "security") ?? "auto",
+            "security": cipher,
         ]
         if let alterId = attr(node, "aid").flatMap(Int.init) {
             outbound["alter_id"] = alterId
@@ -372,8 +399,8 @@ public enum UniversalOutboundBuilder {
         if let pe = attr(node, "packet_encoding") {
             outbound["packet_encoding"] = pe
         }
-        let tlsMode = attr(node, "tls") ?? ""
-        if tlsMode == "tls" || node.security == .tls || node.security == .reality {
+        let tlsMode = (attr(node, "tls") ?? attr(node, "security") ?? node.security?.rawValue ?? "").lowercased()
+        if tlsMode == "tls" || tlsMode == "reality" || node.security == .tls || node.security == .reality {
             if let tls = tlsObject(from: node, defaultSNI: node.server) {
                 outbound["tls"] = tls
             } else {
@@ -396,13 +423,47 @@ public enum UniversalOutboundBuilder {
             "server_port": node.port,
             "password": password,
         ]
-        if let tls = tlsObject(from: node, defaultSNI: node.server) {
-            outbound["tls"] = tls
-        } else {
-            outbound["tls"] = ["enabled": true, "server_name": attr(node, "sni") ?? node.server]
+        let tlsMode = (attr(node, "security") ?? node.security?.rawValue ?? "tls").lowercased()
+        if tlsMode == "tls" || tlsMode == "reality" || node.security == .tls || node.security == .reality || tlsMode.isEmpty {
+            if let tls = tlsObject(from: node, defaultSNI: node.server) {
+                outbound["tls"] = tls
+            } else {
+                outbound["tls"] = ["enabled": true, "server_name": attr(node, "sni") ?? node.server]
+            }
+            if let fp = attr(node, "fp") ?? attr(node, "fingerprint"), !fp.isEmpty {
+                var tls = (outbound["tls"] as? [String: Any]) ?? ["enabled": true]
+                tls["utls"] = ["enabled": true, "fingerprint": fp]
+                outbound["tls"] = tls
+            }
         }
         if let transport = try transportObject(from: node) { outbound["transport"] = transport }
         applyMultiplexAndTLSFragment(from: node, into: &outbound)
+        return outbound
+    }
+
+    private static func buildShadowsocksR(_ node: NormalizedNode) throws -> [String: Any] {
+        guard let method = attr(node, "method") ?? attr(node, "cipher"), !method.isEmpty else {
+            throw VPNDirectCoreError.malformedConfig(component: "shadowsocksr", detail: "Missing method")
+        }
+        guard let password = attr(node, "password"), !password.isEmpty else {
+            throw VPNDirectCoreError.malformedConfig(component: "shadowsocksr", detail: "Missing password")
+        }
+        var outbound: [String: Any] = [
+            "type": "shadowsocksr",
+            "tag": node.name,
+            "server": node.server,
+            "server_port": node.port,
+            "method": method,
+            "password": password,
+            "protocol": attr(node, "protocol") ?? "origin",
+            "obfs": attr(node, "obfs") ?? "plain",
+        ]
+        if let protoParam = attr(node, "protocol_param") ?? attr(node, "protoparam"), !protoParam.isEmpty {
+            outbound["protocol_param"] = protoParam
+        }
+        if let obfsParam = attr(node, "obfs_param") ?? attr(node, "obfsparam"), !obfsParam.isEmpty {
+            outbound["obfs_param"] = obfsParam
+        }
         return outbound
     }
 
@@ -460,7 +521,12 @@ public enum UniversalOutboundBuilder {
             "enabled": true,
             "server_name": attr(node, "sni") ?? node.server,
         ]
-        if boolAttr(node, "insecure") { tls["insecure"] = true }
+        if boolAttr(node, "insecure")
+            || boolAttr(node, "allow_insecure")
+            || boolAttr(node, "allowinsecure")
+        {
+            tls["insecure"] = true
+        }
         if let alpn = attr(node, "alpn") {
             tls["alpn"] = alpn.split(separator: ",").map(String.init)
         }
@@ -489,9 +555,15 @@ public enum UniversalOutboundBuilder {
         ]
         var tls: [String: Any] = [
             "enabled": true,
-            "server_name": attr(node, "sni") ?? node.server,
         ]
-        if attr(node, "insecure") == "1" { tls["insecure"] = true }
+        if boolAttr(node, "disable_sni") || boolAttr(node, "disablesni") {
+            tls["disable_sni"] = true
+        } else {
+            tls["server_name"] = attr(node, "sni") ?? node.server
+        }
+        if boolAttr(node, "insecure") || boolAttr(node, "allowinsecure") || boolAttr(node, "allow_insecure") {
+            tls["insecure"] = true
+        }
         outbound["tls"] = tls
         return outbound
     }

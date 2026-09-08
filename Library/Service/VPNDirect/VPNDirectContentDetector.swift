@@ -7,6 +7,10 @@ public enum VPNDirectContentKind: String, Equatable, Sendable {
     case clashYAML
     case wireGuardConf
     case mieruJSON
+    case openVPNConfig
+    case openConnectConfig
+    case tailscaleJSON
+    case masqueConnectUDPJSON
     case uriList
     case base64URIList
     /// Recognized protocol/format that VPN Direct intentionally does not import.
@@ -49,38 +53,16 @@ public enum VPNDirectContentDetector {
 
     public static func detect(text: String) -> Detection {
         let strippedBOM = text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text
+        let normalized = normalizeImportMarkup(strippedBOM)
 
         // Strip leading subscription comment / Hiddify-style metadata lines before structural JSON.
-        let (cleanedBody, _) = stripLeadingMetadataComments(from: strippedBOM)
+        let (cleanedBody, _) = stripLeadingMetadataComments(from: normalized)
         let leading = cleanedBody.drop(while: { $0.isNewline || $0 == " " || $0 == "\t" })
         let bodyForJSON = String(leading)
 
-        if let unsupported = recognizeUnsupported(strippedBOM) {
-            return Detection(
-                kind: .recognizedUnsupported,
-                text: strippedBOM,
-                unsupportedProtocolID: unsupported
-            )
-        }
-
-        if let kind = classifyJSON(bodyForJSON) {
-            // Prefer cleaned body for parsers when metadata prefix was present.
-            let payload = cleanedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? strippedBOM
-                : cleanedBody
-            return Detection(kind: kind, text: payload)
-        }
-
-        if looksLikeClashYAML(strippedBOM) {
-            return Detection(kind: .clashYAML, text: strippedBOM)
-        }
-        if looksLikeWireGuardConf(strippedBOM) {
-            return Detection(kind: .wireGuardConf, text: strippedBOM)
-        }
-
-        let compact = strippedBOM.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Share-link lists (including mixed ssr:// + supported schemes).
+        let compact = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
         if let decoded = decodeBase64Payload(compact) {
-            // Re-detect decoded payload structurally — even without share schemes (JSON/YAML/conf).
             let nested = detect(text: decoded)
             if nested.kind != .unknown, nested.kind != .uriList, nested.kind != .base64URIList {
                 return Detection(
@@ -94,10 +76,49 @@ public enum VPNDirectContentDetector {
                 return Detection(kind: .base64URIList, text: decoded, wasBase64Decoded: true)
             }
         }
-        if containsShareScheme(strippedBOM) {
-            return Detection(kind: .uriList, text: strippedBOM)
+        if containsShareScheme(normalized) {
+            return Detection(kind: .uriList, text: normalized)
         }
-        return Detection(kind: .unknown, text: strippedBOM)
+
+        if looksLikeOpenVPN(normalized) {
+            return Detection(kind: .openVPNConfig, text: normalized)
+        }
+        if looksLikeOpenConnect(normalized) {
+            return Detection(kind: .openConnectConfig, text: normalized)
+        }
+
+        if let kind = classifyJSON(bodyForJSON) {
+            let payload = cleanedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? normalized
+                : cleanedBody
+            return Detection(kind: kind, text: payload)
+        }
+
+        if looksLikeClashYAML(normalized) {
+            return Detection(kind: .clashYAML, text: normalized)
+        }
+        if looksLikeWireGuardConf(normalized) {
+            return Detection(kind: .wireGuardConf, text: normalized)
+        }
+
+        if let unsupported = recognizeUnsupported(normalized) {
+            return Detection(
+                kind: .recognizedUnsupported,
+                text: normalized,
+                unsupportedProtocolID: unsupported
+            )
+        }
+
+        return Detection(kind: .unknown, text: normalized)
+    }
+
+    /// Telegram / web pastes often glue links with HTML breaks.
+    public static func normalizeImportMarkup(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "<br/>", with: "\n", options: .caseInsensitive)
+            .replacingOccurrences(of: "<br />", with: "\n", options: .caseInsensitive)
+            .replacingOccurrences(of: "<br>", with: "\n", options: .caseInsensitive)
+            .replacingOccurrences(of: "&amp;", with: "&", options: .caseInsensitive)
     }
 
     // MARK: - Structural JSON
@@ -116,6 +137,18 @@ public enum VPNDirectContentDetector {
 
         if looksLikeMieruObject(dict) {
             return .mieruJSON
+        }
+        if looksLikeTailscaleObject(dict) {
+            return .tailscaleJSON
+        }
+        if looksLikeMasqueConnectUDPObject(dict) {
+            return .masqueConnectUDPJSON
+        }
+        if looksLikeOpenConnectObject(dict) {
+            return .openConnectConfig
+        }
+        if looksLikeOpenVPNObject(dict) {
+            return .openVPNConfig
         }
         if looksLikeSingBoxObject(dict) {
             return .singBoxJSON
@@ -209,27 +242,74 @@ public enum VPNDirectContentDetector {
     }
 
     private static func recognizeUnsupported(_ text: String) -> String? {
+        // Reserved for formats that remain intentionally rejected.
+        _ = text
+        return nil
+    }
+
+    private static func looksLikeOpenVPN(_ text: String) -> Bool {
         let lower = text.lowercased()
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasPrefix("client") && lower.contains("dev") && lower.contains("proto") {
-            return "openvpn"
+        if trimmed.hasPrefix("{") { return false }
+        if trimmed.lowercased().hasPrefix("client"), lower.contains("dev"), lower.contains("proto") {
+            return true
         }
-        if lower.contains("-----begin certificate-----") && lower.contains("remote ") && lower.contains("proto ") {
-            return "openvpn"
+        if lower.contains("remote "), lower.contains("proto ") {
+            if lower.contains("-----begin certificate-----") || lower.contains("<ca>") || lower.contains("tls-client") {
+                return true
+            }
         }
-        if lower.contains("<openconnect") || lower.contains("anyconnect") && lower.contains("servercert") {
-            return "openconnect"
+        return false
+    }
+
+    private static func looksLikeOpenConnect(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("{") { return false }
+        if lower.contains("<openconnect") { return true }
+        if lower.contains("anyconnect"), lower.contains("servercert") { return true }
+        if lower.contains("<serverlist>"), lower.contains("<host>") { return true }
+        return false
+    }
+
+    private static func looksLikeTailscaleObject(_ dict: [String: Any]) -> Bool {
+        if let type = dict["type"] as? String, type.lowercased() == "tailscale" { return true }
+        if let endpoints = dict["endpoints"] as? [[String: Any]],
+           endpoints.contains(where: { ($0["type"] as? String)?.lowercased() == "tailscale" }),
+           dict["outbounds"] == nil, dict["inbounds"] == nil
+        {
+            return true
         }
-        if lower.contains("\"tailscale\"") && lower.contains("\"control_url\"") {
-            return "tailscale"
+        if dict["auth_key"] != nil, dict["control_url"] != nil, dict["outbounds"] == nil {
+            return true
         }
-        if lower.contains("connect-udp") || lower.contains("\"protocol\"") && lower.contains("connect-udp") {
-            return "masque_connect_udp"
+        return false
+    }
+
+    private static func looksLikeMasqueConnectUDPObject(_ dict: [String: Any]) -> Bool {
+        if let type = dict["type"] as? String {
+            let t = type.lowercased()
+            if t == "masque-connect-udp" { return true }
+            if t == "masque" {
+                let mode = (dict["mode"] as? String)?.lowercased() ?? ""
+                let proto = (dict["protocol"] as? String)?.lowercased() ?? ""
+                return mode == "connect-udp" || proto == "connect-udp"
+            }
         }
-        if lower.contains("ssr://") {
-            return "ssr"
+        if let outs = dict["outbounds"] as? [[String: Any]],
+           outs.contains(where: { looksLikeMasqueConnectUDPObject($0) }),
+           dict["inbounds"] == nil
+        {
+            return true
         }
-        return nil
+        return false
+    }
+
+    private static func looksLikeOpenConnectObject(_ dict: [String: Any]) -> Bool {
+        (dict["type"] as? String)?.lowercased() == "openconnect"
+    }
+
+    private static func looksLikeOpenVPNObject(_ dict: [String: Any]) -> Bool {
+        (dict["type"] as? String)?.lowercased() == "openvpn-client"
     }
 
     private static func looksLikeClashYAML(_ text: String) -> Bool {
@@ -250,7 +330,7 @@ public enum VPNDirectContentDetector {
     private static func containsShareScheme(_ text: String) -> Bool {
         let lower = text.lowercased()
         let schemes = [
-            "vless://", "vmess://", "trojan://", "ss://",
+            "vless://", "vmess://", "trojan://", "ss://", "ssr://",
             "hysteria://", "hysteria2://", "hy2://", "tuic://", "anytls://",
             "wireguard://", "wg://", "awg://", "socks://", "socks5://", "socks4://",
             "ssh://", "shadowtls://",

@@ -15,9 +15,11 @@ Per-protocol compatibility notes. Unknown connection-critical fields must fail c
 | Naive | [naive.md](naive.md) | parser+runtime |
 | WireGuard | [wireguard.md](wireguard.md) | parser+runtime |
 | AmneziaWG | [amneziawg.md](amneziawg.md) | parser+runtime |
-| MASQUE | [masque.md](masque.md) | parser+runtime (CONNECT-IP) |
+| MASQUE | [masque.md](masque.md) | parser+runtime (CONNECT-IP + CONNECT-UDP) |
 | WARP | [warp.md](warp.md) | parser+runtime |
 | Mieru | [mieru.md](mieru.md) | parser+runtime |
+| OpenVPN / OpenConnect | [openvpn-openconnect.md](openvpn-openconnect.md) | parser+runtime |
+| Tailscale | [tailscale.md](tailscale.md) | parser+runtime |
 | SOCKS | [socks.md](socks.md) | parser+runtime |
 | HTTP proxy | [http-proxy.md](http-proxy.md) | parser+runtime |
 | SSH | [ssh.md](ssh.md) | parser+runtime |

@@ -6,14 +6,12 @@ VPN Direct compatibility knowledge base — **source of truth** for panels, subs
 
 | Doc | Purpose |
 | --- | --- |
-| [COMPATIBILITY_AUDIT.md](COMPATIBILITY_AUDIT.md) | Current DONE / PARTIAL / MISSING / BROKEN / UNPROVEN |
-| [COMPATIBILITY_IMPLEMENTATION_PLAN.md](COMPATIBILITY_IMPLEMENTATION_PLAN.md) | Dependency-aware milestones |
 | [ECOSYSTEMS.md](ECOSYSTEMS.md) | Ecosystem map (Xray, sing-box, WG/AWG, MASQUE, Mieru, …) |
 | [COMPATIBILITY_MATRIX.md](COMPATIBILITY_MATRIX.md) | Protocol × format × panel status |
 | [SUBSCRIPTION_HTTP.md](SUBSCRIPTION_HTTP.md) | Client↔panel HTTP contract |
 | [PANEL_VERSION_MATRIX.md](PANEL_VERSION_MATRIX.md) | Pinned upstream versions |
 | [panels/](panels/) | Per-panel dossiers |
-| [protocols/](protocols/) | Per-protocol dossiers |
+| [protocols/](protocols/) | Per-protocol dossiers (incl. OpenVPN, Tailscale, MASQUE CONNECT-UDP) |
 | Machine-readable | [`core/panel-compatibility.json`](../../core/panel-compatibility.json) |
 
-Golden donor behavior: [TheTochka harvest](../core/THETOCHKA_COMPATIBILITY_HARVEST.md) — behavior only, not architecture to copy.
+Authoritative Core protocol status: [`docs/core/PROTOCOL_MATRIX.md`](../core/PROTOCOL_MATRIX.md). Remnawave/Happ topology behaviors are implemented in the production graph builder (not a separate harvest doc).

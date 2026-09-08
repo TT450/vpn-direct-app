@@ -1,1 +1,1 @@
-/Users/elshan/Direct VPN Client/Library/Service/VPNDirect/VPNDirectSubscriptionHTTPClassifier.swift
+../../../../Library/Service/VPNDirect/VPNDirectSubscriptionHTTPClassifier.swift

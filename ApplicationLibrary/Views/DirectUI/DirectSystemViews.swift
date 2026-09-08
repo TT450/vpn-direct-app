@@ -776,7 +776,10 @@ struct DirectNewConfigurationView: View {
 
     private func syncTypeFromLink() {
         let link = viewModel.remotePath.trimmingCharacters(in: .whitespacesAndNewlines)
-        if VLESSConfigBuilder.isVLESSLink(link) || SubscriptionConfigBuilder.isHTTPURL(link) {
+        if VLESSConfigBuilder.isVLESSLink(link)
+            || SubscriptionConfigBuilder.isShareLinkContent(link)
+            || SubscriptionConfigBuilder.isHTTPURL(link)
+        {
             typeLabel = "Удалённый"
             viewModel.profileType = .remote
         }
@@ -792,11 +795,12 @@ struct DirectNewConfigurationView: View {
         }
 
         if !VLESSConfigBuilder.isVLESSLink(link),
+           !SubscriptionConfigBuilder.isShareLinkContent(link),
            !SubscriptionConfigBuilder.isHTTPURL(link),
            viewModel.profileType == .remote
         {
             resultOK = false
-            resultMessage = "Нужна ссылка vless:// или https:// подписки"
+            resultMessage = "Нужна ссылка vless://, vmess://, trojan:// или https:// подписки"
             HapticManager.shared.play(.error)
             return
         }

@@ -64,7 +64,12 @@
       "protocol": "masque",
       "variant": "connect-udp",
       "fields": [
-        {"path": "*", "connection_critical": true, "status": "EXPLICITLY_UNSUPPORTED", "builder": "ContentDetector.recognizedUnsupported", "tests": []}
+        {"path": "type", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "MasqueConnectUDPAdapter", "tests": ["TunnelEndpointImportTests"]},
+        {"path": "server", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "MasqueConnectUDPAdapter", "tests": []},
+        {"path": "server_port", "connection_critical": true, "status": "SUPPORTED_AND_EMITTED", "builder": "MasqueConnectUDPAdapter", "tests": []},
+        {"path": "uri", "connection_critical": false, "status": "SUPPORTED_AND_EMITTED", "builder": "MasqueConnectUDPAdapter", "tests": []},
+        {"path": "vhttp", "connection_critical": false, "status": "SUPPORTED_AND_EMITTED", "builder": "MasqueConnectUDPAdapter", "tests": []},
+        {"path": "tls", "connection_critical": false, "status": "SUPPORTED_PASSTHROUGH", "builder": "MasqueConnectUDPAdapter", "tests": []}
       ]
     }
   ]

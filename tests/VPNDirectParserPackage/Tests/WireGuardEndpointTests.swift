@@ -104,4 +104,27 @@ final class WireGuardEndpointTests: XCTestCase {
         ]
         XCTAssertThrowsError(try ParserTestSupport.wrapOutbound(legacy))
     }
+
+    func testShareLinkPublicKeyAliasReservedAndHiddifyNoise() throws {
+        // Shape mirrors free-pool WARP / Hiddify dumps (publickey + reserved + wnoise*).
+        let link = """
+        wireguard://AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=@203.0.113.10:500?\
+        address=172.16.0.2/32&reserved=1,2,3&\
+        publickey=bmXOC%2BF1FxEMF9dyiK2H5%2F1SUtzH0JuVo51h2wPfgyo%3D&\
+        mtu=1280&keepalive=5&wnoise=random&wnoisecount=5&wnoisedelay=2-5&wpayloadsize=5-10#pool-wg
+        """.replacingOccurrences(of: "\n", with: "")
+        let node = try WireGuardShareLinkParser().parseShareLink(link)
+        XCTAssertEqual(node.protocolID, .amneziawg)
+        let options = try XCTUnwrap(node.wireguardEndpoint)
+        XCTAssertEqual(options.jc, 5)
+        XCTAssertEqual(options.jmin, 5)
+        XCTAssertEqual(options.jmax, 10)
+        XCTAssertEqual(options.peers.first?.reserved, [1, 2, 3])
+        let leaf = try UniversalOutboundBuilder.build(from: node)
+        let peers = try XCTUnwrap(leaf["peers"] as? [[String: Any]])
+        XCTAssertEqual(peers.first?["reserved"] as? [Int], [1, 2, 3])
+        XCTAssertEqual(leaf["jc"] as? Int, 5)
+        let data = try ParserTestSupport.wrapOutbound(leaf)
+        _ = try ParserTestSupport.singBoxCheck(data, label: "wg-share-noise")
+    }
 }

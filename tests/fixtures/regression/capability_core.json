@@ -10,7 +10,7 @@
   "awg": true,
   "awgVersions": ["1", "2", "3.0", "3.1"],
   "masqueConnectIP": true,
-  "masqueConnectUDP": false,
+  "masqueConnectUDP": true,
   "vlessEncryption": true,
   "mieru": false,
   "hysteria2Obfuscations": ["salamander", "gecko"],

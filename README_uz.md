@@ -54,7 +54,7 @@ Subscription / Config → Content Detector → Universal Parser / Adapters
 
 ## Hozirgi Core holati
 
-**So‘nggi reliz:** [`v1.0.6`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.6)
+**So‘nggi reliz:** [`v1.0.10`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.10)
 
 Builder/parser borligi — hali `tested` / production emas. Holat: [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md).
 
@@ -91,7 +91,7 @@ Scheme’lar: iOS `SFI`, macOS `SFM` / `SFM.System`, tvOS `SFT`. Batafsil: [`doc
 
 ## Hujjatlar
 
-[Docs index](docs/README.md) · [Architecture](docs/core/ARCHITECTURE.md) · [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) · [Production Audit](docs/core/PRODUCTION_READINESS_AUDIT.md) · [Roadmap](ROADMAP.md) · [What's New](WHATS_NEW.md) · [Support](SUPPORT.md)
+[Docs index](docs/README.md) · [Architecture](docs/core/ARCHITECTURE.md) · [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) · [Release ledger](docs/core/RELEASE_BLOCKER_LEDGER.md) · [Roadmap](ROADMAP.md) · [What's New](WHATS_NEW.md) · [Support](SUPPORT.md)
 
 ## Litsenziya
 

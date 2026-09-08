@@ -54,7 +54,7 @@ Subscription / Config → Content Detector → Universal Parser / Adapters
 
 ## 当前 Core 状态
 
-**最新发布：** [`v1.0.6`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.6)
+**最新发布：** [`v1.0.10`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.10)
 
 仅有 builder / parser **不等于** `tested` / production。权威状态见 [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md)。
 
@@ -94,7 +94,7 @@ Scheme：iOS `SFI`，macOS `SFM` / `SFM.System`，tvOS `SFT`。详见 [`docs/cor
 
 ## 文档
 
-[文档索引](docs/README.md) · [架构](docs/core/ARCHITECTURE.md) · [协议矩阵](docs/core/PROTOCOL_MATRIX.md) · [生产就绪审计](docs/core/PRODUCTION_READINESS_AUDIT.md) · [Roadmap](ROADMAP.md) · [What's New](WHATS_NEW.md) · [Support](SUPPORT.md)
+[文档索引](docs/README.md) · [架构](docs/core/ARCHITECTURE.md) · [协议矩阵](docs/core/PROTOCOL_MATRIX.md) · [发布阻塞项](docs/core/RELEASE_BLOCKER_LEDGER.md) · [Roadmap](ROADMAP.md) · [What's New](WHATS_NEW.md) · [Support](SUPPORT.md)
 
 ## 许可证
 

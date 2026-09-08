@@ -352,6 +352,13 @@ public struct VPNHomeView: View {
             importRequest = NewProfileView.ImportRequest(name: name, url: trimmed)
             return
         }
+        if SubscriptionConfigBuilder.isShareLinkContent(trimmed) {
+            importRequest = NewProfileView.ImportRequest(
+                name: SubscriptionConfigBuilder.suggestedName(forShareContent: trimmed),
+                url: trimmed
+            )
+            return
+        }
         if SubscriptionConfigBuilder.isHTTPURL(trimmed) {
             importRequest = NewProfileView.ImportRequest(
                 name: SubscriptionConfigBuilder.suggestedName(for: trimmed),
@@ -366,7 +373,7 @@ public struct VPNHomeView: View {
             return
         }
         guard let remoteProfile else {
-            model.alert = AlertState(errorMessage: String(localized: "Нужна ссылка vless:// или https:// подписки."))
+            model.alert = AlertState(errorMessage: String(localized: "Нужна ссылка vless://, vmess://, trojan:// или https:// подписки."))
             return
         }
         importRequest = NewProfileView.ImportRequest(name: remoteProfile.name, url: remoteProfile.url)

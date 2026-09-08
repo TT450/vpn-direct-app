@@ -1,0 +1,128 @@
+--- a/constant/proxy.go
++++ b/constant/proxy.go
+@@ -28,6 +28,7 @@
+ 	TypeTUIC               = "tuic"
+ 	TypeHysteria2          = "hysteria2"
+ 	TypeMASQUE             = "masque"
++	TypeMASQUEConnectUDP   = "masque-connect-udp"
+ 	TypeOpenConnect        = "openconnect"
+ 	TypeOpenVPNClient      = "openvpn-client"
+ 	TypeOpenVPNServer      = "openvpn-server"
+@@ -127,6 +128,8 @@
+ 		return "Hysteria2"
+ 	case TypeMASQUE:
+ 		return "MASQUE"
++	case TypeMASQUEConnectUDP:
++		return "MASQUE CONNECT-UDP"
+ 	case TypeAnyTLS:
+ 		return "AnyTLS"
+ 	case TypeMieru: // vpndirect mieru
+--- a/include/quic.go
++++ b/include/quic.go
+@@ -11,6 +11,7 @@
+ 	"github.com/sagernet/sing-box/protocol/hysteria"
+ 	"github.com/sagernet/sing-box/protocol/hysteria2"
+ 	"github.com/sagernet/sing-box/protocol/masque"
++	masqueconnectudp "github.com/sagernet/sing-box/protocol/masque_connect_udp"
+ 	_ "github.com/sagernet/sing-box/protocol/naive/quic"
+ 	"github.com/sagernet/sing-box/protocol/tuic"
+ 	_ "github.com/sagernet/sing-box/transport/v2rayquic"
+@@ -27,6 +28,7 @@
+ 	tuic.RegisterOutbound(registry)
+ 	hysteria2.RegisterOutbound(registry)
+ 	masque.RegisterOutbound(registry)
++	masqueconnectudp.RegisterOutbound(registry)
+ }
+ 
+ func registerQUICTransports(registry *dns.TransportRegistry) {
+--- a/include/registry.go
++++ b/include/registry.go
+@@ -103,6 +103,7 @@
+ 	trojan.RegisterOutbound(registry)
+ 	registerNaiveOutbound(registry)
+ 	registerMieruOutbound(registry) // vpndirect mieru
++	registerShadowsocksROutbound(registry)
+ 	tor.RegisterOutbound(registry)
+ 	ssh.RegisterOutbound(registry)
+ 	shadowtls.RegisterOutbound(registry)
+@@ -185,9 +186,6 @@
+ }
+ 
+ func registerStubForRemovedOutbounds(registry *outbound.Registry) {
+-	outbound.Register[option.ShadowsocksROutboundOptions](registry, C.TypeShadowsocksR, func(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.ShadowsocksROutboundOptions) (adapter.Outbound, error) {
+-		return nil, E.New("ShadowsocksR is deprecated and removed in sing-box 1.6.0")
+-	})
+ 	outbound.Register[option.StubOptions](registry, C.TypeWireGuard, func(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.StubOptions) (adapter.Outbound, error) {
+ 		return nil, E.New("WireGuard outbound is deprecated in sing-box 1.11.0 and removed in sing-box 1.13.0, use WireGuard endpoint instead")
+ 	})
+--- a/Makefile.lx
++++ b/Makefile.lx
+@@ -41,7 +41,7 @@
+ # with_lxd alone and the subcommand does not exist, while the command extensions
+ # still answer. The Android AAR carries with_lx_command and never had the daemon
+ # (gomobile builds experimental/libbox, which does not import lxd/).
+-LX_TAGS ?= with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_clash_api,with_naive_outbound,with_purego,badlinkname,tfogo_checklinkname0,with_xhttp,with_awg,with_lx_command,with_lxd,with_openvpn,with_openconnect,with_lx_chain,with_tailscale
++LX_TAGS ?= with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_clash_api,with_naive_outbound,with_shadowsocksr,with_purego,badlinkname,tfogo_checklinkname0,with_xhttp,with_awg,with_lx_command,with_lxd,with_openvpn,with_openconnect,with_lx_chain,with_tailscale
+ 
+ # lx build counter over a given upstream base (override in CI/release: make -f Makefile.lx lx-build LX_BUILD=3).
+ LX_BUILD ?= 1
+--- a/cmd/internal/build_libbox/main.go
++++ b/cmd/internal/build_libbox/main.go
+@@ -72,7 +72,7 @@
+ 	// Clash REST API is dead weight on the client. Without the tag a config referencing
+ 	// experimental.clash_api fails fast with "clash api is not included in this build,
+ 	// rebuild with -tags with_clash_api" (no silent fallback). lx configs won't.
+-	sharedTags = append(sharedTags, "with_gvisor", "with_quic", "with_wireguard", "with_utls", "with_naive_outbound", "badlinkname", "tfogo_checklinkname0")
++	sharedTags = append(sharedTags, "with_gvisor", "with_quic", "with_wireguard", "with_utls", "with_naive_outbound", "with_shadowsocksr", "with_mieru", "badlinkname", "tfogo_checklinkname0")
+ 	// lx:begin awg,xhttp
+ 	// Promote the two downstream features into the Android AAR. They flow into both
+ 	// the main (SDK23) and legacy (SDK21) variants, since legacy derives from
+@@ -117,14 +117,14 @@
+ 	sharedTags = append(sharedTags, "with_openvpn", "with_openconnect")
+ 	// lx:end openvpn
+ 	darwinTags = append(darwinTags, "with_dhcp", "grpcnotrace")
+-	// memcTags = append(memcTags, "with_tailscale")
+-	// lx:begin no-tailscale
+-	// Drop Tailscale from the libbox AAR: the client fork has no tailscale endpoints,
+-	// and tailscale is the single largest dependency by size in the APK. Keeps the AAR
+-	// aligned with the desktop LX_TAGS set (Makefile.lx). The ts_omit_* tags only trim
+-	// with_tailscale, so they go with it. Restore the upstream append below to re-enable.
+-	// sharedTags = append(sharedTags, "with_tailscale", "ts_omit_logtail", "ts_omit_ssh", "ts_omit_drive", "ts_omit_taildrop", "ts_omit_webclient", "ts_omit_doctor", "ts_omit_capture", "ts_omit_kube", "ts_omit_aws", "ts_omit_synology", "ts_omit_bird")
+-	// lx:end no-tailscale
++	// Tailscale endpoint support (owner request): auth_key / control_url JSON import.
++	// Size cost is accepted for feature completeness; ts_omit_* trims unused Tailscale surface.
++	sharedTags = append(sharedTags,
++		"with_tailscale",
++		"ts_omit_logtail", "ts_omit_ssh", "ts_omit_drive", "ts_omit_taildrop",
++		"ts_omit_webclient", "ts_omit_doctor", "ts_omit_capture", "ts_omit_kube",
++		"ts_omit_aws", "ts_omit_synology", "ts_omit_bird",
++	)
+ 	notMemcTags = append(notMemcTags, "with_low_memory")
+ 	debugTags = append(debugTags, "debug")
+ }
+--- a/experimental/libbox/ffi.json
++++ b/experimental/libbox/ffi.json
+@@ -28,6 +28,7 @@
+           "with_wireguard",
+           "with_utls",
+           "with_naive_outbound",
++          "with_shadowsocksr",
+           "with_clash_api",
+           "badlinkname",
+           "tfogo_checklinkname0",
+@@ -87,6 +88,7 @@
+           "with_wireguard",
+           "with_utls",
+           "with_naive_outbound",
++          "with_shadowsocksr",
+           "with_clash_api",
+           "badlinkname",
+           "tfogo_checklinkname0",
+@@ -129,6 +131,7 @@
+           "with_wireguard",
+           "with_utls",
+           "with_naive_outbound",
++          "with_shadowsocksr",
+           "with_purego",
+           "with_clash_api",
+           "badlinkname",

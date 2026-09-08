@@ -1,0 +1,1 @@
+trojan://pool-pass@203.0.113.70:443?allowInsecure=1&sni=cdn.example.com&ws=1&wspath=%2Fimages&cs=TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384#trojan-pool

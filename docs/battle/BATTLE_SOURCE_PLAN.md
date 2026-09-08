@@ -48,28 +48,28 @@ Legend for strategy columns: `public` = intentional free pools; `lab` = `interop
 | vless-ws | public+lab | type=ws | protocols/xray | |
 | vless-grpc | public+lab | type=grpc | protocols/xray | |
 | vless-httpupgrade | public+lab | rare in pools | protocols/xray | lab-first if pool empty |
-| vless-xhttp | lab-first | rare | protocols/xray | capability-gated |
+| vless-xhttp | public+lab | anonymouskeys transport/xhttp | protocols/xray | dedicated XHTTP slice |
 | vless-xhttp-reality | lab-first | rare | protocols/xray | |
-| vless-encryption-pq | lab-first | rare | protocols/xray | mlkem string |
+| vless-encryption-pq | lab-first | remnawave templates / generators | protocols/xray | mlkem string; live URI still rare |
 | vmess | public+lab | pools | protocols/xray | |
 | trojan | public+lab | pools | protocols/xray | |
 | shadowsocks | public+lab | pools | protocols/xray | |
-| shadowsocks-2022 | public+lab | method 2022-* | protocols/xray | |
+| shadowsocks-2022 | public+lab | kasesm ss_raw + Au1rxx | protocols/xray | method 2022-* |
 | hysteria | public+lab | rare | protocols/hysteria | hy1 |
 | hysteria2 | public+lab | hy2 pools | protocols/hysteria | |
 | hy2-salamander | lab-first | obfs | protocols/hysteria | |
 | hy2-gecko | lab-first | capability | protocols/hysteria | |
 | tuic-v5 | public+lab | tuic pools | protocols/tuic | |
-| anytls | public+lab | 0xRadikal anytls | protocols/anytls | |
+| anytls | public+lab | 0xRadikal anytls + snakem982 Clash (+ xyfqzy historically) | protocols/anytls | `disable_sni` → TLS; counts volatile |
 | shadowtls | lab-first | rare | protocols/shadowtls | chain → SS |
 | naive | lab-first | rare | protocols/naive | |
-| wireguard | public+lab | WG bundles + WARP conf | protocols/wireguard | |
-| amneziawg-2 | lab | — | protocols/amneziawg | controlled fields |
-| amneziawg-3.0 | lab | — | protocols/amneziawg | |
+| wireguard | public+lab | WG bundles + WARP + Au1rxx sing-box | protocols/wireguard | `publickey`/`reserved`/`wnoise*` |
+| amneziawg-2 | public+lab | Delta-Kronecker AmneziaWG.zip | protocols/amneziawg | verify field set = v2 |
+| amneziawg-3.0 | lab | — | protocols/amneziawg | confirm in ZIP before claiming |
 | amneziawg-3.1 | lab | — | protocols/amneziawg | |
-| masque-connect-ip | lab | — | protocols/masque | |
-| warp-masque | public parser + external live | Delta-Kronecker WARP-Config | protocols/masque | identity via env |
-| mieru-tcp | lab | — | protocols/mieru | |
+| masque-connect-ip | public managed | Cloudflare WARP / sing-box-lx profile | protocols/masque | own server not required |
+| warp-masque | public parser + managed live | Delta-Kronecker + Cloudflare | protocols/masque | identity via env |
+| mieru-tcp | public+lab | snakem982 (claimed; may be empty) | protocols/mieru | lab fallback if feed empty |
 | mieru-udp | lab | — | protocols/mieru | |
 | mieru-le-32 | lab | — | protocols/mieru | |
 | mieru-le-40 | lab | — | protocols/mieru | |
@@ -82,7 +82,7 @@ Legend for strategy columns: `public` = intentional free pools; `lab` = `interop
 | masque-connect-udp | oos | — | — | |
 | tailscale | oos | — | — | |
 | openvpn | oos | — | — | |
-| ssr | oos | — | — | detect/reject only |
+| ssr | public+lab | 0xRadikal shadowsocksr | protocols/shadowsocks | Core tag `with_shadowsocksr` |
 
 ## Tooling map
 

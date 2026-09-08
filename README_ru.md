@@ -72,7 +72,7 @@ Core намеренно близок к upstream sing-box. Кастомные в
 
 ## Текущий статус Core
 
-**Последний релиз:** [`v1.0.6`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.6) · pin Core: [`core/VERSION`](core/VERSION).
+**Последний релиз:** [`v1.0.10`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.10) · pin Core: [`core/VERSION`](core/VERSION).
 
 Фича не считается **production / `tested`** только из‑за builder. Нужен полный путь:
 
@@ -193,10 +193,9 @@ vpn-direct-app/
 | [Architecture](docs/core/ARCHITECTURE.md) | Дизайн Core и Apple-интеграция |
 | [Build Guide](docs/core/BUILDING.md) | Воспроизведение Libbox и Apple-сборок |
 | [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) | Что парсится, компилируется, тестируется |
-| [Production Audit](docs/core/PRODUCTION_READINESS_AUDIT.md) | Честный статус по реальному коду |
+| [Release Blocker Ledger](docs/core/RELEASE_BLOCKER_LEDGER.md) | Блокеры релиза |
 | [Roadmap](ROADMAP.md) | Публичный roadmap |
-| [What's New](WHATS_NEW.md) | Релизные заметки последнего тега |
-| [Mieru Status](docs/core/MIERU_DEFERRED.md) | Статус Mieru |
+| [What's New](WHATS_NEW.md) | Релизные заметки последнего тега (`v1.0.10`) |
 | [iPhone Qualification](docs/device/IPHONE_QUALIFICATION.md) | Чеклист device evidence |
 
 ## Публичные идентификаторы

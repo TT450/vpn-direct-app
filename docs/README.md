@@ -1,26 +1,39 @@
 # VPN Direct Documentation
 
-Engineering docs map (keep in sync with the GitHub README quick links: App Store · Architecture · Protocol Matrix · Build · Contribute).
+Engineering docs map for **v1.0.10**. Keep in sync with the GitHub README quick links.
+
+## Start here
 
 | Document | Use it for |
 | --- | --- |
-| [`core/ARCHITECTURE.md`](core/ARCHITECTURE.md) | Target Core + subscription pipeline architecture |
-| [`core/CURRENT_ARCHITECTURE.md`](core/CURRENT_ARCHITECTURE.md) | Understanding the repository today |
+| [`../WHATS_NEW.md`](../WHATS_NEW.md) | Latest release notes (`v1.0.10`) |
+| [`../CHANGELOG.md`](../CHANGELOG.md) | Full version history |
+| [`core/ARCHITECTURE.md`](core/ARCHITECTURE.md) | Core + Apple import pipeline (current) |
 | [`core/BUILDING.md`](core/BUILDING.md) | Reproducing Libbox and Apple builds |
 | [`core/PROTOCOL_MATRIX.md`](core/PROTOCOL_MATRIX.md) | Authoritative protocol status |
-| [`../core/protocol-matrix.json`](../core/protocol-matrix.json) | Machine-readable matrix for CI / release gate |
-| [`core/PRODUCTION_READINESS_AUDIT.md`](core/PRODUCTION_READINESS_AUDIT.md) | Honest readiness vs real code |
-| [`core/VPN_DIRECT_PRODUCTION_PLAN.md`](core/VPN_DIRECT_PRODUCTION_PLAN.md) | Hardening milestones |
-| [`core/THETOCHKA_COMPATIBILITY_HARVEST.md`](core/THETOCHKA_COMPATIBILITY_HARVEST.md) | Remnawave/Happ behaviors from TheTochka |
-| [`core/MIERU_DEFERRED.md`](core/MIERU_DEFERRED.md) | Mieru Swift vs Core runtime status |
+| [`../core/protocol-matrix.json`](../core/protocol-matrix.json) | Machine-readable matrix (CI / release gate) |
+| [`core/RELEASE_BLOCKER_LEDGER.md`](core/RELEASE_BLOCKER_LEDGER.md) | Open vs verified release blockers |
+| [`compatibility/README.md`](compatibility/README.md) | Panels, ecosystems, HTTP subscription quirks |
+| [`compatibility/COMPATIBILITY_MATRIX.md`](compatibility/COMPATIBILITY_MATRIX.md) | Panel × protocol support map |
+| [`battle/BATTLE_SOURCE_PLAN.md`](battle/BATTLE_SOURCE_PLAN.md) | Public harvest catalog plan |
 | [`device/IPHONE_QUALIFICATION.md`](device/IPHONE_QUALIFICATION.md) | Device evidence checklist |
+| [`device/IPHONE_INSTALL_2026-09-07.md`](device/IPHONE_INSTALL_2026-09-07.md) | Wi-Fi install recipe (SFI + `devicectl`) |
 | [`../interop/README.md`](../interop/README.md) | Interop lab scaffolds |
-| [`core/DONORS.md`](core/DONORS.md) | Upstream/donor source tracking |
-| [`core/LICENSE_AUDIT.md`](core/LICENSE_AUDIT.md) | Dependency/license engineering notes |
+| [`core/DONORS.md`](core/DONORS.md) | Upstream / donor source tracking |
+| [`core/LICENSE_AUDIT.md`](core/LICENSE_AUDIT.md) | Dependency / license notes |
 | [`../ROADMAP.md`](../ROADMAP.md) | Public product roadmap |
-| [`../WHATS_NEW.md`](../WHATS_NEW.md) | Latest release notes (`v1.0.5`) |
 | [`../SUPPORT.md`](../SUPPORT.md) | How to get help |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | PR / fixture / matrix rules |
+
+## Supporting core notes
+
+| Document | Use it for |
+| --- | --- |
+| [`core/REMOTES.md`](core/REMOTES.md) | Git remotes / submodule pins |
+| [`core/PANIC_BOUNDARY.md`](core/PANIC_BOUNDARY.md) | What must never crash the NE |
+| [`core/LEGACY_OUTBOUND_WRITERS.md`](core/LEGACY_OUTBOUND_WRITERS.md) | Remaining prebuilt-outbound writers |
+| [`core/REMEDIATION_EXECUTION_PLAN.md`](core/REMEDIATION_EXECUTION_PLAN.md) | Living remediation plan (REQ coverage) |
+| [`brand/README.md`](brand/README.md) | Brand assets |
 
 ## Support vocabulary
 
@@ -28,4 +41,6 @@ Engineering docs map (keep in sync with the GitHub README quick links: App Store
 parsed → compiled → validated → interop-tested → device-tested → production (`tested`)
 ```
 
-A parser or builder alone is not proof of production support. `out_of_scope` rows are intentional non-goals for Core 1.x.
+A parser or builder alone is not proof of production support. Rows marked `parser+runtime` mean import + Core registration exist; live tunnel evidence is still required for `tested`.
+
+Historical one-shot audit/plan markdown from early Core 0.1 landings was removed in v1.0.10 — status lives in the matrix, ledger, and CHANGELOG.

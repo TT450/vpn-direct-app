@@ -61,6 +61,15 @@
       "evidence": {}
     },
     {
+      "id": "shadowsocksr",
+      "name": "ShadowsocksR",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "notes": "Restored under with_shadowsocksr; rebuild Libbox.xcframework required for tunnel",
+      "evidence": {}
+    },
+    {
       "id": "tuic",
       "name": "TUIC",
       "parser": "yes",
@@ -145,26 +154,32 @@
     {
       "id": "masque-connect-udp",
       "name": "MASQUE CONNECT-UDP",
-      "parser": "—",
-      "core": false,
-      "status": "out_of_scope",
-      "evidence": {}
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {
+        "note": "RFC 9298 outbound type masque-connect-udp; requires Libbox rebuild with with_quic"
+      }
     },
     {
       "id": "tailscale",
       "name": "Tailscale",
-      "parser": "—",
-      "core": false,
-      "status": "out_of_scope",
-      "evidence": {}
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {
+        "note": "endpoint JSON import; requires Libbox rebuild with with_tailscale"
+      }
     },
     {
       "id": "openvpn",
       "name": "OpenVPN / OpenConnect",
-      "parser": "—",
-      "core": false,
-      "status": "out_of_scope",
-      "evidence": {}
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {
+        "note": ".ovpn / OpenConnect JSON+XML import; Core tags with_openvpn / with_openconnect already on Darwin libbox"
+      }
     }
   ]
 }

@@ -58,7 +58,7 @@ public struct NewProfileMenuView: View {
             .alert($alert)
             .fileImporter(
                 isPresented: $showFileImporter,
-                allowedContentTypes: [.profile, .json],
+                allowedContentTypes: VPNDirectImportContentTypes.menuImport,
                 allowsMultipleSelection: false
             ) { result in
                 handleFileImport(result)
@@ -125,7 +125,7 @@ public struct NewProfileMenuView: View {
         #else
             .fileImporter(
                     isPresented: $showFileImporter,
-                    allowedContentTypes: [.profile, .json],
+                    allowedContentTypes: VPNDirectImportContentTypes.menuImport,
                     allowsMultipleSelection: false
                 ) { result in
                     handleFileImport(result)
@@ -198,7 +198,10 @@ public struct NewProfileMenuView: View {
                     let urls = try result.get()
                     guard let url = urls.first else { return }
 
-                    if url.pathExtension.lowercased() == "json" {
+                    let ext = url.pathExtension.lowercased()
+                    // Textual configs (JSON / .ovpn / OpenConnect / Tailscale) go through the
+                    // local import + normalizeRemoteContent path — not LibboxProfileContent.
+                    if ["json", "ovpn", "conf", "xml", "txt"].contains(ext) || ext.isEmpty {
                         let fileName = url.deletingPathExtension().lastPathComponent
                         localImportRequest = NewProfileView.LocalImportRequest(name: fileName, fileURL: url)
                         return
@@ -257,6 +260,15 @@ public struct NewProfileMenuView: View {
                 return
             }
 
+            if SubscriptionConfigBuilder.isShareLinkContent(trimmed) {
+                importRequest = NewProfileView.ImportRequest(
+                    name: SubscriptionConfigBuilder.suggestedName(forShareContent: trimmed),
+                    url: trimmed
+                )
+                showQRScanner = false
+                return
+            }
+
             // Classic subscription URLs: https://host/sub/<uuid>
             // Also happ://add/https://... / incy://add/https://... deep links from panels.
             if SubscriptionConfigBuilder.isHTTPURL(trimmed) {
@@ -276,7 +288,7 @@ public struct NewProfileMenuView: View {
                 return
             }
             guard let remoteProfile else {
-                alert = AlertState(errorMessage: String(localized: "The QR code does not contain a valid vless://, https:// subscription, or profile import link."))
+                alert = AlertState(errorMessage: String(localized: "The QR code does not contain a valid share link, https:// subscription, or profile import link."))
                 return
             }
             importRequest = NewProfileView.ImportRequest(name: remoteProfile.name, url: remoteProfile.url)

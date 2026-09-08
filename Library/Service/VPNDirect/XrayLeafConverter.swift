@@ -281,58 +281,7 @@ enum XrayLeafConverter {
         } else {
             transport["mode"] = "auto"
         }
-        XrayXHTTPExtra.merge(from: xhttp, into: &transport)
+        XrayXHTTPMapper.merge(from: xhttp, into: &transport)
         return transport
-    }
-}
-
-/// Shared XHTTP `extra` + sibling tuning keys (scMaxEachPostBytes, …).
-enum XrayXHTTPExtra {
-    private static let siblingKeys: [(xray: String, sing: String)] = [
-        ("scMaxEachPostBytes", "sc_max_each_post_bytes"),
-        ("scMinPostsIntervalMs", "sc_min_posts_interval_ms"),
-        ("scMaxConcurrentPosts", "sc_max_concurrent_posts"),
-        ("xPaddingBytes", "x_padding_bytes"),
-        ("noGRPCHeader", "no_grpc_header"),
-        ("xmux", "xmux"),
-    ]
-
-    static func merge(from xhttp: [String: Any], into transport: inout [String: Any]) {
-        var extraMerged: [String: Any] = [:]
-        if let extraObj = xhttp["extra"] as? [String: Any] {
-            extraMerged = extraObj
-        } else if let extraStr = xhttp["extra"] as? String, !extraStr.isEmpty,
-                  let data = extraStr.data(using: .utf8),
-                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        {
-            extraMerged = obj
-        } else if let extraStr = xhttp["extra"] as? String, !extraStr.isEmpty {
-            transport["extra"] = extraStr
-        }
-
-        for (xrayKey, singKey) in siblingKeys {
-            guard let raw = xhttp[xrayKey] else { continue }
-            if transport[singKey] == nil {
-                transport[singKey] = stringifyScalar(raw) ?? raw
-            }
-            if extraMerged[xrayKey] == nil {
-                extraMerged[xrayKey] = raw
-            }
-        }
-
-        if !extraMerged.isEmpty,
-           let data = try? JSONSerialization.data(withJSONObject: extraMerged),
-           let extraJSON = String(data: data, encoding: .utf8)
-        {
-            transport["extra"] = extraJSON
-        }
-    }
-
-    private static func stringifyScalar(_ raw: Any) -> Any? {
-        if raw is String || raw is NSNumber || raw is Bool { return raw }
-        if let arr = raw as? [Any] {
-            return arr.map { "\($0)" }.joined(separator: ",")
-        }
-        return nil
     }
 }

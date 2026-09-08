@@ -1,6 +1,12 @@
 # Roadmap
 
-Public roadmap for VPN Direct (Apple client + VPN Direct Core). Status language matches [`docs/core/PROTOCOL_MATRIX.md`](docs/core/PROTOCOL_MATRIX.md) and [`docs/core/VPN_DIRECT_PRODUCTION_PLAN.md`](docs/core/VPN_DIRECT_PRODUCTION_PLAN.md).
+Public roadmap for VPN Direct (Apple client + VPN Direct Core). Status language matches [`docs/core/PROTOCOL_MATRIX.md`](docs/core/PROTOCOL_MATRIX.md) and [`docs/core/RELEASE_BLOCKER_LEDGER.md`](docs/core/RELEASE_BLOCKER_LEDGER.md).
+
+## Shipped in 1.0.10
+
+- [x] OpenVPN / OpenConnect / Tailscale file+JSON import → graph endpoints
+- [x] MASQUE CONNECT-UDP Core outbound + Swift import (Libbox rebuild for device capability)
+- [x] Docs refresh; obsolete Core 0.1 audit drafts removed
 
 ## Now (1.0.x)
 
@@ -27,10 +33,11 @@ Public roadmap for VPN Direct (Apple client + VPN Direct Core). Status language 
 
 ## Next
 
+- [ ] Rebuild Darwin Libbox with CONNECT-UDP capability + `with_tailscale` and qualify on device
 - [ ] Deep Marzban / Hiddify / PasarGuard / s-ui fixtures + Response Rules corpus
 - [ ] Full Clash YAML library evaluation
-- [ ] XHTTP extra / CDN quirks (TheTochka)
-- [ ] NE RSS budget measurement with Mieru enabled (device evidence)
+- [ ] XHTTP extra / CDN quirks
+- [ ] NE RSS budget measurement with Mieru / Tailscale enabled (device evidence)
 - [ ] Interop evidence per family (`interop/*/evidence/`)
 - [ ] iPhone device qualification filled for Tier‑1 protocols
 - [ ] Flip matrix rows to `tested` only with interop+device evidence
@@ -41,6 +48,6 @@ Public roadmap for VPN Direct (Apple client + VPN Direct Core). Status language 
 - [ ] Ecosystem / “Used by” section when appropriate
 - [ ] Optional thin-fork strategy for a dedicated Core remote
 
-## Non-goals / out of scope (Core 1.x)
+## Non-goals
 
-OpenVPN / OpenConnect, SoftEther, MASQUE CONNECT-UDP, Tailscale — not claimed as product features. See matrix `out_of_scope` rows.
+SoftEther and other protocols not listed in [`PROTOCOL_MATRIX.md`](docs/core/PROTOCOL_MATRIX.md). OpenVPN / OpenConnect / Tailscale / CONNECT-UDP are **in scope** as of v1.0.10 (`parser+runtime`; device `tested` pending Libbox rebuild + evidence).

@@ -50,19 +50,23 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
         public var allowedIPs: [String]
         public var endpoint: String?
         public var persistentKeepaliveInterval: Int?
+        /// Cloudflare WARP / some clients: 3-byte reserved field.
+        public var reserved: [UInt8]?
 
         public init(
             publicKey: String,
             preSharedKey: String? = nil,
             allowedIPs: [String] = ["0.0.0.0/0", "::/0"],
             endpoint: String? = nil,
-            persistentKeepaliveInterval: Int? = nil
+            persistentKeepaliveInterval: Int? = nil,
+            reserved: [UInt8]? = nil
         ) {
             self.publicKey = publicKey
             self.preSharedKey = preSharedKey
             self.allowedIPs = allowedIPs
             self.endpoint = endpoint
             self.persistentKeepaliveInterval = persistentKeepaliveInterval
+            self.reserved = reserved
         }
     }
 
@@ -153,19 +157,39 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
             peers: [
                 Peer(
                     publicKey: peerPublicKey,
-                    preSharedKey: preSharedKey,
+                    preSharedKey: preSharedKey
+                        ?? attributes["pre_shared_key"]
+                        ?? attributes["preshared_key"]
+                        ?? attributes["presharedkey"],
                     allowedIPs: Self.parseAllowedIPs(attributes["allowed_ips"] ?? attributes["allowedips"]),
                     endpoint: peerEndpoint,
                     persistentKeepaliveInterval: (attributes["persistent_keepalive"] ?? attributes["keepalive"])
-                        .flatMap(Int.init)
+                        .flatMap(Int.init),
+                    reserved: Self.parseReserved(attributes["reserved"])
                 ),
             ],
             mtu: mtu,
             amneziaVersion: forcedVersion ?? "2"
         )
         options.jc = attributes["jc"].flatMap(Int.init)
+            ?? attributes["wnoisecount"].flatMap(Int.init)
         options.jmin = attributes["jmin"].flatMap(Int.init)
         options.jmax = attributes["jmax"].flatMap(Int.init)
+        if (options.jmin == nil || options.jmax == nil),
+           let payload = attributes["wpayloadsize"], payload.contains("-")
+        {
+            let parts = payload.split(separator: "-", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            if parts.count == 2 {
+                if options.jmin == nil { options.jmin = Int(parts[0]) }
+                if options.jmax == nil { options.jmax = Int(parts[1]) }
+            }
+        } else if options.jmin == nil, let single = attributes["wpayloadsize"].flatMap(Int.init) {
+            options.jmin = single
+            options.jmax = single
+        }
+        if options.jc == nil, attributes["wnoise"] != nil {
+            options.jc = 4
+        }
         options.s1 = attributes["s1"].flatMap(Int.init)
         options.s2 = attributes["s2"].flatMap(Int.init)
         options.s3 = attributes["s3"].flatMap(Int.init)
@@ -206,6 +230,21 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
     private static func parseAllowedIPs(_ raw: String?) -> [String] {
         guard let raw, !raw.isEmpty else { return ["0.0.0.0/0", "::/0"] }
         return raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    /// Accepts `167,112,109` or base64-ish dumps of exactly 3 bytes.
+    private static func parseReserved(_ raw: String?) -> [UInt8]? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.contains(",") {
+            let parts = trimmed.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            let bytes = parts.compactMap { UInt8($0) }
+            return bytes.count == 3 ? bytes : nil
+        }
+        if let data = Data(base64Encoded: trimmed), data.count == 3 {
+            return [UInt8](data)
+        }
+        return nil
     }
 
     /// Split host:port or [IPv6]:port into Core WireGuardPeer address + port fields.
@@ -251,6 +290,9 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
                 }
                 if let keepalive = peer.persistentKeepaliveInterval {
                     p["persistent_keepalive_interval"] = keepalive
+                }
+                if let reserved = peer.reserved, reserved.count == 3 {
+                    p["reserved"] = reserved.map { Int($0) }
                 }
                 return p
             },
@@ -326,7 +368,8 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
                     preSharedKey: peer.preSharedKey,
                     allowedIPs: peer.allowedIPs.isEmpty ? ["0.0.0.0/0", "::/0"] : peer.allowedIPs,
                     endpoint: peer.endpoint,
-                    persistentKeepaliveInterval: peer.persistentKeepaliveInterval
+                    persistentKeepaliveInterval: peer.persistentKeepaliveInterval,
+                    reserved: peer.reserved
                 )
             )
             currentPeer = nil
@@ -400,6 +443,9 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
             case ("[peer]", "persistentkeepalive"):
                 currentPeer = currentPeer ?? MutablePeer()
                 currentPeer?.persistentKeepaliveInterval = Int(value)
+            case ("[peer]", "reserved"):
+                currentPeer = currentPeer ?? MutablePeer()
+                currentPeer?.reserved = parseReserved(value)
             default: break
             }
         }
@@ -443,6 +489,7 @@ public struct AmneziaWGEndpointOptions: Equatable, Sendable {
         var allowedIPs: [String] = []
         var endpoint: String?
         var persistentKeepaliveInterval: Int?
+        var reserved: [UInt8]?
     }
 }
 

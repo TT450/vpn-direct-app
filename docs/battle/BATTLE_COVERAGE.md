@@ -45,4 +45,4 @@ Status cells: `scaffold` | `planned` | `pass` | `fail` | `n/a` | `oos`
 
 Parser fixture `pass` refers to in-tree regression/public-derived fixtures + Swift XCTests — not live public success.
 
-Public sources `pass` = catalog fetch OK + BattleParse exit OK on 2026-09-07 validate-only run (`--limit-per-source 40`). Does **not** imply live connect or remote server liveness. See [`LIVE_PASS_REPORT.md`](LIVE_PASS_REPORT.md).
+Public sources `pass` = catalog fetch OK + BattleParse exit OK on validate-only runs (`--limit-per-source`). Does **not** imply live connect or remote server liveness. Catalog: `tests/battle/public-sources.json`.

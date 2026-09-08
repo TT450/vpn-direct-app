@@ -141,7 +141,16 @@ public enum XrayJSONAdapter {
                     continue
                 }
 
-                let leafName = "\(displayName)-n\(entryIndex + 1)"
+                // TheTochka/Happ: single-leaf profiles keep remarks as the UI name (flags/labels).
+                // Multi-leaf profiles prefer the Xray tag, else a stable remarks suffix (not "-n1").
+                let leafName: String
+                if ordered.count == 1 {
+                    leafName = displayName
+                } else if !xrayTag.isEmpty {
+                    leafName = xrayTag
+                } else {
+                    leafName = "\(displayName)-\(entryIndex + 1)"
+                }
 
                 var attributes = flattenOutboundFields(outbound)
                 var rawExtensions: [String: String] = [:]

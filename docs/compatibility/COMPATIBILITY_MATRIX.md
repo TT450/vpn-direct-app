@@ -17,13 +17,17 @@ Statuses: `yes` | `partial` | `no` | `planned` | `out_of_scope`
 | Naive | yes | no | yes | no | partial | planned | planned |
 | WireGuard | yes | no | yes | partial | partial | planned | planned |
 | AmneziaWG | yes | no | yes | no | partial | planned | planned |
-| MASQUE/WARP | partial | no | yes | no | partial | planned | planned |
+| MASQUE CONNECT-IP / WARP | partial | no | yes | no | partial | planned | planned |
+| MASQUE CONNECT-UDP | JSON | no | yes | no | partial | planned | planned |
 | Mieru | json | no | yes | no | yes | planned | planned |
+| OpenVPN / OpenConnect | file | no | yes | no | partial | planned | planned |
+| Tailscale | JSON | no | yes | no | partial | planned | planned |
 | Remnawave | — | partial | planned | planned | partial | planned | planned |
 | 3x-ui | partial | partial | no | partial | partial | planned | planned |
 | Marzban | planned | planned | planned | planned | stub | planned | planned |
 | Hiddify | planned | planned | planned | planned | stub | planned | planned |
 | s-ui | — | — | planned | — | stub | planned | planned |
-| CONNECT-UDP/Tailscale/OpenVPN | — | — | — | — | — | — | out_of_scope |
+
+CONNECT-UDP and Tailscale need a Libbox rebuild (`masqueConnectUDP` / `with_tailscale`) before device runtime.
 
 Authoritative protocol Core status remains [`docs/core/PROTOCOL_MATRIX.md`](../core/PROTOCOL_MATRIX.md).

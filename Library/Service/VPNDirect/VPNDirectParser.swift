@@ -48,6 +48,7 @@ public enum VPNDirectParserRegistry {
         VMessShareLinkParser(),
         TrojanShareLinkParser(),
         ShadowsocksShareLinkParser(),
+        ShadowsocksRShareLinkParser(),
         TUICShareLinkParser(),
         AnyTLSShareLinkParser(),
         WireGuardShareLinkParser(),
