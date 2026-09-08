@@ -21,7 +21,7 @@
 
 <p align="center">
   <a href="https://apps.apple.com/app/id6807402257"><b>App Store</b></a> ·
-  <a href="docs/TESTFLIGHT.md"><b>TestFlight</b></a> ·
+  <a href="https://testflight.apple.com/join/yfCEbunt"><b>TestFlight</b></a> ·
   <a href="docs/core/ARCHITECTURE.md"><b>Архитектура</b></a> ·
   <a href="docs/core/PROTOCOL_MATRIX.md"><b>Матрица протоколов</b></a> ·
   <a href="docs/core/BUILDING.md"><b>Сборка</b></a> ·

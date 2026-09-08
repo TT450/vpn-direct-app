@@ -41,6 +41,7 @@ Prior tag: `v1.0.11` (build 33)
 | --- | --- |
 | Marketing | **1.0.11** |
 | Build | **63** |
+| Public join | https://testflight.apple.com/join/yfCEbunt |
 | Upload | App Store Connect — processed 2026-09-08 |
 
 See [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md). Prefer **63+**.

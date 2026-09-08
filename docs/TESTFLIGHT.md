@@ -7,11 +7,11 @@ How to install beta builds and invite people. **No signing secrets belong in thi
 | | |
 | --- | --- |
 | App Store (public) | https://apps.apple.com/app/id6807402257 |
-| TestFlight (Apple) | https://testflight.apple.com |
+| TestFlight (public join) | [Join on TestFlight](https://testflight.apple.com/join/yfCEbunt) |
 | GitHub releases | https://github.com/TT450/vpn-direct-app/releases |
 | Latest notes | [`WHATS_NEW.md`](../WHATS_NEW.md) |
 
-If you enable a **public link** for an External testing group in App Store Connect, share that `https://testflight.apple.com/join/…` URL here in future release notes. Until then, testers join via email invite or Internal testing.
+**Public join link:** https://testflight.apple.com/join/yfCEbunt
 
 ## Current beta
 
@@ -22,9 +22,7 @@ If you enable a **public link** for an External testing group in App Store Conne
 | Bundle ID | `com.vpndirect.vpndirectapp` |
 | GitHub tag | [`v1.0.11.63`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.63) |
 
-Build **63** is on TestFlight Internal (**VPN Direct Test Group**) and finished App Store Connect processing on **2026-09-08**. Prefer **63+**. Older Internal builds (e.g. **33**) may still appear in history.
-
-**Public join link:** not enabled yet. To get a shareable `https://testflight.apple.com/join/…` URL, create an **External Testing** group in App Store Connect and turn on **Public Link** (see below). Until then, add people via Internal (team users) or External email invites.
+Build **63** is on TestFlight (public link + Internal). Prefer **63+**. Older builds (e.g. **33**) may still appear in history.
 
 ## How to add testers (you / App Store Connect)
 
@@ -76,5 +74,5 @@ See `fastlane/SECRETS.example.md`. App Store provisioning profiles for app + ext
 
 ## Support
 
-- Product / bot: [Telegram @vpndirectbot](https://t.me/vpndirectbot)
+- Product / bot: [Telegram - vpndirectbot](https://t.me/vpndirectbot)
 - Source issues: [GitHub Issues](https://github.com/TT450/vpn-direct-app/issues)

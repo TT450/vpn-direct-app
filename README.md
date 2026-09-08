@@ -21,7 +21,7 @@
 
 <p align="center">
   <a href="https://apps.apple.com/app/id6807402257"><b>App Store</b></a> ·
-  <a href="docs/TESTFLIGHT.md"><b>TestFlight</b></a> ·
+  <a href="https://testflight.apple.com/join/yfCEbunt"><b>TestFlight</b></a> ·
   <a href="docs/compatibility/README.md"><b>Compatibility & Providers</b></a> ·
   <a href="docs/core/ARCHITECTURE.md"><b>Architecture</b></a> ·
   <a href="docs/core/PROTOCOL_MATRIX.md"><b>Protocol Matrix</b></a> ·
@@ -223,7 +223,7 @@ vpn-direct-app/
 | App Group | `group.com.vpndirect.vpndirectapp` |
 | URL scheme | `vpndirect://` |
 | App Store ID | `6807402257` |
-| TestFlight | [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md) |
+| TestFlight | [Join](https://testflight.apple.com/join/yfCEbunt) · [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md) |
 
 Secrets and signing credentials are not stored in this repository.
 

@@ -23,6 +23,6 @@ Thanks for using VPN Direct.
 | | |
 | --- | --- |
 | App Store | [VPN Direct](https://apps.apple.com/app/id6807402257) |
-| TestFlight beta | [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md) — invite Internal/External testers, public link |
+| TestFlight beta | [Join](https://testflight.apple.com/join/yfCEbunt) · [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md) |
 
 Never put API keys, `.p8` files, or team secrets in issues or this repo.
