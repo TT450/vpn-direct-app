@@ -67,5 +67,5 @@ See `fastlane/SECRETS.example.md`. App Store provisioning profiles for app + ext
 
 ## Support
 
-- Product / bot: [Telegram @vpndirectbot](https://t.me/vpndirectbot)
+- Product / bot: [Telegram - vpndirectbot](https://t.me/vpndirectbot)
 - Source issues: [GitHub Issues](https://github.com/TT450/vpn-direct-app/issues)
