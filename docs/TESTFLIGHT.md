@@ -7,7 +7,7 @@ How to install beta builds and invite people. **No signing secrets belong in thi
 | | |
 | --- | --- |
 | App Store (public) | https://apps.apple.com/app/id6807402257 |
-| TestFlight (Apple) | https://testflight.apple.com |
+| TestFlight (Apple) | [https://testflight.apple.com](https://testflight.apple.com/join/yfCEbunt) |
 | GitHub releases | https://github.com/TT450/vpn-direct-app/releases |
 | Latest notes | [`WHATS_NEW.md`](../WHATS_NEW.md) |
 
