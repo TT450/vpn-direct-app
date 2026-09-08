@@ -173,6 +173,9 @@ public enum CompatibilityFieldPolicy {
                 "xpaddingbytes", "xmux", "vnext", "address", "port", "users", "id",
                 "multiplex", "multiplex_json", "tls_fragment", "tls_fragment_fallback_delay", "fragment",
                 "encryption", "flow", "email", "level",
+                // Xray TLS knobs panels often dump; sing-box ignores / has no 1:1 mapping.
+                "enablesessionresumption", "disablesystemroots", "pinnedpeercertificatechainsha256",
+                "masterkeylog", "minversion", "maxversion", "ciphersuites", "certificates",
             ]
             if knownDumpLeaves.contains(leaf) { return .futureField }
             return .connectionCritical

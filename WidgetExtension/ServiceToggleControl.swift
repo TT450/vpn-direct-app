@@ -9,25 +9,23 @@ struct ServiceToggleControl: ControlWidget {
             provider: Provider()
         ) { value in
             ControlWidgetToggle(
-                "sing-box",
+                "VPN Direct",
                 isOn: value,
                 action: ToggleServiceControlIntent()
             ) { isOn in
-                Label(isOn ? "Running" : "Stopped", systemImage: "shippingbox.fill")
-                    .controlWidgetActionHint(isOn ? "Stop" : "Start")
+                Label(isOn ? "Подключено" : "Отключено", systemImage: isOn ? "lock.fill" : "lock.open")
+                    .controlWidgetActionHint(isOn ? "Отключить" : "Подключить")
             }
-            .tint(.init(red: CGFloat(Double(69) / 255), green: CGFloat(Double(90) / 255), blue: CGFloat(Double(100) / 255)))
+            .tint(Color(red: 0.66, green: 0.94, blue: 0.41))
         }
-        .displayName("Toggle")
-        .description("Start or stop sing-box service.")
+        .displayName("VPN Direct")
+        .description("Включить или выключить VPN Direct")
     }
 }
 
 extension ServiceToggleControl {
     struct Provider: ControlValueProvider {
-        var previewValue: Bool {
-            false
-        }
+        var previewValue: Bool { false }
 
         func currentValue() async throws -> Bool {
             try await WidgetTunnelControl.currentIsStarted()
@@ -36,13 +34,15 @@ extension ServiceToggleControl {
 }
 
 struct ToggleServiceControlIntent: SetValueIntent {
-    static var title: LocalizedStringResource = "Toggle sing-box"
+    static var title: LocalizedStringResource = "VPN Direct"
+    static var description = IntentDescription("Включить или выключить VPN Direct")
 
-    @Parameter(title: "Running")
+    @Parameter(title: "Подключено")
     var value: Bool
 
     func perform() async throws -> some IntentResult {
         try await WidgetTunnelControl.setStarted(value)
+        WidgetTunnelControl.reloadWidgets()
         return .result()
     }
 }

@@ -193,6 +193,7 @@ open class ExtensionProvider: NEPacketTunnelProvider {
             if #available(iOS 18.0, *) {
                 ControlCenter.shared.reloadControls(ofKind: ExtensionProfile.controlKind)
             }
+            WidgetCenter.shared.reloadAllTimelines()
         #endif
     }
 
@@ -279,6 +280,7 @@ open class ExtensionProvider: NEPacketTunnelProvider {
             if #available(iOS 18.0, *) {
                 ControlCenter.shared.reloadControls(ofKind: ExtensionProfile.controlKind)
             }
+            WidgetCenter.shared.reloadAllTimelines()
         #endif
     }
 

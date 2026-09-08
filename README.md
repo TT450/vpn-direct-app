@@ -21,6 +21,7 @@
 
 <p align="center">
   <a href="https://apps.apple.com/app/id6807402257"><b>App Store</b></a> ·
+  <a href="docs/TESTFLIGHT.md"><b>TestFlight</b></a> ·
   <a href="docs/compatibility/README.md"><b>Compatibility & Providers</b></a> ·
   <a href="docs/core/ARCHITECTURE.md"><b>Architecture</b></a> ·
   <a href="docs/core/PROTOCOL_MATRIX.md"><b>Protocol Matrix</b></a> ·
@@ -73,7 +74,7 @@ The Core remains intentionally close to upstream sing-box. Custom functionality 
 
 ## Current Core status
 
-Latest published: v1.0.10 · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
+Latest published: v1.0.11 · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
 
 A feature is not **production / `tested`** merely because a builder exists. Production requires:
 
@@ -204,8 +205,9 @@ vpn-direct-app/
 | [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) | What is parsed, compiled, tested and production-ready |
 | [Release Blocker Ledger](docs/core/RELEASE_BLOCKER_LEDGER.md) | Open vs verified release blockers |
 | [Roadmap](ROADMAP.md) | Public product roadmap |
-| [What's New](WHATS_NEW.md) | Latest release notes (`v1.0.10`) |
+| [What's New](WHATS_NEW.md) | Latest release notes (`v1.0.11`) |
 | [Changelog](CHANGELOG.md) | Full version history |
+| [TestFlight](docs/TESTFLIGHT.md) | Beta install + how to invite testers |
 | [Donors](docs/core/DONORS.md) | Upstream and donor source tracking |
 | [License Audit](docs/core/LICENSE_AUDIT.md) | Dependency/license engineering notes |
 | [iPhone Qualification](docs/device/IPHONE_QUALIFICATION.md) | Device evidence checklist |
@@ -220,6 +222,7 @@ vpn-direct-app/
 | App Group | `group.com.vpndirect.vpndirectapp` |
 | URL scheme | `vpndirect://` |
 | App Store ID | `6807402257` |
+| TestFlight | [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md) |
 
 Secrets and signing credentials are not stored in this repository.
 

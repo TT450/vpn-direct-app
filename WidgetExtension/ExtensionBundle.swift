@@ -5,5 +5,6 @@ import WidgetKit
 struct ExtensionBundle: WidgetBundle {
     var body: some Widget {
         ServiceToggleControl()
+        StatusHomeWidget()
     }
 }

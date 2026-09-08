@@ -5,6 +5,12 @@ enum VPNDirectTagFactory {
         var base = name
             .replacingOccurrences(of: #"\s+"#, with: "-", options: .regularExpression)
             .replacingOccurrences(of: #"[^A-Za-z0-9._\-а-яА-ЯёЁ]"#, with: "", options: .regularExpression)
+        while base.hasPrefix("-") {
+            base = String(base.dropFirst())
+        }
+        while base.hasSuffix("-") {
+            base = String(base.dropLast())
+        }
         if base.isEmpty {
             base = fallback
         }

@@ -23,6 +23,22 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 Generate iOS screenshots
 
+### ios release
+
+```sh
+[bundle exec] fastlane ios release
+```
+
+Archive SFI and upload to App Store Connect / TestFlight
+
+### ios upload
+
+```sh
+[bundle exec] fastlane ios upload
+```
+
+Upload an existing IPA to App Store Connect / TestFlight
+
 ----
 
 

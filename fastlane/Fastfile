@@ -66,6 +66,8 @@ platform :ios do
   desc "Archive SFI and upload to App Store Connect / TestFlight"
   lane :release do
     api_key = vpn_direct_api_key
+    team_id = ENV.fetch("FASTLANE_TEAM_ID", "6D563CF4V3")
+    ENV["DEVELOPMENT_TEAM"] = team_id
 
     build_app(
       project: "sing-box.xcodeproj",
@@ -75,37 +77,43 @@ platform :ios do
       export_method: "app-store",
       output_directory: "build/fastlane",
       output_name: "VPNDirect",
-      derived_data_path: "build/DerivedData"
+      derived_data_path: "build/DerivedData",
+      xcargs: "DEVELOPMENT_TEAM=#{team_id} -allowProvisioningUpdates",
+      export_xcargs: "-allowProvisioningUpdates",
+      export_options: {
+        method: "app-store",
+        signingStyle: "manual",
+        teamID: team_id,
+        provisioningProfiles: {
+          "com.vpndirect.vpndirectapp" => "com.vpndirect.vpndirectapp AppStore",
+          "com.vpndirect.vpndirectapp.SingBoxPacketTunnel" => "com.vpndirect.vpndirectapp.SingBoxPacketTunnel AppStore",
+          "com.vpndirect.vpndirectapp.intents" => "com.vpndirect.vpndirectapp.intents AppStore",
+          "com.vpndirect.vpndirectapp.widget" => "com.vpndirect.vpndirectapp.widget AppStore"
+        }
+      }
     )
 
-    upload_to_app_store(
+    upload_to_testflight(
       api_key: api_key,
       app_identifier: APP_IDENTIFIER,
       apple_id: ENV.fetch("APP_STORE_APP_ID"),
-      skip_metadata: true,
-      skip_screenshots: true,
-      precheck_include_in_app_purchases: false,
-      force: true,
-      submit_for_review: false,
-      automatic_release: false
+      skip_waiting_for_build_processing: true,
+      distribute_external: false,
+      changelog: ENV["TESTFLIGHT_CHANGELOG"] || "VPN Direct 1.0.11 (32)"
     )
   end
 
-  desc "Upload an existing IPA to App Store Connect"
+  desc "Upload an existing IPA to App Store Connect / TestFlight"
   lane :upload do |options|
     api_key = vpn_direct_api_key
     ipa = options[:ipa] || "build/fastlane/VPNDirect.ipa"
-    upload_to_app_store(
+    upload_to_testflight(
       api_key: api_key,
       app_identifier: APP_IDENTIFIER,
       apple_id: ENV.fetch("APP_STORE_APP_ID"),
       ipa: ipa,
-      skip_metadata: true,
-      skip_screenshots: true,
-      precheck_include_in_app_purchases: false,
-      force: true,
-      submit_for_review: false,
-      automatic_release: false
+      skip_waiting_for_build_processing: true,
+      distribute_external: false
     )
   end
 end

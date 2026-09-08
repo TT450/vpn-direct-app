@@ -1,5 +1,6 @@
 import Foundation
 import NetworkExtension
+import WidgetKit
 
 enum WidgetAppConfiguration {
     static let packageName: String = {
@@ -79,6 +80,14 @@ enum WidgetTunnelControl {
                 try await manager.saveToPreferences()
             }
             manager.connection.stopVPNTunnel()
+        }
+        reloadWidgets()
+    }
+
+    static func reloadWidgets() {
+        WidgetCenter.shared.reloadAllTimelines()
+        if #available(iOS 18.0, *) {
+            ControlCenter.shared.reloadControls(ofKind: WidgetAppConfiguration.widgetControlKind)
         }
     }
 

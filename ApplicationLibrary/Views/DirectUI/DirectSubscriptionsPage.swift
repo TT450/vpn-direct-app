@@ -29,62 +29,74 @@ struct DirectSubscriptionsPage: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                PageHeading(
-                    kicker: "ИСТОЧНИКИ / \(String(format: "%02d", max(model.subscriptions.count, 1)))",
-                    title: "Подписки",
-                    subtitle: "Выберите один для подключения"
-                )
+        GeometryReader { geo in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    PageHeading(
+                        kicker: "ИСТОЧНИКИ / \(String(format: "%02d", max(model.subscriptions.count, 1)))",
+                        title: "Подписки",
+                        subtitle: "Выберите один для подключения"
+                    )
 
-                Button(action: openAddMenu) {
-                    HStack(spacing: 12) {
-                        Text("＋").font(.system(size: 23, weight: .light)).foregroundStyle(DS.acid)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Добавить подписку").font(.system(size: 14, weight: .semibold))
-                            Text("QR, буфер обмена или URL").font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+                    Button(action: openAddMenu) {
+                        HStack(spacing: 12) {
+                            Text("＋").font(.system(size: 23, weight: .light)).foregroundStyle(DS.acid)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Добавить подписку").font(.system(size: 14, weight: .semibold))
+                                    .lineLimit(1)
+                                Text("QR, буфер, ссылка, файл или конфиг").font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Text("05 СПОСОБОВ")
+                                .microLabel(color: .white.opacity(0.45))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
-                        Spacer()
-                        Text("03 СПОСОБА").microLabel(color: .white.opacity(0.45))
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 76)
+                        .background(DS.panel)
+                        .foregroundStyle(.white)
                     }
-                    .padding(.horizontal, 16)
-                    .frame(height: 76)
-                    .background(DS.panel)
-                    .foregroundStyle(.white)
-                }
-                .buttonStyle(HapticButtonStyle())
-                .padding(.top, 28)
+                    .buttonStyle(HapticButtonStyle())
+                    .padding(.top, 28)
 
-                SourceSectionHeader(title: "АКТИВНАЯ", count: 1)
-                    .padding(.top, 22)
-                activeSectionCard
-                    .padding(.top, 10)
-
-                if vpndirectCatalogCount > 0 {
-                    SourceSectionHeader(title: "DIRECT ACCESS", count: vpndirectCatalogCount)
+                    SourceSectionHeader(title: "АКТИВНАЯ", count: 1)
                         .padding(.top, 22)
-                    if showFreeInCatalog {
-                        FreeBalanceCard(model: model)
-                            .padding(.top, 10)
-                    }
-                    if showPremiumInCatalog {
-                        PremiumAccessCard(model: model)
-                            .padding(.top, showFreeInCatalog ? 12 : 10)
-                    }
-                }
+                    activeSectionCard
+                        .padding(.top, 10)
 
-                if !inactiveImported.isEmpty {
-                    SourceSectionHeader(title: "ДОБАВЛЕННЫЕ ИЗВНЕ", count: inactiveImported.count)
-                        .padding(.top, 22)
-                    ForEach(Array(inactiveImported.enumerated()), id: \.element.id) { index, subscription in
-                        ExternalSubscriptionCard(model: model, subscription: subscription)
-                            .padding(.top, index == 0 ? 10 : 12)
+                    if vpndirectCatalogCount > 0 {
+                        SourceSectionHeader(title: "DIRECT ACCESS", count: vpndirectCatalogCount)
+                            .padding(.top, 22)
+                        if showFreeInCatalog {
+                            FreeBalanceCard(model: model)
+                                .padding(.top, 10)
+                        }
+                        if showPremiumInCatalog {
+                            PremiumAccessCard(model: model)
+                                .padding(.top, showFreeInCatalog ? 12 : 10)
+                        }
+                    }
+
+                    if !inactiveImported.isEmpty {
+                        SourceSectionHeader(title: "ДОБАВЛЕННЫЕ ИЗВНЕ", count: inactiveImported.count)
+                            .padding(.top, 22)
+                        ForEach(Array(inactiveImported.enumerated()), id: \.element.id) { index, subscription in
+                            ExternalSubscriptionCard(model: model, subscription: subscription)
+                                .padding(.top, index == 0 ? 10 : 12)
+                        }
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 24)
+                .frame(width: geo.size.width, alignment: .leading)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 24)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
     }
 
     @ViewBuilder
@@ -158,12 +170,15 @@ private struct FreeBalanceCard: View {
                     Text("VPN Direct Free")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(DS.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     Text(balanceLine)
                         .font(.system(size: 12))
                         .foregroundStyle(DS.muted)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Spacer(minLength: 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 if isActive {
                     Text("СЕЙЧАС")
@@ -176,6 +191,7 @@ private struct FreeBalanceCard: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Hairline()
 
@@ -195,9 +211,11 @@ private struct FreeBalanceCard: View {
                 Button {
                     if !isActive { model.activateFreeAccess() }
                 } label: {
-                    Text(isActive ? "Подключено" : "Сделать активной")
+                    Text(isActive ? "Подключено" : "Активировать")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(isActive ? DS.green : DS.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(HapticButtonStyle())
@@ -268,12 +286,15 @@ private struct PremiumAccessCard: View {
                         Text("VPN Direct Premium")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(DS.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                         Text(detailLine)
                             .font(.system(size: 12))
                             .foregroundStyle(DS.muted)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-
-                    Spacer(minLength: 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     if isActive {
                         Text("СЕЙЧАС")
@@ -290,6 +311,7 @@ private struct PremiumAccessCard: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(HapticButtonStyle())
@@ -335,18 +357,32 @@ private struct PremiumAccessCard: View {
 private struct ExternalSubscriptionCard: View {
     @ObservedObject var model: VPNConnectionModel
     let subscription: VPNSubscriptionItem
+    @State private var showDeleteConfirm = false
 
     private var isActive: Bool { model.isSubscriptionActive(subscription.id) }
 
+    private var meta: SubscriptionMetadata {
+        SubscriptionMetadataStore.load(profileID: subscription.id) ?? SubscriptionMetadata()
+    }
+
     private var detailLine: String {
-        let meta = SubscriptionMetadataStore.load(profileID: subscription.id)
-        let days = subscription.expiry
-        let traffic = meta?.trafficQuotaLabel ?? "—"
-        let unit = meta?.trafficQuotaUnit ?? ""
-        let trafficPart = unit.isEmpty || traffic == "—" ? traffic : "\(traffic) \(unit)"
+        var parts: [String] = []
+        let expiry = subscription.expiry
+        if !expiry.isEmpty, expiry != "—" { parts.append(expiry) }
+        let traffic = meta.trafficQuotaFullLabel.trimmingCharacters(in: .whitespaces)
+        if !traffic.isEmpty, traffic != "— —", !traffic.hasPrefix("—") {
+            parts.append(traffic)
+        } else if meta.totalBytes == nil, (meta.uploadBytes ?? 0) + (meta.downloadBytes ?? 0) > 0 {
+            parts.append(meta.trafficQuotaLabel)
+        }
         let devices = subscription.devices
-        return "\(days) · \(trafficPart) · \(devices)"
-            .replacingOccurrences(of: " · —", with: "")
+        if !devices.isEmpty, devices != "—" { parts.append(devices) }
+        let locations = subscription.servers.count
+        if locations > 0 { parts.append("\(locations) лок.") }
+        if let panel = meta.compatibilityProfileID, panel != "generic", !panel.isEmpty {
+            parts.append(panel.uppercased())
+        }
+        return parts.isEmpty ? "Нет данных панели · обновите подписку" : parts.joined(separator: " · ")
     }
 
     var body: some View {
@@ -357,6 +393,14 @@ private struct ExternalSubscriptionCard: View {
                 inactiveCard
             }
         }
+        .alert("Удалить подписку?", isPresented: $showDeleteConfirm) {
+            Button("Удалить", role: .destructive) {
+                model.deleteSubscription(subscriptionID: subscription.id)
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Конфигурация будет полностью удалена с устройства.")
+        }
     }
 
     private var inactiveCard: some View {
@@ -364,6 +408,7 @@ private struct ExternalSubscriptionCard: View {
             HStack {
                 Text("ВНЕШНЯЯ ПОДПИСКА").microLabel(color: DS.muted)
                 Spacer()
+                Text("\(subscription.servers.count) СЕРВ.").microLabel(color: DS.muted)
             }
             .padding(.horizontal, 14)
             .padding(.top, 12)
@@ -372,7 +417,7 @@ private struct ExternalSubscriptionCard: View {
             Hairline()
 
             Button {
-                model.activate(subscriptionID: subscription.id)
+                model.openDetail(.subscription(subscription.id))
             } label: {
                 HStack(spacing: 12) {
                     Text("URL")
@@ -386,13 +431,18 @@ private struct ExternalSubscriptionCard: View {
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(DS.ink)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                         Text(detailLine)
                             .font(.system(size: 12))
                             .foregroundStyle(DS.muted)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(subscription.updated)
+                            .font(.system(size: 10))
+                            .foregroundStyle(DS.muted.opacity(0.85))
                             .lineLimit(1)
                     }
-
-                    Spacer(minLength: 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     Image(systemName: "arrow.right")
                         .font(.system(size: 14, weight: .semibold))
@@ -400,32 +450,52 @@ private struct ExternalSubscriptionCard: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(HapticButtonStyle())
-            .disabled(model.isBusy)
 
             Hairline()
 
             HStack(spacing: 0) {
                 Button {
-                    model.openDetail(.subscription(subscription.id))
+                    model.activate(subscriptionID: subscription.id)
                 } label: {
-                    Text("Подробнее")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(DS.ink)
+                    Text("Активировать")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(DS.green)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(HapticButtonStyle())
+                .disabled(model.isBusy)
 
                 Rectangle().fill(DS.line).frame(width: 1, height: 28)
 
                 Button {
-                    model.activate(subscriptionID: subscription.id)
+                    model.refreshSubscription(subscriptionID: subscription.id)
                 } label: {
-                    Text("Сделать активной")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(DS.green)
+                    Text("Обновить")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(DS.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(HapticButtonStyle())
+                .disabled(model.isBusy || subscription.profile.type != .remote)
+
+                Rectangle().fill(DS.line).frame(width: 1, height: 28)
+
+                Button {
+                    showDeleteConfirm = true
+                } label: {
+                    Text("Удалить")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(DS.danger)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(HapticButtonStyle())
@@ -444,49 +514,72 @@ private struct ExternalSubscriptionCard: View {
                 Text("АКТИВНА").microLabel(color: DS.acid)
             }
 
-            HStack(spacing: 12) {
-                Text("URL")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(DS.acid)
-                    .frame(width: 52, height: 52)
-                    .overlay(Rectangle().stroke(Color.white.opacity(0.22)))
+            Button {
+                model.openDetail(.subscription(subscription.id))
+            } label: {
+                HStack(spacing: 12) {
+                    Text("URL")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(DS.acid)
+                        .frame(width: 52, height: 52)
+                        .overlay(Rectangle().stroke(Color.white.opacity(0.22)))
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(subscription.name)
-                        .font(.system(size: 17, weight: .semibold))
-                    Text(detailLine)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.55))
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(subscription.name)
+                            .font(.system(size: 17, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                        Text(detailLine)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(subscription.updated)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text("СЕЙЧАС")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(DS.acid)
+                        .padding(.horizontal, 8)
+                        .frame(height: 28)
+                        .overlay(Rectangle().stroke(DS.acid.opacity(0.7), lineWidth: 1))
                 }
-
-                Spacer(minLength: 8)
-
-                Text("СЕЙЧАС")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(DS.acid)
-                    .padding(.horizontal, 8)
-                    .frame(height: 28)
-                    .overlay(Rectangle().stroke(DS.acid.opacity(0.7), lineWidth: 1))
+                .padding(.top, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .padding(.top, 16)
+            .buttonStyle(HapticButtonStyle())
 
             HStack(spacing: 0) {
                 Button {
-                    model.openDetail(.subscription(subscription.id))
+                    model.refreshSubscription(subscriptionID: subscription.id)
                 } label: {
-                    Text("Подробнее")
-                        .font(.system(size: 13, weight: .semibold))
+                    Text("Обновить")
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(HapticButtonStyle())
+                .disabled(model.isBusy || subscription.profile.type != .remote)
 
                 Rectangle().fill(Color.white.opacity(0.12)).frame(width: 1, height: 28)
 
-                Text("Подключено")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(DS.acid)
-                    .frame(maxWidth: .infinity, minHeight: 48)
+                Button {
+                    showDeleteConfirm = true
+                } label: {
+                    Text("Удалить")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.red.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(HapticButtonStyle())
             }
             .foregroundStyle(DS.acid)
             .padding(.top, 8)

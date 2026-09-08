@@ -1,13 +1,14 @@
 # VPN Direct Documentation
 
-Engineering docs map for **v1.0.10**. Keep in sync with the GitHub README quick links.
+Engineering docs map for **v1.0.11**. Keep in sync with the GitHub README quick links.
 
 ## Start here
 
 | Document | Use it for |
 | --- | --- |
-| [`../WHATS_NEW.md`](../WHATS_NEW.md) | Latest release notes (`v1.0.10`) |
+| [`../WHATS_NEW.md`](../WHATS_NEW.md) | Latest release notes (`v1.0.11`) |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | Full version history |
+| [`TESTFLIGHT.md`](TESTFLIGHT.md) | TestFlight beta + inviting testers |
 | [`core/ARCHITECTURE.md`](core/ARCHITECTURE.md) | Core + Apple import pipeline (current) |
 | [`core/BUILDING.md`](core/BUILDING.md) | Reproducing Libbox and Apple builds |
 | [`core/PROTOCOL_MATRIX.md`](core/PROTOCOL_MATRIX.md) | Authoritative protocol status |

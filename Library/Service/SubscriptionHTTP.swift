@@ -4,7 +4,7 @@ import Security
     import UIKit
 #endif
 
-/// Subscription fetch identity modes. Generic-first for arbitrary hosts; Happ only when negotiated.
+/// Subscription fetch identity modes. Happ-first for Remnawave XRAY_JSON; generic as fallback.
 public enum SubscriptionFetchMode: String, Sendable {
     /// Minimal UA, no HWID / device headers.
     case generic
@@ -17,12 +17,12 @@ public enum SubscriptionClientIdentity {
     public static let primaryUserAgent = "Happ/3.13.0"
     public static let genericUserAgent = "vpndirect"
 
-    /// Ordered agents: generic first (no HWID), then brand, then Happ (HWID).
+    /// Ordered agents: Happ first (Remnawave XRAY_JSON + HWID), then brand, then bare generic.
     public static let userAgents: [String] = [
-        genericUserAgent,
+        primaryUserAgent,
         "VPN Direct/1.0.0",
         "sfi/1.0.0 vpndirect",
-        primaryUserAgent,
+        genericUserAgent,
     ]
 
     public static var device: DeviceIdentity.Info { DeviceIdentity.current }
@@ -154,7 +154,7 @@ enum SubscriptionHTTP {
         delegateQueue: nil
     )
 
-    /// Compatibility alias — generic-first via `SubscriptionClientIdentity`.
+    /// Compatibility alias — Happ-first via `SubscriptionClientIdentity`.
     static var userAgents: [String] { SubscriptionClientIdentity.userAgents }
 
     static func fetch(

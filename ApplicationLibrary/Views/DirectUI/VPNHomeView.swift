@@ -6,6 +6,11 @@ import UIKit
 
 #if os(iOS)
 
+private enum DirectChrome {
+    static let appBarHeight: CGFloat = 58
+    static let tabBarHeight: CGFloat = 46
+}
+
 @MainActor
 public struct VPNHomeView: View {
     @EnvironmentObject private var environments: ExtensionEnvironments
@@ -19,96 +24,104 @@ public struct VPNHomeView: View {
     public init() {}
 
     public var body: some View {
-        ZStack(alignment: .topTrailing) {
-            DS.paper.ignoresSafeArea()
+        GeometryReader { proxy in
+            let chromeWidth = proxy.size.width
 
-            VStack(spacing: 0) {
-                Color.clear.frame(height: 58)
+            ZStack(alignment: .top) {
+                DS.paper.ignoresSafeArea()
 
-                Group {
-                    if let detailPage = model.detailPage {
-                        switch detailPage {
-                        case let .subscription(id):
-                            DirectSubscriptionDetailView(model: model, subscriptionID: id)
-                        case .security:
-                            DirectSecurityCenterView(model: model)
-                        case .connection:
-                            DirectConnectionSettingsView(model: model)
-                        case .diagnostics:
-                            DirectDiagnosticsView(model: model)
-                        case .activity:
-                            DirectActivityView(model: model)
-                        case .systemSettings:
-                            DirectSystemSettingsView(model: model)
-                        case .systemWarning:
-                            DirectSystemSettingsWarningView(model: model)
-                        case .about:
-                            DirectAboutAppView(model: model)
-                        case .serviceLog:
-                            DirectServiceLogView(model: model)
+                VStack(spacing: 0) {
+                    // Reserve space for the overlay app bar — header itself is not in this tree.
+                    Color.clear.frame(height: DirectChrome.appBarHeight)
+
+                    Group {
+                        if let detailPage = model.detailPage {
+                            switch detailPage {
+                            case let .subscription(id):
+                                DirectSubscriptionDetailView(model: model, subscriptionID: id)
+                            case .security:
+                                DirectSecurityCenterView(model: model)
+                            case .connection:
+                                DirectConnectionSettingsView(model: model)
+                            case .diagnostics:
+                                DirectDiagnosticsView(model: model)
+                            case .activity:
+                                DirectActivityView(model: model)
+                            case .systemSettings:
+                                DirectSystemSettingsView(model: model)
+                            case .systemWarning:
+                                DirectSystemSettingsWarningView(model: model)
+                            case .about:
+                                DirectAboutAppView(model: model)
+                            case .serviceLog:
+                                DirectServiceLogView(model: model)
                         case .newConfiguration:
                             DirectNewConfigurationView(model: model)
+                        case .importFile:
+                            DirectImportFileView(model: model)
+                        case .importConfigText:
+                            DirectImportConfigTextView(model: model)
                         case .applicationSettings:
-                            DirectApplicationSettingsView(model: model)
-                        case .coreSettings:
-                            DirectCoreSettingsView(model: model)
-                        case .tunnelSettings:
-                            DirectTunnelSettingsView(model: model)
-                        case .onDemandSettings:
-                            DirectOnDemandSettingsView(model: model)
-                        case .accessChoice:
-                            DirectAccessChoiceView(model: model)
-                        case .freeAccess:
-                            DirectFreeAccessView(model: model)
-                        case .premiumPlans:
-                            DirectPremiumPlansView(model: model)
-                        case .payment:
-                            DirectPaymentMethodView(model: model)
-                        case .addOns:
-                            DirectAddOnsView(model: model)
-                        }
-                    } else {
-                        switch model.selectedTab {
-                        case .home:
-                            DirectHomePage(model: model)
-                        case .subscriptions:
-                            DirectSubscriptionsPage(model: model) {
-                                model.isMenuOpen = true
+                                DirectApplicationSettingsView(model: model)
+                            case .coreSettings:
+                                DirectCoreSettingsView(model: model)
+                            case .tunnelSettings:
+                                DirectTunnelSettingsView(model: model)
+                            case .onDemandSettings:
+                                DirectOnDemandSettingsView(model: model)
+                            case .accessChoice:
+                                DirectAccessChoiceView(model: model)
+                            case .freeAccess:
+                                DirectFreeAccessView(model: model)
+                            case .premiumPlans:
+                                DirectPremiumPlansView(model: model)
+                            case .payment:
+                                DirectPaymentMethodView(model: model)
+                            case .addOns:
+                                DirectAddOnsView(model: model)
                             }
-                        case .profile:
-                            DirectProfilePage(model: model)
+                        } else {
+                            switch model.selectedTab {
+                            case .home:
+                                DirectHomePage(model: model)
+                            case .subscriptions:
+                                DirectSubscriptionsPage(model: model) {
+                                    model.isMenuOpen = true
+                                }
+                            case .profile:
+                                DirectProfilePage(model: model)
+                            }
                         }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    bottomNavigation
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(width: chromeWidth, height: proxy.size.height)
 
-                bottomNavigation
-            }
+                if model.isMenuOpen {
+                    Color.black.opacity(0.12)
+                        .ignoresSafeArea(edges: .bottom)
+                        .padding(.top, DirectChrome.appBarHeight)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            model.isMenuOpen = false
+                            HapticManager.shared.play(.menuClosed)
+                        }
+                        .zIndex(30)
 
-            if model.isMenuOpen {
-                Color.black.opacity(0.12)
-                    .ignoresSafeArea(edges: .bottom)
-                    .padding(.top, 58)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        model.isMenuOpen = false
-                        HapticManager.shared.play(.menuClosed)
-                    }
-                    .zIndex(30)
+                    addSubscriptionMenu
+                        .padding(.top, DirectChrome.appBarHeight + 4)
+                        .padding(.trailing, 16)
+                        .zIndex(40)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
-                addSubscriptionMenu
-                    .padding(.top, 62)
-                    .padding(.trailing, 16)
-                    .zIndex(40)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-
-            VStack(spacing: 0) {
+                // Overlay app bar: width locked to container, never laid out with tab content.
                 appHeader
-                Spacer(minLength: 0)
-                    .allowsHitTesting(false)
+                    .frame(width: chromeWidth)
+                    .zIndex(50)
             }
-            .zIndex(50)
         }
         .tint(DS.ink)
         .preferredColorScheme(.light)
@@ -217,52 +230,67 @@ public struct VPNHomeView: View {
     }
 
     private var appHeader: some View {
-        HStack {
+        HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 1) {
-                Text("VPN DIRECT").font(.system(size: 16, weight: .bold))
+                Text("VPN DIRECT").font(.system(size: 15, weight: .bold))
                 Text("PRIVATE NETWORK").microLabel()
             }
-            Spacer()
-            Text("VPN / \(String(format: "%02d", model.headerPageIndex))").microLabel()
-            Button {
-                model.isMenuOpen.toggle()
-                HapticManager.shared.play(model.isMenuOpen ? .menuOpened : .menuClosed)
-            } label: {
-                ZStack {
-                    if model.isMenuOpen {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .medium))
-                    } else {
-                        VStack(spacing: 5) {
-                            Capsule().fill(DS.ink).frame(width: 16, height: 1.5)
-                            Capsule().fill(DS.ink).frame(width: 16, height: 1.5)
-                        }
-                    }
-                }
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-                .background(model.isMenuOpen ? DS.ink : Color.clear)
-                .foregroundStyle(model.isMenuOpen ? DS.acid : DS.ink)
-                .overlay(Rectangle().stroke(DS.ink, lineWidth: 1))
-            }
-            .buttonStyle(HapticButtonStyle())
-            .padding(.leading, 8)
+            Spacer(minLength: 0)
         }
         .padding(.leading, 20)
-        .padding(.trailing, 10)
-        .frame(height: 58)
-        .overlay(alignment: .bottom) { Hairline() }
-        .zIndex(20)
+        // Keep trailing controls out of the HStack flow — absolute pin to the bar edge.
+        .overlay(alignment: .trailing) {
+            HStack(spacing: 8) {
+                Text("VPN / \(String(format: "%02d", model.headerPageIndex))")
+                    .microLabel()
+                Button {
+                    model.isMenuOpen.toggle()
+                    HapticManager.shared.play(model.isMenuOpen ? .menuOpened : .menuClosed)
+                } label: {
+                    ZStack {
+                        if model.isMenuOpen {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .medium))
+                        } else {
+                            VStack(spacing: 4) {
+                                Capsule().fill(DS.ink).frame(width: 14, height: 1.5)
+                                Capsule().fill(DS.ink).frame(width: 14, height: 1.5)
+                            }
+                        }
+                    }
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+                    .background(model.isMenuOpen ? DS.ink : Color.clear)
+                    .foregroundStyle(model.isMenuOpen ? DS.acid : DS.ink)
+                    .overlay(Rectangle().stroke(DS.ink, lineWidth: 1))
+                }
+                .buttonStyle(HapticButtonStyle())
+            }
+            .padding(.trailing, 12)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: DirectChrome.appBarHeight)
         .background(DS.paper)
+        .overlay(alignment: .bottom) { Hairline() }
+        // Tab switches must never animate this chrome.
+        .transaction { $0.animation = nil }
     }
 
     private var addSubscriptionMenu: some View {
         let actions: [(String, String, String, String, () -> Void)] = [
-            ("01", "Отсканировать QR", "Открыть камеру", "qrcode.viewfinder", { showQRScanner = true }),
-            ("02", "Вставить из буфера", "Использовать скопированную ссылку", "doc.on.clipboard", { pasteFromClipboard() }),
-            ("03", "Ручной ввод", "Ввести URL подписки", "arrow.right", {
+            ("01", "Отсканировать QR", "Ссылка подписки или share-link", "qrcode.viewfinder", { showQRScanner = true }),
+            ("02", "Вставить из буфера", "Ссылка или готовый конфиг", "doc.on.clipboard", { pasteFromClipboard() }),
+            ("03", "Ручной ввод ссылки", "vless / vmess / trojan / https", "link", {
                 model.selectedTab = .subscriptions
                 model.openDetail(.newConfiguration)
+            }),
+            ("04", "Импорт файла", "JSON, Clash, WireGuard, ovpn", "doc.badge.arrow.up", {
+                model.selectedTab = .subscriptions
+                model.openDetail(.importFile)
+            }),
+            ("05", "Вставить конфиг", "Текст JSON / YAML / URI-список", "doc.plaintext", {
+                model.selectedTab = .subscriptions
+                model.openDetail(.importConfigText)
             }),
         ]
 
@@ -270,7 +298,7 @@ public struct VPNHomeView: View {
             HStack {
                 Text("ДОБАВИТЬ ПОДПИСКУ").microLabel(color: .white.opacity(0.48))
                 Spacer()
-                Text("03 ВАРИАНТА").microLabel(color: .white.opacity(0.48))
+                Text("05 ВАРИАНТОВ").microLabel(color: .white.opacity(0.48))
             }
             .padding(16)
 
@@ -309,7 +337,7 @@ public struct VPNHomeView: View {
                 Button {
                     model.select(tab: tab)
                 } label: {
-                    VStack(spacing: 5) {
+                    VStack(spacing: 3) {
                         Text(String(format: "%02d", tab.rawValue)).microLabel(color: model.selectedTab == tab ? DS.green : DS.muted)
                         Text(tab.title)
                             .font(.system(size: 11, weight: model.selectedTab == tab ? .semibold : .regular))
@@ -320,7 +348,7 @@ public struct VPNHomeView: View {
                 .buttonStyle(HapticButtonStyle())
             }
         }
-        .frame(height: 64)
+        .frame(height: DirectChrome.tabBarHeight)
         .overlay(alignment: .top) { Hairline() }
     }
 
@@ -340,7 +368,7 @@ public struct VPNHomeView: View {
             applyImportString(string)
             showQRScanner = false
         case .qrsData:
-            model.alert = AlertState(errorMessage: String(localized: "Используйте QR с vless:// или https:// ссылкой подписки."))
+            model.alert = AlertState(errorMessage: String(localized: "Используйте QR со ссылкой подписки или share-link."))
             showQRScanner = false
         }
     }
@@ -366,6 +394,13 @@ public struct VPNHomeView: View {
             )
             return
         }
+        // Raw config body (JSON / Clash / WG / URI list) — not a bare URL.
+        if DirectLocalProfileImporter.looksLikeConfigContent(trimmed) {
+            model.pendingImportConfigText = trimmed
+            model.selectedTab = .subscriptions
+            model.openDetail(.importConfigText)
+            return
+        }
         var error: NSError?
         let remoteProfile = LibboxParseRemoteProfileImportLink(trimmed, &error)
         if let error {
@@ -373,7 +408,7 @@ public struct VPNHomeView: View {
             return
         }
         guard let remoteProfile else {
-            model.alert = AlertState(errorMessage: String(localized: "Нужна ссылка vless://, vmess://, trojan:// или https:// подписки."))
+            model.alert = AlertState(errorMessage: String(localized: "Нужна ссылка, share-link или конфиг (JSON / Clash / WG)."))
             return
         }
         importRequest = NewProfileView.ImportRequest(name: remoteProfile.name, url: remoteProfile.url)

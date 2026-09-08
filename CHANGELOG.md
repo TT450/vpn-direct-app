@@ -2,6 +2,18 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.11] — 2026-09-08
+
+### DirectUI + widgets
+
+- Home Screen / Lock Screen / Control Center widgets (VPN Direct branded toggle + status)
+- Connection mode **5G** (renamed from «Антиблокировка»; stored preference migrates)
+- Page chrome: unified heading size; Home kicker `КЛИЕНТ / VPN`; status dot after title
+- Subscriptions: vertical-only ScrollView (no horizontal pan); card text constraints
+- Import menu: QR, clipboard, URL, file, paste config (`DirectImportViews` / local importer)
+- Server picker: full-width Ping; offline TCP endpoint ping + connected urlTest
+- Fastlane `ios release` lane: ASC API key + TestFlight upload path documented in `docs/TESTFLIGHT.md`
+
 ## [1.0.10] — 2026-09-08
 
 ### Tunnel import + CONNECT-UDP

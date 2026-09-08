@@ -72,7 +72,7 @@ Core намеренно близок к upstream sing-box. Кастомные в
 
 ## Текущий статус Core
 
-**Последний релиз:** [`v1.0.10`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.10) · pin Core: [`core/VERSION`](core/VERSION).
+**Последний релиз:** [`v1.0.11`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11) · pin Core: [`core/VERSION`](core/VERSION).
 
 Фича не считается **production / `tested`** только из‑за builder. Нужен полный путь:
 
@@ -195,7 +195,7 @@ vpn-direct-app/
 | [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) | Что парсится, компилируется, тестируется |
 | [Release Blocker Ledger](docs/core/RELEASE_BLOCKER_LEDGER.md) | Блокеры релиза |
 | [Roadmap](ROADMAP.md) | Публичный roadmap |
-| [What's New](WHATS_NEW.md) | Релизные заметки последнего тега (`v1.0.10`) |
+| [What's New](WHATS_NEW.md) | Релизные заметки последнего тега (`v1.0.11`) |
 | [iPhone Qualification](docs/device/IPHONE_QUALIFICATION.md) | Чеклист device evidence |
 
 ## Публичные идентификаторы

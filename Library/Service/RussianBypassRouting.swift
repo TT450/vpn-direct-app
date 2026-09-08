@@ -8,13 +8,16 @@ public enum RussianBypassRouting {
         "vpndirect-geosite-ru-available-only-inside",
     ]
 
+    /// Shared HTTP client tag for remote rule-set downloads (sing-box 1.14+; replaces `download_detour`).
+    private static let httpClientTag = "vpndirect-ruleset-http"
+
     private static let ruleSets: [[String: Any]] = [
         [
             "tag": "vpndirect-geosite-category-ru",
             "type": "remote",
             "format": "binary",
             "url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geosite/geosite-category-ru.srs",
-            "download_detour": "proxy",
+            "http_client": httpClientTag,
             "update_interval": "24h",
         ],
         [
@@ -22,7 +25,7 @@ public enum RussianBypassRouting {
             "type": "remote",
             "format": "binary",
             "url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geoip/geoip-ru.srs",
-            "download_detour": "proxy",
+            "http_client": httpClientTag,
             "update_interval": "24h",
         ],
         [
@@ -30,7 +33,7 @@ public enum RussianBypassRouting {
             "type": "remote",
             "format": "binary",
             "url": "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/sing-box/rule-set-geosite/geosite-ru-available-only-inside.srs",
-            "download_detour": "proxy",
+            "http_client": httpClientTag,
             "update_interval": "24h",
         ],
     ]
@@ -61,6 +64,10 @@ public enum RussianBypassRouting {
             return false
         }
 
+        // Always scrub legacy `download_detour` so sing-box 1.14+ does not warn.
+        sets = sets.map(migrateLegacyDownloadDetour)
+        scrubLegacyGeoDownloadDetour(route: &route)
+
         if enabled {
             sets.append(contentsOf: ruleSets)
             let insertIndex = rules.firstIndex { rule in
@@ -71,6 +78,20 @@ public enum RussianBypassRouting {
                 "outbound": "direct",
             ]
             rules.insert(bypassRule, at: min(insertIndex, rules.count))
+        }
+
+        let needsHTTPClient = enabled || sets.contains { ($0["type"] as? String) == "remote" }
+        if needsHTTPClient {
+            ensureSharedHTTPClient(root: &root, route: &route)
+            // Point any remote set still missing http_client at the shared client.
+            sets = sets.map { set in
+                var next = set
+                guard (next["type"] as? String) == "remote" else { return next }
+                if next["http_client"] == nil {
+                    next["http_client"] = httpClientTag
+                }
+                return next
+            }
         }
 
         route["rule_set"] = sets
@@ -89,5 +110,40 @@ public enum RussianBypassRouting {
             return json
         }
         return text
+    }
+
+    /// `download_detour` → `http_client` tag/object (sing-box 1.14+). Always drops the legacy key.
+    private static func migrateLegacyDownloadDetour(_ set: [String: Any]) -> [String: Any] {
+        var next = set
+        let legacy = next.removeValue(forKey: "download_detour") as? String
+        if next["http_client"] == nil {
+            if let legacy, !legacy.isEmpty {
+                next["http_client"] = ["detour": legacy]
+            } else if (next["type"] as? String) == "remote" {
+                next["http_client"] = httpClientTag
+            }
+        }
+        return next
+    }
+
+    private static func scrubLegacyGeoDownloadDetour(route: inout [String: Any]) {
+        for key in ["geoip", "geosite"] {
+            guard var block = route[key] as? [String: Any] else { continue }
+            block.removeValue(forKey: "download_detour")
+            route[key] = block
+        }
+    }
+
+    /// Explicit shared client so remote rule-sets do not need legacy `download_detour`.
+    /// Uses `direct` so rule-set files can download before the VPN tunnel is fully selected.
+    private static func ensureSharedHTTPClient(root: inout [String: Any], route: inout [String: Any]) {
+        var clients = root["http_clients"] as? [[String: Any]] ?? []
+        clients.removeAll { ($0["tag"] as? String) == httpClientTag }
+        clients.append([
+            "tag": httpClientTag,
+            "detour": "direct",
+        ])
+        root["http_clients"] = clients
+        route["default_http_client"] = httpClientTag
     }
 }

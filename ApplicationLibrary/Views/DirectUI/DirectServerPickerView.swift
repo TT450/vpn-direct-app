@@ -75,22 +75,59 @@ struct DirectServerPickerView: View {
                             Text(item.rawValue)
                             if item == .favorites {
                                 Text(String(format: "%02d", model.favoriteServers(for: model.activeSubscription).count))
-                                    .microLabel(color: DS.green)
+                                    .microLabel(color: tab == item ? DS.green : DS.muted)
                             }
                         }
-                        .font(.system(size: 10, weight: tab == item ? .semibold : .regular))
-                        .frame(maxWidth: .infinity, minHeight: 38)
+                        .font(.system(size: 11, weight: tab == item ? .semibold : .regular))
+                        .foregroundStyle(tab == item ? DS.ink : DS.muted)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(tab == item ? Color.white.opacity(0.72) : Color.clear)
                         .overlay(alignment: .bottom) {
                             if tab == item {
-                                Rectangle().fill(DS.ink).frame(height: 2).padding(.horizontal, 18)
+                                Rectangle().fill(DS.ink).frame(height: 2)
                             }
                         }
                     }
                     .buttonStyle(HapticButtonStyle())
+                    if item != PickerTab.allCases.last {
+                        Hairline().frame(width: 1).padding(.vertical, 8)
+                    }
                 }
             }
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .background(Color.white.opacity(0.52))
+            .overlay(Rectangle().stroke(DS.line, lineWidth: 1))
             .padding(.horizontal, 20)
-            .padding(.top, 8)
+            .padding(.top, 10)
+
+            Button {
+                model.pingAllServers()
+            } label: {
+                HStack(spacing: 10) {
+                    if model.isPingingServers {
+                        ProgressView()
+                            .tint(DS.acid)
+                    } else {
+                        Image(systemName: "waveform.path.ecg")
+                            .foregroundStyle(DS.acid)
+                    }
+                    Text(model.isPingingServers ? "Пинг…" : "Пинг")
+                        .font(.system(size: 14, weight: .semibold))
+                    Spacer()
+                    Text(model.isPingingServers ? "ИЗМЕРЕНИЕ" : "ВСЕ СЕРВЕРЫ")
+                        .microLabel(color: .white.opacity(0.45))
+                }
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .foregroundStyle(.white)
+                .background(DS.ink)
+            }
+            .buttonStyle(HapticButtonStyle())
+            .disabled(model.isPingingServers || (model.activeSubscription?.servers.isEmpty ?? true))
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
 
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 0) {
@@ -124,7 +161,6 @@ struct DirectServerPickerView: View {
         .background(DS.paper.ignoresSafeArea())
         .hapticScrollThresholds()
         .hapticSelection(tab)
-        .onAppear { model.requestURLTest() }
     }
 }
 

@@ -143,6 +143,10 @@ struct DirectSubscriptionDetailView: View {
         DirectBuiltinProfile.isBuiltin(subscription?.profile.remoteURL)
     }
 
+    private var meta: SubscriptionMetadata {
+        SubscriptionMetadataStore.load(profileID: subscriptionID) ?? SubscriptionMetadata()
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
@@ -188,15 +192,28 @@ struct DirectSubscriptionDetailView: View {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 0) {
                         DetailFact(label: "ИСТЕКАЕТ", value: subscription.expiry)
                         DetailFact(label: "УСТРОЙСТВ", value: subscription.devices)
-                        DetailFact(label: "ПРОТОКОЛЫ", value: "VLESS")
+                        DetailFact(label: "ТРАФИК", value: meta.trafficQuotaFullLabel)
                         DetailFact(label: "ОБНОВЛЕНА", value: subscription.updated.uppercased())
+                        DetailFact(label: "ЛОКАЦИЙ", value: "\(subscription.servers.count)")
+                        DetailFact(
+                            label: "ПАНЕЛЬ",
+                            value: (meta.compatibilityProfileID ?? "generic").uppercased()
+                        )
+                    }
+
+                    if let announce = meta.announce?.trimmingCharacters(in: .whitespacesAndNewlines), !announce.isEmpty {
+                        DirectSectionHeader(title: "ОБЪЯВЛЕНИЕ", meta: "PANEL").padding(.top, 16)
+                        Text(announce)
+                            .font(.system(size: 12))
+                            .foregroundStyle(DS.muted)
+                            .padding(.vertical, 10)
                     }
 
                     if !isActive {
                         Button {
                             model.activate(subscriptionID: subscriptionID)
                         } label: {
-                            HStack { Text("Сделать активной"); Spacer(); Image(systemName: "arrow.right") }
+                            HStack { Text("Активировать"); Spacer(); Image(systemName: "arrow.right") }
                                 .padding(.horizontal, 15).frame(height: 48)
                                 .foregroundStyle(DS.acid).background(DS.ink)
                         }
@@ -234,7 +251,7 @@ struct DirectSubscriptionDetailView: View {
                             ActionRow(number: "03", title: "Поделиться конфигурацией", subtitle: "Экспортировать ссылку или QR-код", icon: "square.and.arrow.up") {
                                 model.shareSubscription(subscriptionID: subscriptionID)
                             }
-                            ActionRow(number: "04", title: "Удалить подписку", subtitle: "Удалить конфигурацию с устройства", icon: "trash", destructive: true) {
+                            ActionRow(number: "04", title: "Удалить подписку", subtitle: "Полностью удалить конфигурацию с устройства", icon: "trash", destructive: true) {
                                 showDeleteConfirm = true
                             }
                         }
@@ -258,7 +275,7 @@ struct DirectSubscriptionDetailView: View {
             }
             Button("Отмена", role: .cancel) {}
         } message: {
-            Text("Конфигурация будет удалена с этого устройства.")
+            Text("Конфигурация будет полностью удалена с этого устройства.")
         }
     }
 
@@ -603,7 +620,11 @@ struct DirectConnectionReportView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        SheetScaffold(kicker: "ПРОВЕРКА / ВЫПОЛНЕНО", title: model.isProtected ? "Соединение защищено" : "Соединение не защищено", close: { dismiss() }) {
+        SheetScaffold(
+            kicker: "ПРОВЕРКА / \(model.isProtected ? "VPN" : "WAN")",
+            title: model.isProtected ? "Соединение подключено" : "Соединение отключено",
+            close: { dismiss() }
+        ) {
             HStack(spacing: 13) {
                 Text(model.isProtected ? "✓" : "×")
                     .font(.system(size: 19))
@@ -611,13 +632,26 @@ struct DirectConnectionReportView: View {
                     .frame(width: 47, height: 47)
                     .overlay(Rectangle().stroke(Color.white.opacity(0.25)))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("ВНЕШНИЙ IP").microLabel(color: .white.opacity(0.42))
-                    Text(model.isProtected ? "185.213.•••.••" : "—").font(.system(size: 16, weight: .semibold, design: .monospaced))
-                    Text(model.activeServer.map { $0.locationLabel } ?? "VPN не подключён")
+                    Text(model.isProtected ? "IP VPN" : "РЕАЛЬНЫЙ IP").microLabel(color: .white.opacity(0.42))
+                    HStack(spacing: 8) {
+                        if model.publicIPLoading {
+                            ProgressView().tint(DS.acid)
+                        }
+                        Text(model.publicIPText)
+                            .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                    }
+                    Text(model.isProtected
+                         ? (model.activeServer.map { $0.locationLabel } ?? "Туннель активен")
+                         : "Без VPN — адрес вашего провайдера")
                         .font(.system(size: 9)).foregroundStyle(.white.opacity(0.5))
                 }
                 Spacer()
-                Text(model.isProtected ? "БЕЗ УТЕЧЕК" : "НЕ ЗАЩИЩЕНО").microLabel(color: model.isProtected ? DS.acid : DS.danger)
+                Button {
+                    model.refreshPublicIP()
+                } label: {
+                    Text("ОБНОВИТЬ").microLabel(color: DS.acid)
+                }
+                .buttonStyle(HapticButtonStyle())
             }
             .padding(.horizontal, 14).frame(height: 106).background(DS.ink).foregroundStyle(.white)
 
@@ -631,7 +665,15 @@ struct DirectConnectionReportView: View {
             }
 
             DirectSectionHeader(title: "ПРОВЕРКА КАНАЛА", meta: model.isProtected ? "4 / 4" : "0 / 4").padding(.top, 18)
-            ForEach(["IP-адрес скрыт", "DNS-запросы защищены", "WebRTC утечек нет", "Маршрут через \(model.activeSubscription?.name ?? "VPN")"], id: \.self) { item in
+            ForEach(
+                [
+                    model.isProtected ? "Исходящий IP через VPN" : "Показан реальный IP",
+                    "DNS-запросы \(model.isProtected ? "защищены" : "открыты")",
+                    "WebRTC \(model.isProtected ? "утечек нет" : "не проверялся")",
+                    "Маршрут через \(model.activeSubscription?.name ?? "VPN")",
+                ],
+                id: \.self
+            ) { item in
                 HStack {
                     Text(item).font(.system(size: 11))
                     Spacer()
@@ -641,9 +683,13 @@ struct DirectConnectionReportView: View {
             }
         }
         .onAppear {
+            model.refreshPublicIP()
             if model.isProtected {
                 HapticManager.shared.play(.vpnConnected)
             }
+        }
+        .onChange(of: model.isProtected) { _ in
+            model.refreshPublicIP()
         }
     }
 }
@@ -657,7 +703,7 @@ struct DirectConnectionProfilesView: View {
         ("S", "Максимальная скорость", "Ближайший сервер с минимальным ping"),
         ("R", "Стабильный", "Надёжный маршрут и failover"),
         ("V", "Для видео", "Высокая пропускная способность"),
-        ("X", "Антиблокировка", "Автоподбор транспорта и порта"),
+        ("X", "5G", "Автоподбор транспорта и порта"),
     ]
 
     var body: some View {

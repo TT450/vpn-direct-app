@@ -628,7 +628,7 @@ struct DirectServiceLogView: View {
     }
 }
 
-private struct ConfigField<Content: View>: View {
+struct ConfigField<Content: View>: View {
     let number: String
     let title: String
     let content: Content
@@ -671,7 +671,7 @@ struct DirectNewConfigurationView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 7) {
                         Text("ПОДДЕРЖИВАЕМЫЕ ФОРМАТЫ").microLabel(color: .white.opacity(0.42))
-                        Text("vless://  ·  vmess://  ·  https://")
+                        Text("vless · vmess · trojan · ss · hy2 · https://")
                             .font(.system(size: 12, weight: .medium, design: .monospaced))
                     }
                     Spacer()

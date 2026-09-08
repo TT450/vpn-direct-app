@@ -18,6 +18,11 @@ Thanks for using VPN Direct.
 | Security vulnerability | [`SECURITY.md`](SECURITY.md) (private advisory) |
 | Upstream sing-box engine | [SagerNet/sing-box](https://github.com/SagerNet/sing-box) |
 
-## App Store
+## App Store / TestFlight
 
-[VPN Direct on the App Store](https://apps.apple.com/app/id6807402257)
+| | |
+| --- | --- |
+| App Store | [VPN Direct](https://apps.apple.com/app/id6807402257) |
+| TestFlight beta | [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md) — invite Internal/External testers, public link |
+
+Never put API keys, `.p8` files, or team secrets in issues or this repo.

@@ -54,7 +54,7 @@ Subscription / Config → Content Detector → Universal Parser / Adapters
 
 ## Hozirgi Core holati
 
-**So‘nggi reliz:** [`v1.0.10`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.10)
+**So‘nggi reliz:** [`v1.0.11`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11)
 
 Builder/parser borligi — hali `tested` / production emas. Holat: [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md).
 

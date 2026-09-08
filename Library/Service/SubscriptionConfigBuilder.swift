@@ -140,9 +140,9 @@ public enum SubscriptionConfigBuilder {
     ) async throws -> Result {
         let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
         var lastError: Error = SubscriptionError.empty
-        // Generic-first (no HWID); Happ UA is last and alone sends device identity.
-        precondition(SubscriptionClientIdentity.userAgents.first == SubscriptionClientIdentity.genericUserAgent)
-        precondition(SubscriptionClientIdentity.userAgents.contains(SubscriptionClientIdentity.primaryUserAgent))
+        // Happ-first (Remnawave / Happ panels need HWID for XRAY_JSON); generic UA is last fallback.
+        precondition(SubscriptionClientIdentity.userAgents.first == SubscriptionClientIdentity.primaryUserAgent)
+        precondition(SubscriptionClientIdentity.userAgents.contains(SubscriptionClientIdentity.genericUserAgent))
 
         for agent in SubscriptionClientIdentity.userAgents {
             do {

@@ -13,7 +13,7 @@ public enum SingBoxGraphBuilder {
         static let dnsStrategy = "prefer_ipv4"
         static let tunMTUWithoutProtocolHint = 1500
         static let urltestProbe = "https://www.gstatic.com/generate_204"
-        static let urltestInterval = "1m"
+        static let urltestInterval = "12s"
         static let urltestTolerance = 80
         static let urltestIdleTimeout = "30m"
         static let bypassPrivateNetworks = true
@@ -77,21 +77,33 @@ public enum SingBoxGraphBuilder {
             return candidates[0]
         }
 
-        var referencedNames = Set<String>()
+        // Detour / nested-group targets only. Do NOT treat every xrayTag (e.g. ubiquitous "proxy"
+        // across Remnawave country profiles) as topology-critical — that made one bad leaf abort
+        // the entire subscription graph.
+        var detourTargets = Set<String>()
         for location in subscription.locations {
             for endpoint in location.endpoints {
-                if let detour = endpoint.detour, !detour.isEmpty { referencedNames.insert(detour) }
-                if let xrayTag = endpoint.attributes["xrayTag"], !xrayTag.isEmpty { referencedNames.insert(xrayTag) }
+                if let detour = endpoint.detour, !detour.isEmpty { detourTargets.insert(detour) }
             }
-            for member in location.memberLocationIDs { referencedNames.insert(member) }
+            for member in location.memberLocationIDs { detourTargets.insert(member) }
         }
 
         // Pre-assign every location tag so nested groups are order-independent.
         var locationIDToTag: [String: String] = [:]
         var ambiguousLocationNames = Set<String>()
+        // Prefer human-readable location.name for tags (Remnawave "Germany" / Happ country UX).
+        // `profile-N` / `share-N` ids are stable keys only — they must not become picker labels.
         for (index, location) in subscription.locations.enumerated() {
+            let tagSource: String
+            if !location.name.isEmpty {
+                tagSource = location.name
+            } else if !location.id.isEmpty {
+                tagSource = location.id
+            } else {
+                tagSource = ""
+            }
             let tag = VPNDirectTagFactory.uniqueTag(
-                from: location.id.isEmpty ? location.name : location.id,
+                from: tagSource,
                 fallback: "loc-\(index + 1)",
                 used: &usedTags
             )
@@ -119,12 +131,8 @@ public enum SingBoxGraphBuilder {
                 } catch {
                     let (component, detail) = classifyBuildError(error)
                     let xrayTag = endpoint.attributes["xrayTag"] ?? ""
-                    let topologyReferenced = referencedNames.contains(endpoint.name)
-                        || (!xrayTag.isEmpty && referencedNames.contains(xrayTag))
-                        || endpoint.detour != nil
-                        || location.strategy != .single
-                        || !location.memberLocationIDs.isEmpty
-                        || location.endpoints.count > 1
+                    let topologyReferenced = detourTargets.contains(endpoint.name)
+                        || (!xrayTag.isEmpty && detourTargets.contains(xrayTag))
                     rejected.append(RejectedLeaf(
                         name: endpoint.name,
                         protocolID: endpoint.protocolID.rawValue,

@@ -247,6 +247,8 @@ private struct HapticScrollThresholdModifier: ViewModifier {
         content.simultaneousGesture(
             DragGesture(minimumDistance: 12)
                 .onChanged { value in
+                    // Ignore mostly-horizontal pans so tab pages don't feel like a website.
+                    guard abs(value.translation.height) >= abs(value.translation.width) else { return }
                     let distance = hypot(value.translation.width, value.translation.height)
                     if distance > 44, !crossedFirst {
                         crossedFirst = true

@@ -44,6 +44,9 @@ public enum XrayJSONAdapter {
         var locations: [NormalizedLocation] = []
         var firstName: String?
         var allImportWarnings: [String] = []
+        // Remnawave / Happ XRAY_JSON: multiple remarked profiles → TheTochka country UX
+        // (skip packed Автовыбор, one selectable leaf per country). Other Xray shapes keep full leaves.
+        let remnawaveStyle = looksLikeRemnawaveHappProfiles(profiles)
 
         for (index, profile) in profiles.enumerated() {
             let remarks = ((profile["remarks"] as? String) ?? "")
@@ -51,6 +54,11 @@ public enum XrayJSONAdapter {
             let displayName = remarks.isEmpty ? "Server \(index + 1)" : remarks
 
             if isTrafficStub(displayName) {
+                continue
+            }
+
+            // TheTochka Remnawave: «Автовыбор» packs every node — prefer named country profiles.
+            if remnawaveStyle, isGlobalAutoName(displayName), profiles.count > 1 {
                 continue
             }
 
@@ -96,6 +104,13 @@ public enum XrayJSONAdapter {
                 if rt == "proxy" { return false }
                 return false
             }
+            // TheTochka Remnawave: one primary outbound per country (prefer tag `proxy`).
+            let workList: [[String: Any]] = {
+                if remnawaveStyle, let primary = ordered.first {
+                    return [primary]
+                }
+                return ordered
+            }()
 
             var endpoints: [NormalizedNode] = []
             var xrayTagToIndex: [String: Int] = [:]
@@ -104,7 +119,7 @@ public enum XrayJSONAdapter {
             var seenServersInProfile = Set<String>()
             // convertFailures may already contain unsupported_protocol diagnostics.
 
-            for (entryIndex, xray) in ordered.enumerated() {
+            for (entryIndex, xray) in workList.enumerated() {
                 let xrayTag = ((xray["tag"] as? String) ?? "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 let fallbackTag = "loc-\(index + 1)-\(entryIndex + 1)"
@@ -144,7 +159,7 @@ public enum XrayJSONAdapter {
                 // TheTochka/Happ: single-leaf profiles keep remarks as the UI name (flags/labels).
                 // Multi-leaf profiles prefer the Xray tag, else a stable remarks suffix (not "-n1").
                 let leafName: String
-                if ordered.count == 1 {
+                if workList.count == 1 {
                     leafName = displayName
                 } else if !xrayTag.isEmpty {
                     leafName = xrayTag
@@ -248,11 +263,19 @@ public enum XrayJSONAdapter {
             }
 
             let kind: NormalizedLocationKind = isGlobalAutoName(displayName) ? .globalAuto : .country
-            let (filtered, strategy) = try applyBalancers(
-                balancers: balancers,
-                endpoints: endpoints,
-                locationName: displayName
-            )
+            let filtered: [NormalizedNode]
+            let strategy: NormalizedLocationStrategy
+            if remnawaveStyle {
+                // Country profiles are already collapsed to one primary leaf — no balancer expand.
+                filtered = endpoints
+                strategy = .single
+            } else {
+                (filtered, strategy) = try applyBalancers(
+                    balancers: balancers,
+                    endpoints: endpoints,
+                    locationName: displayName
+                )
+            }
             endpoints = filtered
 
             locations.append(
@@ -560,6 +583,22 @@ public enum XrayJSONAdapter {
     private static func isTrafficStub(_ name: String) -> Bool {
         name.localizedCaseInsensitiveContains("осталось трафика")
             || name.localizedCaseInsensitiveContains("traffic left")
+    }
+
+    /// Remnawave Happ payload: JSON array of profiles with `remarks` + nested `outbounds`.
+    private static func looksLikeRemnawaveHappProfiles(_ profiles: [[String: Any]]) -> Bool {
+        guard profiles.count >= 2 else { return false }
+        var remarked = 0
+        var withOutbounds = 0
+        for profile in profiles {
+            let remarks = ((profile["remarks"] as? String) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !remarks.isEmpty { remarked += 1 }
+            if let outs = profile["outbounds"] as? [[String: Any]], !outs.isEmpty {
+                withOutbounds += 1
+            }
+        }
+        return remarked >= 2 && withOutbounds >= 2
     }
 
     private static func isGlobalAutoName(_ name: String) -> Bool {

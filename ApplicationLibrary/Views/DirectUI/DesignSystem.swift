@@ -35,9 +35,19 @@ struct PageHeading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(kicker).microLabel()
-            Text(title).font(.system(size: 39, weight: .semibold))
-            Text(subtitle).font(.system(size: 13)).foregroundStyle(DS.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(title)
+                .font(.system(size: 22, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Text(subtitle)
+                .font(.system(size: 13))
+                .foregroundStyle(DS.muted)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -77,6 +87,11 @@ struct FlagImage: View {
                     .resizable()
                     .interpolation(.high)
                     .scaledToFill()
+            } else if let emoji = Self.flagEmoji(for: normalized) {
+                Text(emoji)
+                    .font(.system(size: min(width, height) * 0.85))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(DS.ink.opacity(0.35))
             } else {
                 Text(normalized)
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
@@ -111,6 +126,21 @@ struct FlagImage: View {
             }
         }
         return UIImage(named: name)
+    }
+
+    /// Regional-indicator flag for any ISO 3166-1 alpha-2 code (covers countries without assets).
+    private static func flagEmoji(for code: String) -> String? {
+        let upper = code.uppercased()
+        guard upper.count == 2, upper.unicodeScalars.allSatisfy({ CharacterSet.uppercaseLetters.contains($0) }) else {
+            return nil
+        }
+        let base: UInt32 = 0x1F1E6
+        var scalars = String.UnicodeScalarView()
+        for scalar in upper.unicodeScalars {
+            guard let flag = UnicodeScalar(base + (scalar.value - 65)) else { return nil }
+            scalars.append(flag)
+        }
+        return String(scalars)
     }
 }
 

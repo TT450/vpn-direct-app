@@ -54,7 +54,7 @@ Subscription / Config → Content Detector → Universal Parser / Adapters
 
 ## 当前 Core 状态
 
-**最新发布：** [`v1.0.10`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.10)
+**最新发布：** [`v1.0.11`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11)
 
 仅有 builder / parser **不等于** `tested` / production。权威状态见 [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md)。
 
