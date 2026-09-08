@@ -18,6 +18,7 @@ Engineering docs map for **v1.0.10**. Keep in sync with the GitHub README quick 
 | [`battle/BATTLE_SOURCE_PLAN.md`](battle/BATTLE_SOURCE_PLAN.md) | Public harvest catalog plan |
 | [`device/IPHONE_QUALIFICATION.md`](device/IPHONE_QUALIFICATION.md) | Device evidence checklist |
 | [`device/IPHONE_INSTALL_2026-09-07.md`](device/IPHONE_INSTALL_2026-09-07.md) | Wi-Fi install recipe (SFI + `devicectl`) |
+| [`device/IPHONE_INSTALL_2026-09-08.md`](device/IPHONE_INSTALL_2026-09-08.md) | Wi-Fi install evidence for v1.0.10 (build + launch) |
 | [`../interop/README.md`](../interop/README.md) | Interop lab scaffolds |
 | [`core/DONORS.md`](core/DONORS.md) | Upstream / donor source tracking |
 | [`core/LICENSE_AUDIT.md`](core/LICENSE_AUDIT.md) | Dependency / license notes |
