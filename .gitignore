@@ -50,3 +50,7 @@ tests/VPNDirectParserPackage/.build/
 **/.env.backend
 **/backend.secrets*
 **/mobile_api.server.py
+
+# Client ↔ Direct backend API (local only; do not publish)
+ApplicationLibrary/Views/DirectUI/DirectBackendAPI.swift
+**/DirectBackendAPI.swift
