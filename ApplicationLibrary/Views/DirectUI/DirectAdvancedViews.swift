@@ -13,12 +13,11 @@ private struct DetailBackButton: View {
         Button {
             model.goBack()
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "arrow.left")
-                Text(title)
-            }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(DS.muted)
+            Image(systemName: "arrow.left")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(DS.muted)
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
         }
         .buttonStyle(HapticButtonStyle())
     }
@@ -119,7 +118,7 @@ private struct SheetScaffold<Content: View>: View {
                 content
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 22)
+            .padding(.bottom, 22)
         }
         .background(DS.paper.ignoresSafeArea())
     }
@@ -260,7 +259,7 @@ struct DirectSubscriptionDetailView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .alert("Переименовать подписку", isPresented: $showRenameAlert) {
             TextField("Название", text: $renameText)
@@ -420,7 +419,7 @@ struct DirectSecurityCenterView: View {
                 }
                 .buttonStyle(HapticButtonStyle()).padding(.vertical, 18)
             }
-            .padding(.horizontal, 20).padding(.vertical, 24)
+            .padding(.horizontal, 20).padding(.bottom, 24)
         }
         .alert("Добавить доверенную сеть", isPresented: $showAddTrustedSSID) {
             TextField("Имя Wi‑Fi (SSID)", text: $trustedSSIDInput)
@@ -491,7 +490,7 @@ struct DirectConnectionSettingsView: View {
                 }
                 .padding(14).background(Color.white.opacity(0.28)).overlay(Rectangle().stroke(DS.line)).padding(.vertical, 18)
             }
-            .padding(.horizontal, 20).padding(.vertical, 24)
+            .padding(.horizontal, 20).padding(.bottom, 24)
         }
     }
 }
@@ -567,7 +566,7 @@ struct DirectDiagnosticsView: View {
                 HStack { Text("Скопировать отчёт диагностики").font(.system(size: 10)); Spacer(); Text("КОПИРОВАТЬ").microLabel(color: DS.green) }
                     .padding(.horizontal, 12).frame(height: 46).background(Color.white.opacity(0.28)).overlay(Rectangle().stroke(DS.line))
             }
-            .padding(.horizontal, 20).padding(.vertical, 24)
+            .padding(.horizontal, 20).padding(.bottom, 24)
         }
     }
 }
@@ -608,7 +607,7 @@ struct DirectActivityView: View {
                 .font(.system(size: 10)).foregroundStyle(Color.red.opacity(0.65))
                 .frame(maxWidth: .infinity, minHeight: 44).overlay(Rectangle().stroke(Color.red.opacity(0.18))).padding(.top, 15)
             }
-            .padding(.horizontal, 20).padding(.vertical, 24)
+            .padding(.horizontal, 20).padding(.bottom, 24)
         }
     }
 }

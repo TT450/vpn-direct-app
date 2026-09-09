@@ -145,7 +145,7 @@ struct DirectApplicationSettingsView: View {
                     .padding(.top, 16)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .onAppear { language = currentLanguageLabel() }
     }
@@ -203,7 +203,7 @@ struct DirectCoreSettingsView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .task {
             version = LibboxVersion()
@@ -331,7 +331,7 @@ struct DirectTunnelSettingsView: View {
                 .padding(.top, 8)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .task {
             ignoreMemoryLimit = await SharedPreferences.ignoreMemoryLimit.get()
@@ -444,7 +444,7 @@ struct DirectOnDemandSettingsView: View {
                 .padding(.top, 8)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .task {
             mode = await loadMode()

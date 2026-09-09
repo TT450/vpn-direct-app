@@ -11,12 +11,11 @@ struct AccessBackButton: View {
         Button {
             model.goBack()
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "arrow.left")
-                Text(title)
-            }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(DS.muted)
+            Image(systemName: "arrow.left")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(DS.muted)
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
         }
         .buttonStyle(HapticButtonStyle())
     }
@@ -131,7 +130,7 @@ struct DirectAccessChoiceView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
     }
 }
@@ -218,7 +217,7 @@ struct DirectPremiumPlansView: View {
                     .padding(.top, 14)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .onAppear {
             if model.selectedPlan.name == nil, model.planBrowseMode == .presets {
@@ -533,13 +532,12 @@ struct DirectPaymentMethodView: View {
                 .padding(.top, 16)
 
                 AccessButton(title: model.paymentMethod == .apple ? "Продолжить с Apple" : "Открыть защищённую страницу") {
-                    HapticManager.shared.play(.purchaseStarted)
-                    model.completeCheckout()
+                    model.requestCheckoutPayment()
                 }
                 .padding(.top, 14)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
     }
 }
@@ -665,7 +663,7 @@ struct DirectAddOnsView: View {
                     .padding(.top, 14)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
     }
 }

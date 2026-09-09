@@ -58,6 +58,21 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var pendingAddOnDay = false
     @Published public var accessChoiceContext: String?
     @Published public var importFromAccessChoice = false
+    @Published public var checkoutAuthEmail = ""
+    @Published public var checkoutAuthCode = ""
+    @Published public var checkoutAuthBotCode = ""
+    @Published public var checkoutAuthError: String?
+    @Published public var checkoutAuthBusy = false
+    /// When true, auth success returns to account instead of continuing checkout.
+    @Published public var authFlowReturnsToAccount = false
+    @Published public var paymentErrorMessage = "Не удалось завершить оплату"
+    @Published public var paymentActivationPending = false
+    @Published public var lastPaymentId: String?
+    @Published public var directAccountEmail: String?
+    @Published public var directSubscriptionURL: String?
+    @Published public var lastSuccessTitle = ""
+    @Published public var lastSuccessPrice = 0
+    @Published public var lastSuccessPeriodDays = 30
 
     // Security center (backed by SharedPreferences)
     // Kill Switch (includeAllNetworks) is permanently disabled — it can black-hole Wi‑Fi.
@@ -547,7 +562,33 @@ public final class VPNConnectionModel: ObservableObject {
         case .subscription: return "Подписка"
         case .newConfiguration, .importFile, .importConfigText: return "Импорт"
         case .applicationSettings, .coreSettings, .tunnelSettings, .onDemandSettings: return "Настройки"
+        case .authLogin: return "Вход"
+        case .authEmail: return "Email"
+        case .authCode: return "Код"
+        case .authRegister: return "Регистрация"
+        case .authRecovery: return "Восстановление"
+        case .authBot: return "Telegram"
+        case .authSuccess: return "Готово"
+        case .account: return "Аккаунт"
+        case .paymentProcessing, .paymentCancelled, .paymentError, .paymentSuccess, .externalPay:
+            return "Оплата"
         }
+    }
+
+    public func openAuthFromAccount() {
+        authFlowReturnsToAccount = true
+        checkoutAuthError = nil
+        openDetail(.authLogin)
+    }
+
+    public func completeAuthAfterSuccess() {
+        HapticManager.shared.play(.selection)
+        if authFlowReturnsToAccount {
+            detailStack.removeAll()
+            detailPage = .account
+            return
+        }
+        continueCheckoutAfterAuth()
     }
 
     public func openAccessStripAction() {
@@ -825,7 +866,174 @@ public final class VPNConnectionModel: ObservableObject {
         checkoutReturnPage = .addOns
     }
 
+    public var isDirectAuthenticated: Bool {
+        DirectBackendAPI.shared.isAuthenticated
+            || UserDefaults.standard.bool(forKey: "vpndirect.authenticated")
+    }
+
+    public func savePendingCheckout() {
+        PendingCheckout.save(
+            PendingCheckout(
+                title: checkoutTitle,
+                price: checkoutPrice,
+                periodDays: selectedPlan.days,
+                paymentMethodRaw: paymentMethod.rawValue,
+                returnPage: String(describing: checkoutReturnPage),
+                planName: selectedPlan.name,
+                trafficGB: selectedPlan.trafficGB,
+                devices: selectedPlan.devices,
+                whitelistGB: selectedPlan.whitelistGB,
+                createdAt: Date()
+            )
+        )
+    }
+
+    public func clearPendingCheckout() {
+        PendingCheckout.clear()
+    }
+
+    /// Gate: guest path ends at payment method; auth required only when charging.
+    public func requestCheckoutPayment() {
+        savePendingCheckout()
+        HapticManager.shared.play(.purchaseStarted)
+        if !isDirectAuthenticated {
+            authFlowReturnsToAccount = false
+            checkoutAuthError = nil
+            openDetail(.authLogin)
+            return
+        }
+        Task { await startAuthenticatedCheckout() }
+    }
+
+    public func continueCheckoutAfterAuth() {
+        openDetail(.payment)
+        Task { await startAuthenticatedCheckout() }
+    }
+
+    public func startAuthenticatedCheckout() async {
+        openDetail(.paymentProcessing)
+        paymentActivationPending = true
+        do {
+            try await DirectBackendAPI.shared.registerDevice()
+            let created = try await DirectBackendAPI.shared.createCheckout(
+                title: checkoutTitle,
+                price: checkoutPrice,
+                periodDays: selectedPlan.days,
+                paymentMethod: paymentMethod,
+                planName: selectedPlan.name
+            )
+            lastPaymentId = created.paymentId
+            if paymentMethod == .external, let raw = created.payUrl, let url = URL(string: raw) {
+                openDetail(.externalPay(url))
+                return
+            }
+            // Apple / demo: client reports success → backend grants subscription URL.
+            await finalizeCheckoutSuccess(paymentId: created.paymentId ?? UUID().uuidString)
+        } catch {
+            paymentErrorMessage = error.localizedDescription
+            openDetail(.paymentError)
+            HapticManager.shared.play(.error)
+        }
+    }
+
+    public func cancelExternalCheckout() {
+        openDetail(.paymentCancelled)
+    }
+
+    public func retryCheckout() {
+        Task { await startAuthenticatedCheckout() }
+    }
+
+    public func finalizeCheckoutSuccess(paymentId: String) async {
+        openDetail(.paymentProcessing)
+        paymentActivationPending = true
+        do {
+            let pending = PendingCheckout.current
+            let verified = try await DirectBackendAPI.shared.verifyCheckout(
+                paymentId: paymentId,
+                periodDays: pending?.periodDays ?? selectedPlan.days,
+                trafficGB: pending?.trafficGB ?? selectedPlan.trafficGB,
+                devices: pending?.devices ?? selectedPlan.devices,
+                title: pending?.title ?? checkoutTitle
+            )
+            if let url = verified.subscriptionUrl {
+                directSubscriptionURL = url
+                await attachDirectSubscription(url: url)
+            }
+            applyLocalPremiumFromCheckout(pending: pending)
+            if let me = verified.me {
+                await applyDirectAuth(me: me)
+            }
+            lastSuccessTitle = pending?.title ?? checkoutTitle
+            lastSuccessPrice = pending?.price ?? checkoutPrice
+            lastSuccessPeriodDays = pending?.periodDays ?? selectedPlan.days
+            paymentActivationPending = false
+            clearPendingCheckout()
+            openDetail(.paymentSuccess)
+            HapticManager.shared.play(.purchaseCompleted)
+        } catch {
+            paymentErrorMessage = error.localizedDescription
+            openDetail(.paymentError)
+            HapticManager.shared.play(.error)
+        }
+    }
+
+    public func applyDirectAuth(me: DirectBackendAPI.Me) async {
+        UserDefaults.standard.set(true, forKey: "vpndirect.authenticated")
+        directAccountEmail = me.email
+        if let url = me.subscriptionUrl, !(url.isEmpty) {
+            directSubscriptionURL = url
+            await attachDirectSubscription(url: url)
+            if me.hasSubscription == true {
+                hasPremiumEntitlement = true
+                persistPremiumState()
+                setActiveAccess(.premium)
+            }
+        }
+        objectWillChange.send()
+    }
+
+    public func logoutDirectAccount() async {
+        await DirectBackendAPI.shared.logout()
+        directAccountEmail = nil
+        directSubscriptionURL = nil
+        UserDefaults.standard.set(false, forKey: "vpndirect.authenticated")
+        objectWillChange.send()
+    }
+
+    public func refreshDirectAccount() async {
+        guard DirectBackendAPI.shared.isAuthenticated else { return }
+        do {
+            let me = try await DirectBackendAPI.shared.fetchMe()
+            await applyDirectAuth(me: me)
+        } catch {
+            // Session may have expired — keep local flag until user re-auths at pay.
+        }
+    }
+
+    public func attachDirectSubscription(url: String) async {
+        guard let environments else { return }
+        do {
+            _ = try await AutoSubscriptionImporter.importIfNeeded(url: url, environments: environments)
+            await reloadSubscriptions()
+            if let item = subscriptions.first(where: {
+                DirectBuiltinProfile.isDirectOwned($0.profile.remoteURL)
+                    && !DirectBuiltinProfile.isBuiltin($0.profile.remoteURL)
+            }) {
+                setActiveAccess(.premium)
+                activate(subscriptionID: item.id)
+            }
+        } catch {
+            paymentErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Legacy local entitlement helper used after backend grant (or offline fallback).
     public func completeCheckout() {
+        requestCheckoutPayment()
+    }
+
+    private func applyLocalPremiumFromCheckout(pending: PendingCheckout?) {
         if checkoutReturnPage == .addOns {
             if pendingAddOnTrafficGB > 0 {
                 if premiumTrafficGB < Self.unlimitedTrafficGB {
@@ -844,14 +1052,14 @@ public final class VPNConnectionModel: ObservableObject {
             hasPremiumEntitlement = true
         } else {
             hasPremiumEntitlement = true
-            premiumRemainingDays = selectedPlan.days
-            if let gb = selectedPlan.trafficGB {
+            premiumRemainingDays = pending?.periodDays ?? selectedPlan.days
+            if let gb = pending?.trafficGB ?? selectedPlan.trafficGB {
                 premiumTrafficGB = gb
             } else {
                 premiumTrafficGB = Self.unlimitedTrafficGB
             }
-            premiumWhitelistGB = selectedPlan.whitelistGB
-            premiumDeviceLimit = max(1, selectedPlan.devices)
+            premiumWhitelistGB = pending?.whitelistGB ?? selectedPlan.whitelistGB
+            premiumDeviceLimit = max(1, pending?.devices ?? selectedPlan.devices)
             premiumDevicesUsed = min(premiumDevicesUsed, premiumDeviceLimit)
         }
         persistPremiumState()
@@ -859,9 +1067,6 @@ public final class VPNConnectionModel: ObservableObject {
         if let premiumID = premiumProfileID {
             activate(subscriptionID: premiumID)
         }
-        selectedTab = .management
-        closeDetail()
-        HapticManager.shared.play(.purchaseCompleted)
     }
 
     private static func checkoutTitle(for plan: PlanConfiguration) -> String {
@@ -1494,6 +1699,11 @@ public final class VPNConnectionModel: ObservableObject {
                 await SharedPreferences.connectionMode.set(connectionMode)
             }
             await reloadSubscriptions()
+            try? await DirectBackendAPI.shared.registerDevice()
+            await refreshDirectAccount()
+            Task { @MainActor in
+                await DirectLocationsCatalog.shared.refreshFromBackendIfNeeded()
+            }
             try? await environments.ensureExtensionProfileReady()
             await applySecuritySettings()
             await migrateUrlTestBalancerIfNeeded()

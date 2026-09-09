@@ -81,6 +81,59 @@ public struct VPNHomeView: View {
                                 DirectPaymentMethodView(model: model)
                             case .addOns:
                                 DirectAddOnsView(model: model)
+                            case .authLogin:
+                                DirectAuthLoginView(model: model)
+                            case .authEmail:
+                                DirectAuthEmailView(model: model)
+                            case .authCode:
+                                DirectAuthCodeView(model: model)
+                            case .authRegister:
+                                DirectAuthRegisterView(model: model)
+                            case .authRecovery:
+                                DirectAuthRecoveryView(model: model)
+                            case .authBot:
+                                DirectAuthBotView(model: model)
+                            case .authSuccess:
+                                DirectAuthSuccessView(model: model)
+                            case .paymentProcessing:
+                                DirectPaymentProcessingView(
+                                    title: "Оплата",
+                                    subtitle: "Связываемся с \(DirectBackend.host)…"
+                                )
+                            case .paymentCancelled:
+                                DirectPaymentCancelledView(
+                                    retry: { model.retryCheckout() },
+                                    changeMethod: { model.openDetail(.payment) }
+                                )
+                            case .paymentError:
+                                DirectPaymentErrorView(message: model.paymentErrorMessage) {
+                                    model.retryCheckout()
+                                }
+                            case .paymentSuccess:
+                                DirectPaymentSuccessView(
+                                    title: "Подписка активна",
+                                    price: model.lastSuccessPrice > 0 ? model.lastSuccessPrice : model.checkoutPrice,
+                                    period: "\(model.lastSuccessPeriodDays) дней",
+                                    activationPending: model.paymentActivationPending,
+                                    openLocations: {
+                                        model.closeDetail()
+                                        model.select(tab: .locations)
+                                    },
+                                    openHome: {
+                                        model.closeDetail()
+                                        model.select(tab: .home)
+                                    }
+                                )
+                            case .account:
+                                DirectAccountView(model: model)
+                            case .externalPay(let url):
+                                DirectExternalPayWebView(url: url) {
+                                    if let id = model.lastPaymentId {
+                                        Task { await model.finalizeCheckoutSuccess(paymentId: id) }
+                                    } else {
+                                        model.cancelExternalCheckout()
+                                    }
+                                }
                             }
                         } else {
                             switch model.selectedTab {
@@ -248,17 +301,14 @@ public struct VPNHomeView: View {
                 Button {
                     model.goBack()
                 } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.left")
-                        Text(model.chromeBackTitle)
-                    }
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(DS.muted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(DS.muted)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(HapticButtonStyle())
-                .padding(.trailing, 12)
+                .padding(.trailing, 8)
             }
 
             VStack(alignment: .leading, spacing: 1) {

@@ -107,7 +107,7 @@ struct DirectImportFileView: View {
                     .padding(.top, 15)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .fileImporter(
             isPresented: $pickerPresented,
@@ -264,7 +264,7 @@ struct DirectImportConfigTextView: View {
                     .padding(.top, 15)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .onAppear {
             if configText.isEmpty, let pending = model.pendingImportConfigText?.trimmingCharacters(in: .whitespacesAndNewlines),

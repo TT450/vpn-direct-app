@@ -22,15 +22,21 @@ struct DirectProfilePage: View {
                 PageHeading(kicker: "АККАУНТ / ALD–0248", title: "Профиль", subtitle: "Управление приложением и безопасностью")
 
                 HStack(spacing: 16) {
-                    Text("A")
+                    Text(model.isDirectAuthenticated ? "D" : "A")
                         .font(.system(size: 30, weight: .medium, design: .monospaced))
                         .foregroundStyle(DS.acid)
                         .frame(width: 62, height: 62)
                         .overlay(Rectangle().stroke(Color.white.opacity(0.25)))
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ").microLabel(color: .white.opacity(0.45))
-                        Text("Ваш профиль").font(.system(size: 19, weight: .semibold))
-                        Text(model.isProtected ? "Статус: Подключено" : "Статус: Отключено")
+                        Text("DIRECT ACCOUNT").microLabel(color: .white.opacity(0.45))
+                        Text(model.isDirectAuthenticated
+                             ? (model.directAccountEmail ?? "Аккаунт Direct")
+                             : "Войти в Direct")
+                            .font(.system(size: 19, weight: .semibold))
+                            .lineLimit(1)
+                        Text(model.isDirectAuthenticated
+                             ? "Синхронизация с \(DirectBackend.host)"
+                             : "Оплата и привязка бота")
                             .font(.system(size: 10))
                             .foregroundStyle(.white.opacity(0.5))
                             .lineLimit(1)
@@ -44,6 +50,15 @@ struct DirectProfilePage: View {
                 .background(DS.ink)
                 .foregroundStyle(.white)
                 .padding(.top, 28)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if model.isDirectAuthenticated {
+                        model.openDetail(.account)
+                    } else {
+                        model.openAuthFromAccount()
+                    }
+                    HapticManager.shared.play(.selection)
+                }
 
                 HStack(spacing: 0) {
                     ProfileStat(label: "ПОДПИСОК", value: String(format: "%02d", model.subscriptions.count))

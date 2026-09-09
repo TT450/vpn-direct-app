@@ -132,7 +132,32 @@ public final class DirectLocationsCatalog: ObservableObject {
         replace(with: servers)
     }
 
-    /// Refresh from CDN if TTL expired. Never throws into UI; keeps last good list.
+    /// Refresh from Direct backend `/api/v1/locations` (bot.vpn-direct.com).
+    public func refreshFromBackendIfNeeded(force: Bool = false) async {
+        if !force, let fetched = UserDefaults.standard.object(forKey: fetchedAtKey) as? Date,
+           Date().timeIntervalSince(fetched) < Self.remoteTTL
+        {
+            return
+        }
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+        do {
+            let remote = try await DirectBackendAPI.shared.fetchLocations()
+            guard !remote.isEmpty else {
+                await refreshFromRemoteIfNeeded(force: force)
+                return
+            }
+            locations = remote
+            lastUpdated = Date()
+            persistDisk(remote)
+            UserDefaults.standard.set(lastUpdated, forKey: fetchedAtKey)
+        } catch {
+            await refreshFromRemoteIfNeeded(force: force)
+        }
+    }
+
+    /// Refresh from optional CDN URL if configured. Never throws into UI.
     public func refreshFromRemoteIfNeeded(force: Bool = false) async {
         let urlString = Self.remoteCatalogURLString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: urlString), !urlString.isEmpty else { return }

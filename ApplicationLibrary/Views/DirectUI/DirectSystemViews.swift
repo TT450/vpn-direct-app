@@ -13,12 +13,11 @@ struct SystemBackButton: View {
         Button {
             model.goBack()
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "arrow.left")
-                Text(title)
-            }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(DS.muted)
+            Image(systemName: "arrow.left")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(DS.muted)
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
         }
         .buttonStyle(HapticButtonStyle())
     }
@@ -178,7 +177,7 @@ struct DirectSystemSettingsWarningView: View {
                     .padding(.top, 15)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .onAppear { HapticManager.shared.play(.warning) }
     }
@@ -298,7 +297,7 @@ struct DirectSystemSettingsView: View {
                 .overlay(alignment: .bottom) { Hairline() }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .task {
             specialFlags = await SharedPreferences.ignoreMemoryLimit.get()
@@ -372,7 +371,7 @@ struct DirectAboutAppView: View {
                 SystemRow(icon: "star.bubble", title: "Оценить в App Store", subtitle: "Поддержать развитие проекта", accent: true)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
     }
 }
@@ -766,7 +765,7 @@ struct DirectNewConfigurationView: View {
                     .padding(.top, 15)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .onAppear {
             syncTypeFromLink()

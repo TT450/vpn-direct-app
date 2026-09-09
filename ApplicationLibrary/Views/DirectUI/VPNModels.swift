@@ -46,6 +46,19 @@ public enum DetailPage: Equatable {
     case planConstructor
     case payment
     case addOns
+    case authLogin
+    case authEmail
+    case authCode
+    case authRegister
+    case authRecovery
+    case authBot
+    case authSuccess
+    case paymentProcessing
+    case paymentCancelled
+    case paymentError
+    case paymentSuccess
+    case account
+    case externalPay(URL)
 }
 
 public enum AccessSource: Equatable {
@@ -54,7 +67,7 @@ public enum AccessSource: Equatable {
     case imported(Int64)
 }
 
-public enum PaymentMethod: String, CaseIterable {
+public enum PaymentMethod: String, CaseIterable, Codable {
     case apple = "Покупка через Apple"
     case external = "Другие способы"
 }
@@ -75,6 +88,9 @@ public enum DirectBackend {
     public static let baseURLString = "https://bot.vpn-direct.com"
     /// Legacy direct IP of the same box (SSH / known_hosts). Prefer `host` in URLs.
     public static let legacyIP = "144.31.5.124"
+    /// Public subscription / Happ page host (not the API host).
+    public static let subscriptionHost = "app.vpsperviy.ru"
+    public static let subscriptionBaseURLString = "https://app.vpsperviy.ru:8443"
 
     public static var baseURL: URL { URL(string: baseURLString)! }
 }
@@ -85,11 +101,12 @@ public enum DirectBuiltinProfile {
     public static let freeName = "VPN Direct Free"
     public static let premiumName = "VPN Direct Premium"
 
-    /// Hosts whose `/sub/…` (etc.) belong to the Direct backend — never Remnawave panel,
-    /// never marketing `vpn-direct.com`, never third-party imports.
+    /// Hosts whose `/sub/…` belong to Direct — API + subscription page.
+    /// Never Remnawave panel, never third-party imports.
     public static let ownedHosts: [String] = [
         DirectBackend.host,
         DirectBackend.legacyIP,
+        DirectBackend.subscriptionHost,
     ]
 
     public static func kind(for remoteURL: String?) -> AccessSource? {
@@ -104,7 +121,7 @@ public enum DirectBuiltinProfile {
         kind(for: remoteURL) != nil
     }
 
-    /// Builtin stub **or** subscription URL served by `bot.vpn-direct.com` (xuiweb).
+    /// Builtin stub **or** subscription URL on Direct hosts (`bot…` API / `app.vpsperviy.ru` sub page).
     public static func isDirectOwned(_ remoteURL: String?) -> Bool {
         if isBuiltin(remoteURL) { return true }
         guard let raw = remoteURL?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {

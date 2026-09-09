@@ -1,0 +1,34 @@
+---
+description: Never push VPNDirectPatch, backend TZ/API, or server secrets to GitHub
+alwaysApply: true
+---
+
+# Backend / VPNDirectPatch — never publish to GitHub
+
+## Hard ban (do not commit, stage, or push)
+
+Never add to git, never `git commit`, never `git push` anything that exposes Direct backend ops:
+
+- The entire folder `VPNDirectPatch/` (installer, patches, `payloads/mobile_api.py`, docs)
+- TZ / SoW / runbooks under `VPNDirectPatch/docs/` (including `LOCATION_TRAFFIC_CAPS_TZ_SOW.md`)
+- Server copies under `/root/bot/`, nginx secrets, admin secret paths, SSH keys, DB dumps
+- Backend hostnames/IPs, Remnawave admin URLs, webhook secrets, payment keys, when writing **committed** project docs
+- Any new local folders meant for backend-only ops (`_private_vpndirect/`, `private_backend/`, etc.)
+
+These paths are listed in `.gitignore`. If `git status` still shows them, stop and fix ignore — do not force-add (`git add -f`).
+
+## Allowed on GitHub
+
+- iOS/macOS app code under `ApplicationLibrary/`, `Library/`, etc.
+- Public product docs that do **not** describe server layout, patch internals, or credentials
+- Client-side API **usage** (e.g. calling a public HTTPS API) without pasting server source, secret paths, or deploy runbooks into the repo
+
+## If the user asks to commit/push
+
+1. Exclude `VPNDirectPatch/` and any backend-private files from the commit.
+2. Warn explicitly if the requested commit would include backend patch/API/TZ material.
+3. Never suggest uploading `payloads/mobile_api.py` or server SSH details to GitHub Releases/Gists.
+
+## When working on backend
+
+Keep changes in `VPNDirectPatch/` and/or on the server. Sync to the server with scp/rsync/SSH — not via the public git remote.

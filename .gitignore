@@ -40,3 +40,13 @@ tests/VPNDirectParserPackage/.build/
 
 .build/
 .build/**
+
+# =============================================================================
+# VPN Direct backend ops — NEVER push to GitHub (patch, TZ, server API payloads)
+# =============================================================================
+/VPNDirectPatch/
+/_private_vpndirect/
+/private_backend/
+**/.env.backend
+**/backend.secrets*
+**/mobile_api.server.py
