@@ -1,20 +1,20 @@
-# What's New — VPN Direct 1.0.11 (69)
+# What's New — VPN Direct 1.0.11 (81)
 
-Release date: 2026-09-08  
-App build: `69` (TestFlight)  
-Prior TestFlight: `66`
+Release date: 2026-09-09  
+App build: `81` (TestFlight)  
+Prior TestFlight: `63` / local `69+`
 
 ## App Store / short What's New
 
-- Manual server pick switches connection mode to **Пользовательский** (Auto no longer overrides it)
-- Happ-style server ping: **via Proxy** when VPN is on, **TCP** when off; picker sorted by ping
-- Reject public VLESS without TLS/Reality (INCY-style plaintext fail-closed)
-- Auto-select sticky / urltest tolerance fixes
+- «Убрать из клиента» очищает активную подписку на главной (больше не подставляет следующую внешнюю)
+- Подписи локаций — только страны; кэш флагов/каталога, быстрее открытие выбора сервера
+- Happ-style ping, manual server → режим «Пользовательский», fail-closed для plaintext VLESS
+- Полный набор флагов стран в приложении и виджетах
 
 ## TestFlight
 
 | Field | Value |
 | --- | --- |
 | Version | **1.0.11** |
-| Build | **69** |
+| Build | **81** |
 | Join | https://testflight.apple.com/join/yfCEbunt |

@@ -2,6 +2,15 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.11.81] — 2026-09-09
+
+### Soft-remove, labels, picker (TestFlight build 81)
+
+- Soft-remove («Убрать из клиента») clears home selection (`selectedProfileID = -1`); no auto-activate next import
+- Country labels only (no capital substitution); cached catalog + faster server picker
+- Full country flag asset set across app / widgets
+- Backup branch snapshot aligned with this release tip
+
 ## [1.0.11.63] — 2026-09-08
 
 ### Widgets + tunnel reliability (TestFlight build 63)
