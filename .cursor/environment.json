@@ -1,0 +1,5 @@
+{
+  "name": "VPN Direct Core (Linux)",
+  "user": "ubuntu",
+  "install": "./.cursor/install.sh"
+}
