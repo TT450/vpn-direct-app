@@ -50,7 +50,7 @@ struct DirectHomePage: View {
             }
             .buttonStyle(HapticButtonStyle())
             .padding(.horizontal, 20)
-            .padding(.top, 24)
+            .padding(.top, DS.pageTop)
 
             Button {
                 model.activeSheet = .profiles
@@ -206,7 +206,7 @@ private struct HomeSubscriptionActions: View {
                     .microLabel(color: DS.ink)
                     .frame(width: HomeBottomBar.indexWidth, alignment: .leading)
                 HStack(spacing: 2) {
-                    actionButton(title: "Сменить", subtitle: "сервер", enabled: !(model.activeSubscription?.servers.isEmpty ?? true)) {
+                    actionButton(title: "Сменить", subtitle: "локацию", enabled: !(model.activeSubscription?.servers.isEmpty ?? true)) {
                         model.openChangeServer()
                     }
                     actionButton(

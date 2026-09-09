@@ -2,14 +2,14 @@ import SwiftUI
 
 #if os(iOS)
 
-private struct AccessBackButton: View {
+struct AccessBackButton: View {
     @ObservedObject var model: VPNConnectionModel
     let title: String
-    var destination: DetailPage?
+    var destination: DetailPage? = nil
 
     var body: some View {
         Button {
-            model.detailPage = destination
+            model.goBack()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.left")
@@ -64,19 +64,19 @@ struct DirectAccessChoiceView: View {
     @ObservedObject var model: VPNConnectionModel
 
     private var connectionMethodCount: Int {
-        model.importedSubscriptions.isEmpty ? 2 : 4
+        model.importedSubscriptions.isEmpty ? 1 : 3
     }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                AccessBackButton(model: model, title: "Главная", destination: nil)
+
                 PageHeading(
                     kicker: "ПОДКЛЮЧЕНИЕ / НАЧАЛО",
                     title: "Выберите доступ",
-                    subtitle: "Бесплатно, Premium или внешняя подписка"
+                    subtitle: "Сначала VPN Direct, затем другие провайдеры"
                 )
-                .padding(.top, 17)
+                .padding(.top, DS.pageTop)
 
                 if let context = model.accessChoiceContext {
                     Text(context)
@@ -94,7 +94,7 @@ struct DirectAccessChoiceView: View {
                     Text("СЕЙЧАС НЕ ЗАЩИЩЕНО").microLabel(color: .white.opacity(0.42))
                     Text("У вас пока нет активного подключения")
                         .font(.system(size: 21, weight: .semibold))
-                    Text("Выберите удобный способ. Позже его можно сменить в разделе «Подписки».")
+                    Text("Оформите тариф VPN Direct или подключите внешнюю подписку.")
                         .font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
                 }
                 .padding(17)
@@ -103,25 +103,28 @@ struct DirectAccessChoiceView: View {
                 .background(DS.panel)
                 .padding(.top, 24)
 
-                AccessSectionHeader(title: "СПОСОБ ПОДКЛЮЧЕНИЯ", meta: String(format: "%02d", connectionMethodCount))
+                AccessSectionHeader(title: "VPN DIRECT", meta: String(format: "%02d", connectionMethodCount))
                     .padding(.top, 22)
-                AccessChoiceRow(mark: "FREE", title: "Получить бесплатно", subtitle: "3 рекламы → 1 час и 200 МБ") {
-                    model.clearAccessChoiceContext()
-                    model.handleAccessChoiceFree()
-                }
-                AccessChoiceRow(mark: "PLUS", title: "VPN Direct Premium", subtitle: "Без рекламы · от 1 месяца") {
+                AccessChoiceRow(mark: "PLUS", title: "Тарифы VPN Direct", subtitle: "Пресеты и конструктор · Plus рекомендуем") {
                     model.clearAccessChoiceContext()
                     model.handleAccessChoicePremium()
                 }
 
                 if !model.importedSubscriptions.isEmpty {
-                    AccessSectionHeader(title: "ВЫБРАТЬ ПОДПИСКУ", meta: "02")
+                    AccessSectionHeader(title: "ДРУГИЕ ПРОВАЙДЕРЫ", meta: "02")
                         .padding(.top, 22)
                     AccessChoiceRow(mark: "SUB", title: "Выбрать из добавленных", subtitle: "Внешние подписки в приложении") {
                         model.clearAccessChoiceContext()
                         model.handleAccessChoicePickSubscription()
                     }
                     AccessChoiceRow(mark: "URL", title: "Добавить URL", subtitle: "Подписка любого провайдера") {
+                        model.clearAccessChoiceContext()
+                        model.handleAccessChoiceAddURL()
+                    }
+                } else {
+                    AccessSectionHeader(title: "ДРУГИЕ ПРОВАЙДЕРЫ", meta: "01")
+                        .padding(.top, 22)
+                    AccessChoiceRow(mark: "URL", title: "Добавить внешнюю подписку", subtitle: "QR, ссылка, файл или конфиг") {
                         model.clearAccessChoiceContext()
                         model.handleAccessChoiceAddURL()
                     }
@@ -160,300 +163,327 @@ private struct AccessChoiceRow: View {
     }
 }
 
-struct DirectFreeAccessView: View {
-    @ObservedObject var model: VPNConnectionModel
-    @State private var isWatching = false
-    @State private var showReward = false
-
-    var body: some View {
-        ZStack {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    AccessBackButton(model: model, title: "Подписки")
-                    PageHeading(
-                        kicker: "DIRECT / FREE",
-                        title: "Бесплатный доступ",
-                        subtitle: "Смотрите рекламу и пополняйте VPN-баланс"
-                    )
-                    .padding(.top, 17)
-
-                    VStack(spacing: 0) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("ВАШ БАЛАНС").microLabel(color: .white.opacity(0.42))
-                                Text(model.freeRemainingDisplayText)
-                                    .font(.system(size: 27, weight: .semibold, design: .monospaced))
-                                Text("Время действует по часам, даже без подключения")
-                                    .font(.system(size: 10)).foregroundStyle(.white.opacity(0.48))
-                            }
-                            Spacer()
-                            Text("FREE").microLabel(color: DS.acid)
-                                .frame(width: 58, height: 58)
-                                .overlay(Rectangle().stroke(Color.white.opacity(0.23)))
-                        }
-                        .padding(16)
-
-                        HStack(spacing: 0) {
-                            DarkStat(label: "ТРАФИК", value: model.freeTrafficText)
-                            DarkStat(label: "УСТРОЙСТВА", value: "1 / 1")
-                        }
-                    }
-                    .foregroundStyle(.white)
-                    .background(DS.panel)
-                    .padding(.top, 23)
-
-                    AccessSectionHeader(title: "СЛЕДУЮЩИЙ ЧАС", meta: "\(model.watchedAds) ИЗ 3")
-                        .padding(.top, 23)
-                    Text("После третьей рекламы мы сразу добавим 1 час и 200 МБ.")
-                        .font(.system(size: 10)).foregroundStyle(DS.muted)
-                        .padding(.bottom, 12)
-
-                    HStack(spacing: 7) {
-                        ForEach(0 ..< 3, id: \.self) { index in
-                            AdProgressCell(
-                                number: index + 1,
-                                isComplete: index < model.watchedAds,
-                                isCurrent: index == model.watchedAds
-                            )
-                        }
-                    }
-
-                    HStack {
-                        Text("НАГРАДА ЗА КОМПЛЕКТ").microLabel()
-                        Spacer()
-                        Text("+1 Ч · +200 МБ").microLabel(color: DS.green)
-                    }
-                    .padding(.horizontal, 12)
-                    .frame(height: 42)
-                    .overlay(Rectangle().stroke(DS.line))
-                    .padding(.top, 10)
-
-                    Button {
-                        watchAd()
-                    } label: {
-                        HStack {
-                            Image(systemName: isWatching ? "hourglass" : "play.fill")
-                            Text(isWatching
-                                ? "Реклама воспроизводится…"
-                                : "Посмотреть рекламу \(min(model.watchedAds + 1, 3)) из 3")
-                            Spacer()
-                            Image(systemName: "arrow.right")
-                        }
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(DS.acid)
-                        .padding(.horizontal, 15)
-                        .frame(height: 50)
-                        .background(DS.ink)
-                    }
-                    .buttonStyle(HapticButtonStyle())
-                    .disabled(isWatching)
-                    .padding(.top, 14)
-
-                    Text("Можно смотреть сколько угодно комплектов. Каждый комплект добавляет ещё 1 час и 200 МБ; устройство остаётся одно.")
-                        .font(.system(size: 10)).foregroundStyle(DS.muted).lineSpacing(3)
-                        .padding(.top, 14)
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 24)
-            }
-
-            if showReward {
-                Color.black.opacity(0.38).ignoresSafeArea()
-                RewardOverlay(model: model, showReward: $showReward)
-                    .padding(14)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-        }
-    }
-
-    private func watchAd() {
-        guard !isWatching else { return }
-        isWatching = true
-        HapticManager.shared.play(.adStarted)
-        Task {
-            try? await Task.sleep(nanoseconds: 900_000_000)
-            let completed = model.watchNextAd()
-            isWatching = false
-            if completed {
-                showReward = true
-            } else {
-                HapticManager.shared.play(.adCompleted)
-            }
-        }
-    }
-}
-
-private struct AdProgressCell: View {
-    let number: Int
-    let isComplete: Bool
-    let isCurrent: Bool
-
-    var body: some View {
-        VStack(spacing: 7) {
-            Text(isComplete ? "✓" : String(format: "%02d", number))
-                .microLabel(color: isComplete ? DS.acid : DS.ink)
-                .frame(width: 25, height: 25)
-                .background(isComplete ? DS.ink : .clear)
-                .overlay(Rectangle().stroke(DS.line))
-            Text(isComplete ? "Просмотрена" : (isCurrent ? "Доступна" : "Следующая"))
-                .font(.system(size: 9, weight: .medium))
-        }
-        .frame(maxWidth: .infinity, minHeight: 69)
-        .background(isComplete ? DS.acid.opacity(0.11) : .clear)
-        .overlay(Rectangle().stroke(DS.line))
-    }
-}
-
-private struct RewardOverlay: View {
-    @ObservedObject var model: VPNConnectionModel
-    @Binding var showReward: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(DS.acid)
-                .frame(width: 58, height: 58)
-                .background(DS.ink)
-            Text("НАГРАДА НАЧИСЛЕНА").microLabel().padding(.top, 17)
-            Text("Добавлен 1 час VPN")
-                .font(.system(size: 25, weight: .semibold))
-                .padding(.top, 6)
-            Text("Баланс обновлён. Можно подключиться сейчас или накопить ещё несколько часов.")
-                .font(.system(size: 11)).foregroundStyle(DS.muted)
-                .padding(.top, 7)
-
-            HStack(spacing: 0) {
-                RewardFact(label: "ВРЕМЯ", value: "+1 Ч")
-                RewardFact(label: "ТРАФИК", value: "+200 МБ")
-                RewardFact(label: "УСТРОЙСТВА", value: "1")
-            }
-            .padding(.top, 17)
-
-            HStack(spacing: 7) {
-                AccessButton(title: "Ещё час", secondary: true) { showReward = false }
-                AccessButton(title: "Подключиться") {
-                    showReward = false
-                    model.clearAccessChoiceContext()
-                    model.handleAccessChoiceFree()
-                }
-            }
-            .padding(.top, 15)
-        }
-        .padding(18)
-        .background(DS.paper)
-    }
-}
-
-private struct RewardFact: View {
-    let label: String
-    let value: String
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label).microLabel()
-            Text(value).font(.system(size: 11, weight: .semibold, design: .monospaced))
-        }
-        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-        .padding(.horizontal, 8)
-        .overlay(alignment: .leading) { Rectangle().fill(DS.line).frame(width: 1) }
-        .overlay(alignment: .top) { Hairline(color: DS.ink) }
-        .overlay(alignment: .bottom) { Hairline() }
-    }
-}
-
 struct DirectPremiumPlansView: View {
     @ObservedObject var model: VPNConnectionModel
 
-    private let plans = [(1, 249), (2, 449), (3, 599), (6, 999), (12, 1799)]
+    private var periodOptions: [Int] {
+        if model.planBrowseMode == .constructor {
+            return VPNDirectPlanCatalog.constructorDays
+        }
+        if model.selectedPresetID == "travel" {
+            return [7] + VPNDirectPlanCatalog.presetPeriodDays
+        }
+        return VPNDirectPlanCatalog.presetPeriodDays
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                AccessBackButton(model: model, title: "Подписки")
-                PageHeading(
-                    kicker: "DIRECT / PREMIUM",
-                    title: "Выберите срок",
-                    subtitle: "VPN без рекламы с расширяемыми лимитами"
-                )
-                .padding(.top, 17)
 
-                AccessSectionHeader(title: "ДЛИТЕЛЬНОСТЬ", meta: "ДЕМО-ЦЕНЫ")
-                    .padding(.top, 25)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 7), count: 3), spacing: 7) {
-                    ForEach(plans, id: \.0) { months, price in
-                        Button {
-                            model.selectPlan(months: months, price: price)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(planTitle(months))
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text("\(price) ₽").font(.system(size: 9)).opacity(0.58)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
-                            .padding(.horizontal, 10)
-                            .foregroundStyle(model.selectedPlanMonths == months ? DS.acid : DS.ink)
-                            .background(model.selectedPlanMonths == months ? DS.ink : .clear)
-                            .overlay(Rectangle().stroke(model.selectedPlanMonths == months ? DS.ink : DS.line))
-                        }
-                        .buttonStyle(HapticButtonStyle())
-                    }
+                PageHeading(
+                    kicker: "DIRECT / ТАРИФЫ",
+                    title: "VPN Direct",
+                    subtitle: "Готовые пресеты или свой набор лимитов"
+                )
+                .padding(.top, DS.pageTop)
+
+                planModePicker
+                    .padding(.top, 22)
+
+                if model.planBrowseMode == .presets {
+                    presetsSection
+                } else {
+                    constructorSection
                 }
 
-                PlanSummaryView(model: model)
+                AccessSectionHeader(
+                    title: "СРОК",
+                    meta: VPNDirectPlanCatalog.periodLabel(days: model.selectedPlan.days).uppercased()
+                )
+                .padding(.top, 22)
+                periodGrid
+
+                PlanCheckoutSummary(plan: model.selectedPlan, price: model.selectedPlanPrice)
                     .padding(.top, 16)
 
                 AccessButton(title: "Продолжить") {
+                    model.applySelectedPlan(model.selectedPlan, presetID: model.selectedPresetID)
                     model.checkoutReturnPage = .premiumPlans
-                    model.detailPage = .payment
+                    model.openDetail(.payment)
                 }
                 .padding(.top, 14)
 
-                Text("Точные цены и доступные способы оплаты подставляются для страны App Store пользователя.")
+                Text("Демо-цены для интерфейса. Финальная сумма зависит от способа оплаты и storefront.")
                     .font(.system(size: 10)).foregroundStyle(DS.muted).lineSpacing(3)
                     .padding(.top, 14)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 24)
         }
+        .onAppear {
+            if model.selectedPlan.name == nil, model.planBrowseMode == .presets {
+                let featured = VPNDirectPlanCatalog.featured
+                model.applySelectedPlan(featured.configuration(days: featured.defaultDays), presetID: featured.id)
+            }
+        }
     }
 
-    private func planTitle(_ months: Int) -> String {
-        switch months {
-        case 1: return "1 месяц"
-        case 2, 3: return "\(months) месяца"
-        default: return "\(months) месяцев"
+    private var planModePicker: some View {
+        HStack(spacing: 0) {
+            ForEach(VPNDirectPlanMode.allCases) { mode in
+                Button {
+                    model.planBrowseMode = mode
+                    if mode == .presets,
+                       let preset = VPNDirectPlanCatalog.preset(id: model.selectedPresetID)
+                    {
+                        let days = VPNDirectPlanCatalog.presetPeriodDays.contains(model.selectedPlan.days)
+                            ? model.selectedPlan.days
+                            : preset.defaultDays
+                        model.applySelectedPlan(preset.configuration(days: days), presetID: preset.id)
+                    } else if mode == .constructor {
+                        var custom = model.selectedPlan
+                        custom.name = nil
+                        model.applySelectedPlan(custom)
+                    }
+                } label: {
+                    Text(mode.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(model.planBrowseMode == mode ? DS.acid : DS.ink)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .background(model.planBrowseMode == mode ? DS.ink : Color.clear)
+                }
+                .buttonStyle(HapticButtonStyle())
+            }
+        }
+        .overlay(Rectangle().stroke(DS.line))
+    }
+
+    private var presetsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            AccessSectionHeader(title: "ГОТОВЫЕ ТАРИФЫ", meta: String(format: "%02d", VPNDirectPlanCatalog.presets.count))
+                .padding(.top, 18)
+            ForEach(VPNDirectPlanCatalog.presets) { preset in
+                let daysForPrice = periodOptions.contains(model.selectedPlan.days)
+                    ? model.selectedPlan.days
+                    : preset.defaultDays
+                PresetPlanCard(
+                    preset: preset,
+                    isSelected: model.selectedPresetID == preset.id,
+                    price: VPNDirectPricingEngine.price(for: preset.configuration(days: daysForPrice))
+                ) {
+                    let days = periodOptions.contains(model.selectedPlan.days)
+                        ? model.selectedPlan.days
+                        : preset.defaultDays
+                    model.applySelectedPlan(preset.configuration(days: days), presetID: preset.id)
+                }
+            }
+        }
+    }
+
+    private var constructorSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            AccessSectionHeader(title: "КОНСТРУКТОР", meta: "СВОЙ НАБОР")
+                .padding(.top, 18)
+
+            optionHeader("УСТРОЙСТВА")
+            intChipRow(values: VPNDirectPlanCatalog.constructorDevices, selected: model.selectedPlan.devices) { value in
+                var plan = model.selectedPlan
+                plan.name = nil
+                plan.devices = value
+                model.applySelectedPlan(plan)
+            }
+
+            optionHeader("ТРАФИК")
+            trafficChipRow
+
+            optionHeader("БЕЛЫЕ СПИСКИ")
+            intChipRow(
+                values: VPNDirectPlanCatalog.constructorWhitelistGB,
+                selected: model.selectedPlan.whitelistGB,
+                label: VPNDirectPlanCatalog.whitelistOptionLabel
+            ) { value in
+                var plan = model.selectedPlan
+                plan.name = nil
+                plan.whitelistGB = value
+                model.applySelectedPlan(plan)
+            }
+        }
+    }
+
+    private var trafficChipRow: some View {
+        let columns = [GridItem(.adaptive(minimum: 72), spacing: 6)]
+        return LazyVGrid(columns: columns, spacing: 6) {
+            ForEach(Array(VPNDirectPlanCatalog.constructorTrafficGB.enumerated()), id: \.offset) { _, gb in
+                let isOn = model.selectedPlan.trafficGB == gb
+                Button {
+                    var plan = model.selectedPlan
+                    plan.name = nil
+                    plan.trafficGB = gb
+                    model.applySelectedPlan(plan)
+                } label: {
+                    Text(VPNDirectPlanCatalog.trafficOptionLabel(gb))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(isOn ? DS.acid : DS.ink)
+                        .padding(.horizontal, 8)
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                        .background(isOn ? DS.ink : Color.clear)
+                        .overlay(Rectangle().stroke(isOn ? DS.ink : DS.line))
+                }
+                .buttonStyle(HapticButtonStyle())
+            }
+        }
+    }
+
+    private var periodGrid: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 7), count: 3), spacing: 7) {
+            ForEach(periodOptions, id: \.self) { days in
+                let sample: PlanConfiguration = {
+                    var plan = model.selectedPlan
+                    plan.days = days
+                    return plan
+                }()
+                let price = VPNDirectPricingEngine.price(for: sample)
+                Button {
+                    var plan = model.selectedPlan
+                    plan.days = days
+                    model.applySelectedPlan(plan, presetID: model.selectedPresetID)
+                } label: {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(VPNDirectPlanCatalog.periodLabel(days: days))
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("\(price) ₽").font(.system(size: 9)).opacity(0.58)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .foregroundStyle(model.selectedPlan.days == days ? DS.acid : DS.ink)
+                    .background(model.selectedPlan.days == days ? DS.ink : .clear)
+                    .overlay(Rectangle().stroke(model.selectedPlan.days == days ? DS.ink : DS.line))
+                }
+                .buttonStyle(HapticButtonStyle())
+            }
+        }
+    }
+
+    private func optionHeader(_ title: String) -> some View {
+        Text(title)
+            .microLabel(color: DS.muted)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+    }
+
+    private func intChipRow(
+        values: [Int],
+        selected: Int,
+        label: ((Int) -> String)? = nil,
+        onSelect: @escaping (Int) -> Void
+    ) -> some View {
+        let columns = [GridItem(.adaptive(minimum: 72), spacing: 6)]
+        return LazyVGrid(columns: columns, spacing: 6) {
+            ForEach(values, id: \.self) { value in
+                let isOn = selected == value
+                Button {
+                    onSelect(value)
+                } label: {
+                    Text(label?(value) ?? "\(value)")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(isOn ? DS.acid : DS.ink)
+                        .padding(.horizontal, 8)
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                        .background(isOn ? DS.ink : Color.clear)
+                        .overlay(Rectangle().stroke(isOn ? DS.ink : DS.line))
+                }
+                .buttonStyle(HapticButtonStyle())
+            }
         }
     }
 }
 
-private struct PlanSummaryView: View {
-    @ObservedObject var model: VPNConnectionModel
+private struct PresetPlanCard: View {
+    let preset: VPNDirectPlanPreset
+    let isSelected: Bool
+    let price: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text(preset.name.uppercased())
+                        .font(.system(size: 16, weight: .semibold))
+                    Spacer()
+                    if preset.isFeatured {
+                        Text("★ ПОПУЛЯРНЫЙ")
+                            .microLabel(color: DS.acid)
+                            .padding(.horizontal, 8)
+                            .frame(height: 24)
+                            .background(DS.ink)
+                    }
+                }
+                Text(preset.tagline)
+                    .font(.system(size: 11))
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.55) : DS.muted)
+                    .padding(.top, 6)
+
+                HStack(spacing: 0) {
+                    presetStat(label: "ТРАФИК", value: VPNDirectPlanCatalog.trafficOptionLabel(preset.trafficGB), dark: isSelected)
+                    presetStat(label: "WHITE-LIST", value: "\(preset.whitelistGB) GB", dark: isSelected)
+                    presetStat(label: "УСТР.", value: "\(preset.devices)", dark: isSelected)
+                }
+                .padding(.top, 12)
+
+                HStack {
+                    Text("от \(price) ₽")
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    Spacer()
+                    Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                }
+                .padding(.top, 10)
+            }
+            .padding(14)
+            .foregroundStyle(isSelected ? Color.white : DS.ink)
+            .background(isSelected ? DS.panel : Color.white.opacity(0.72))
+            .overlay(Rectangle().stroke(isSelected ? DS.green : DS.line))
+        }
+        .buttonStyle(HapticButtonStyle())
+    }
+
+    private func presetStat(label: String, value: String, dark: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).microLabel(color: dark ? .white.opacity(0.42) : DS.muted)
+            Text(value)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct PlanCheckoutSummary: View {
+    let plan: PlanConfiguration
+    let price: Int
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("DIRECT PREMIUM").microLabel(color: .white.opacity(0.42))
-                    Text(model.selectedPlanMonths == 1
-                        ? "1 месяц"
-                        : (model.selectedPlanMonths == 2 || model.selectedPlanMonths == 3
-                            ? "\(model.selectedPlanMonths) месяца"
-                            : "\(model.selectedPlanMonths) месяцев"))
+                    Text("VPN DIRECT").microLabel(color: .white.opacity(0.42))
+                    Text(plan.displayTitle)
                         .font(.system(size: 20, weight: .semibold))
-                    Text("Срок начнётся после активации")
+                    Text(plan.summaryLine)
                         .font(.system(size: 10)).foregroundStyle(.white.opacity(0.48))
                 }
                 Spacer()
-                Text("\(model.selectedPlanPrice) ₽")
+                Text("\(price) ₽")
                     .font(.system(size: 20, weight: .semibold, design: .monospaced))
                     .foregroundStyle(DS.acid)
             }
             .padding(16)
 
             HStack(spacing: 0) {
-                DarkStat(label: "ТРАФИК", value: "300 ГБ")
-                DarkStat(label: "УСТРОЙСТВА", value: "5")
-                DarkStat(label: "ЛОКАЦИИ", value: "18")
+                DarkStat(label: "ТРАФИК", value: plan.trafficLabel)
+                DarkStat(label: "WHITE-LIST", value: plan.whitelistGB > 0 ? "\(plan.whitelistGB) GB" : "—")
+                DarkStat(label: "УСТРОЙСТВА", value: "\(plan.devices)")
             }
         }
         .foregroundStyle(.white)
@@ -467,9 +497,9 @@ struct DirectPaymentMethodView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                AccessBackButton(model: model, title: "Назад", destination: model.checkoutReturnPage)
+
                 PageHeading(kicker: "ОФОРМЛЕНИЕ / ОПЛАТА", title: "Способ оплаты", subtitle: "Выберите доступный вариант")
-                    .padding(.top, 17)
+                    .padding(.top, DS.pageTop)
 
                 AccessSectionHeader(title: "ОПЛАТА", meta: "02 СПОСОБА")
                     .padding(.top, 25)
@@ -559,13 +589,13 @@ struct DirectAddOnsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                AccessBackButton(model: model, title: "Подписки")
+
                 PageHeading(
                     kicker: "DIRECT PREMIUM / УПРАВЛЕНИЕ",
                     title: "Добавить ресурсы",
                     subtitle: "Увеличьте лимиты действующей подписки"
                 )
-                .padding(.top, 17)
+                .padding(.top, DS.pageTop)
 
                 CurrentPremiumSummary(model: model)
                     .padding(.top, 23)
@@ -625,7 +655,7 @@ struct DirectAddOnsView: View {
                 AccessButton(title: "Продолжить к оплате") {
                     guard total > 0 else { return }
                     model.prepareAddOnsCheckout(trafficGB: traffic, device: device, day: day, price: total)
-                    model.detailPage = .payment
+                    model.openDetail(.payment)
                 }
                 .opacity(total == 0 ? 0.42 : 1)
                 .padding(.top, 12)
@@ -654,7 +684,7 @@ private struct CurrentPremiumSummary: View {
             .frame(height: 38)
             HStack(spacing: 0) {
                 DarkStat(label: "СРОК", value: model.hasPremiumEntitlement ? "\(model.premiumRemainingDays) ДНЯ" : "—")
-                DarkStat(label: "ТРАФИК", value: "\(model.premiumTrafficGB) ГБ")
+                DarkStat(label: "ТРАФИК", value: model.hasPremiumEntitlement ? model.premiumTrafficDisplayLabel : "—")
                 DarkStat(label: "УСТРОЙСТВА", value: "\(model.premiumDevicesUsed)")
             }
         }

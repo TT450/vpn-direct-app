@@ -31,9 +31,6 @@ public enum HapticEvent: Hashable {
     case vpnDisconnected
     case vpnSwitching
     case vpnSwitched
-    case adStarted
-    case adCompleted
-    case rewardGranted
     case purchaseStarted
     case purchaseCompleted
 }
@@ -156,12 +153,6 @@ public final class HapticManager {
             playPattern([(0.00, 0.38, 0.58), (0.09, 0.58, 0.72), (0.18, 0.38, 0.58)], fallback: { selection.selectionChanged() })
         case .vpnSwitched:
             playPattern([(0.00, 0.44, 0.38), (0.085, 0.76, 0.72)], fallback: { notification.notificationOccurred(.success) })
-        case .adStarted:
-            playPattern([(0.00, 0.30, 0.22), (0.06, 0.48, 0.42)], fallback: { impactLight.impactOccurred(intensity: 0.48) })
-        case .adCompleted:
-            playPattern([(0.00, 0.35, 0.32), (0.075, 0.60, 0.56)], fallback: { notification.notificationOccurred(.success) })
-        case .rewardGranted:
-            playPattern([(0.00, 0.36, 0.32), (0.07, 0.64, 0.58), (0.145, 0.92, 0.82), (0.26, 0.52, 0.48)], fallback: { notification.notificationOccurred(.success) })
         case .purchaseStarted:
             playPattern([(0.00, 0.46, 0.52), (0.09, 0.46, 0.52)], fallback: { impactMedium.impactOccurred(intensity: 0.52) })
         case .purchaseCompleted:
@@ -184,7 +175,7 @@ public final class HapticManager {
             notification.notificationOccurred(.error)
         case .warning:
             notification.notificationOccurred(.warning)
-        case .vpnConnected, .vpnSwitched, .adCompleted, .rewardGranted,
+        case .vpnConnected, .vpnSwitched,
              .purchaseCompleted, .copied, .shared, .saved, .imported:
             notification.notificationOccurred(.success)
         case .selection, .swipeThreshold:

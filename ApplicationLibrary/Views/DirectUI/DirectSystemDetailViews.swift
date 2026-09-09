@@ -89,9 +89,9 @@ struct DirectApplicationSettingsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SystemBackButton(model: model, title: "Настройки", destination: .systemSettings)
+
                 PageHeading(kicker: "СИСТЕМА / ПРИЛОЖЕНИЕ", title: "Приложение", subtitle: "Язык и поведение интерфейса")
-                    .padding(.top, 17)
+                    .padding(.top, DS.pageTop)
 
                 HStack {
                     VStack(alignment: .leading, spacing: 7) {
@@ -174,9 +174,9 @@ struct DirectCoreSettingsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SystemBackButton(model: model, title: "Настройки", destination: .systemSettings)
+
                 PageHeading(kicker: "СИСТЕМА / CORE", title: "Ядро", subtitle: "Версия sing-box и размер данных")
-                    .padding(.top, 17)
+                    .padding(.top, DS.pageTop)
 
                 HStack(alignment: .bottom) {
                     VStack(alignment: .leading, spacing: 7) {
@@ -247,9 +247,9 @@ struct DirectTunnelSettingsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SystemBackButton(model: model, title: "Настройки", destination: .systemSettings)
+
                 PageHeading(kicker: "СИСТЕМА / PACKET TUNNEL", title: "Туннель", subtitle: "Маршруты и системные исключения")
-                    .padding(.top, 17)
+                    .padding(.top, DS.pageTop)
 
                 HStack {
                     VStack(alignment: .leading, spacing: 7) {
@@ -362,9 +362,9 @@ struct DirectOnDemandSettingsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SystemBackButton(model: model, title: "Настройки", destination: .systemSettings)
+
                 PageHeading(kicker: "АВТОМАТИКА / ON DEMAND", title: "Запуск по требованию", subtitle: "Когда VPN должен включаться сам")
-                    .padding(.top, 17)
+                    .padding(.top, DS.pageTop)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("ТЕКУЩЕЕ ПРАВИЛО").microLabel(color: .white.opacity(0.42))

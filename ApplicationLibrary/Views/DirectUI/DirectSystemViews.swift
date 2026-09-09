@@ -11,7 +11,7 @@ struct SystemBackButton: View {
 
     var body: some View {
         Button {
-            model.detailPage = destination
+            model.goBack()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.left")
@@ -80,13 +80,13 @@ struct DirectSystemSettingsWarningView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SystemBackButton(model: model, title: "Профиль", destination: nil)
+
                 PageHeading(
                     kicker: "ЗАЩИЩЁННЫЙ РАЗДЕЛ",
                     title: "Системные настройки",
                     subtitle: "Параметры сетевого ядра и маршрутизации"
                 )
-                .padding(.top, 17)
+                .padding(.top, DS.pageTop)
 
                 VStack(spacing: 0) {
                     HStack(spacing: 15) {
@@ -142,7 +142,7 @@ struct DirectSystemSettingsWarningView: View {
                 .padding(.top, 24)
 
                 Button {
-                    model.detailPage = nil
+                    model.goBack()
                 } label: {
                     HStack {
                         Image(systemName: "arrow.left")
@@ -218,13 +218,13 @@ struct DirectSystemSettingsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SystemBackButton(model: model, title: "Профиль", destination: nil)
+
                 PageHeading(
                     kicker: "СИСТЕМА / 05",
                     title: "Настройки",
                     subtitle: "Управление приложением и ядром"
                 )
-                .padding(.top, 17)
+                .padding(.top, DS.pageTop)
 
                 HStack(spacing: 15) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -329,9 +329,9 @@ struct DirectAboutAppView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SystemBackButton(model: model, title: "Настройки", destination: .systemSettings)
+
                 PageHeading(kicker: "ПРОЕКТ / OPEN SOURCE", title: "О приложении", subtitle: "VPN Direct для iPhone")
-                    .padding(.top, 17)
+                    .padding(.top, DS.pageTop)
 
                 HStack(spacing: 17) {
                     Text("A")
@@ -412,9 +412,9 @@ struct DirectServiceLogView: View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
-                    SystemBackButton(model: model, title: "Настройки", destination: .systemSettings)
+
                     PageHeading(kicker: "ОТЛАДКА / LIVE", title: "Журнал", subtitle: "События ядра и сетевого туннеля")
-                        .padding(.top, 17)
+                        .padding(.top, DS.pageTop)
 
                     HStack(spacing: 0) {
                         Label(isLive ? "LIVE" : "OFFLINE", systemImage: "circle.fill")
@@ -664,9 +664,9 @@ struct DirectNewConfigurationView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SystemBackButton(model: model, title: "Подписки", destination: nil)
+
                 PageHeading(kicker: "ИМПОРТ / РУЧНОЙ ВВОД", title: "Новая конфигурация", subtitle: "Добавьте ссылку или URL подписки")
-                    .padding(.top, 17)
+                    .padding(.top, DS.pageTop)
 
                 HStack {
                     VStack(alignment: .leading, spacing: 7) {

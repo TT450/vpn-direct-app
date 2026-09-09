@@ -5,13 +5,15 @@ import Library
 
 public enum AppTab: Int, CaseIterable {
     case home = 1
-    case subscriptions
+    case locations
+    case management
     case profile
 
     public var title: String {
         switch self {
         case .home: "Главная"
-        case .subscriptions: "Подписки"
+        case .locations: "Локации"
+        case .management: "Управление"
         case .profile: "Профиль"
         }
     }
@@ -41,6 +43,7 @@ public enum DetailPage: Equatable {
     case accessChoice
     case freeAccess
     case premiumPlans
+    case planConstructor
     case payment
     case addOns
 }
@@ -56,11 +59,38 @@ public enum PaymentMethod: String, CaseIterable {
     case external = "Другие способы"
 }
 
+/// Direct product backend — the only origin the Direct UI layer talks to.
+///
+/// ```
+/// bot.vpn-direct.com ──nginx──► xuiweb :8282   (/sub, Happ, public API)
+///                           └─► web_admin :8181 (/s9kqz83x1/…)
+///                           └─► payments :8081  (webhooks)
+/// ```
+///
+/// Remnawave (`remna.vpn-direct.com`) stays **server-side only** behind that stack.
+/// The iOS Direct layer never calls Remnawave. Imported third-party subscriptions
+/// are unrelated and must not use these hosts.
+public enum DirectBackend {
+    public static let host = "bot.vpn-direct.com"
+    public static let baseURLString = "https://bot.vpn-direct.com"
+    /// Legacy direct IP of the same box (SSH / known_hosts). Prefer `host` in URLs.
+    public static let legacyIP = "144.31.5.124"
+
+    public static var baseURL: URL { URL(string: baseURLString)! }
+}
+
 public enum DirectBuiltinProfile {
     public static let freeURL = "vpndirect://builtin/free"
     public static let premiumURL = "vpndirect://builtin/premium"
     public static let freeName = "VPN Direct Free"
     public static let premiumName = "VPN Direct Premium"
+
+    /// Hosts whose `/sub/…` (etc.) belong to the Direct backend — never Remnawave panel,
+    /// never marketing `vpn-direct.com`, never third-party imports.
+    public static let ownedHosts: [String] = [
+        DirectBackend.host,
+        DirectBackend.legacyIP,
+    ]
 
     public static func kind(for remoteURL: String?) -> AccessSource? {
         switch remoteURL {
@@ -72,6 +102,26 @@ public enum DirectBuiltinProfile {
 
     public static func isBuiltin(_ remoteURL: String?) -> Bool {
         kind(for: remoteURL) != nil
+    }
+
+    /// Builtin stub **or** subscription URL served by `bot.vpn-direct.com` (xuiweb).
+    public static func isDirectOwned(_ remoteURL: String?) -> Bool {
+        if isBuiltin(remoteURL) { return true }
+        guard let raw = remoteURL?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return false
+        }
+        let host: String?
+        if let urlHost = URL(string: raw)?.host {
+            host = urlHost.lowercased()
+        } else if raw.contains("://") {
+            host = nil
+        } else {
+            // Bare host / IP
+            host = raw.lowercased().split(separator: "/").first.map(String.init)
+        }
+        guard let host else { return false }
+        // Exact match only — do not treat remna.vpn-direct.com / armenia.* as Direct.
+        return ownedHosts.contains(host)
     }
 }
 

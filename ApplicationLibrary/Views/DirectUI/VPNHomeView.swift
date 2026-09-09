@@ -72,9 +72,11 @@ public struct VPNHomeView: View {
                             case .accessChoice:
                                 DirectAccessChoiceView(model: model)
                             case .freeAccess:
-                                DirectFreeAccessView(model: model)
+                                DirectPlansView(model: model)
                             case .premiumPlans:
-                                DirectPremiumPlansView(model: model)
+                                DirectPlansView(model: model)
+                            case .planConstructor:
+                                DirectConstructorView(model: model)
                             case .payment:
                                 DirectPaymentMethodView(model: model)
                             case .addOns:
@@ -84,8 +86,10 @@ public struct VPNHomeView: View {
                             switch model.selectedTab {
                             case .home:
                                 DirectHomePage(model: model)
-                            case .subscriptions:
-                                DirectSubscriptionsPage(model: model) {
+                            case .locations:
+                                DirectServersPage(model: model)
+                            case .management:
+                                DirectManagementPage(model: model) {
                                     model.isMenuOpen = true
                                 }
                             case .profile:
@@ -240,6 +244,23 @@ public struct VPNHomeView: View {
 
     private var appHeader: some View {
         HStack(spacing: 0) {
+            if model.detailPage != nil {
+                Button {
+                    model.goBack()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.left")
+                        Text(model.chromeBackTitle)
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(DS.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                }
+                .buttonStyle(HapticButtonStyle())
+                .padding(.trailing, 12)
+            }
+
             VStack(alignment: .leading, spacing: 1) {
                 Text("VPN DIRECT").font(.system(size: 15, weight: .bold))
                 Text("PRIVATE NETWORK").microLabel()
@@ -290,15 +311,15 @@ public struct VPNHomeView: View {
             ("01", "Отсканировать QR", "Ссылка подписки или share-link", "qrcode.viewfinder", { showQRScanner = true }),
             ("02", "Вставить из буфера", "Ссылка или готовый конфиг", "doc.on.clipboard", { pasteFromClipboard() }),
             ("03", "Ручной ввод ссылки", "vless / vmess / trojan / https", "link", {
-                model.selectedTab = .subscriptions
+                model.selectedTab = .management
                 model.openDetail(.newConfiguration)
             }),
             ("04", "Импорт файла", "JSON, Clash, WireGuard, ovpn", "doc.badge.arrow.up", {
-                model.selectedTab = .subscriptions
+                model.selectedTab = .management
                 model.openDetail(.importFile)
             }),
             ("05", "Вставить конфиг", "Текст JSON / YAML / URI-список", "doc.plaintext", {
-                model.selectedTab = .subscriptions
+                model.selectedTab = .management
                 model.openDetail(.importConfigText)
             }),
         ]
@@ -408,7 +429,7 @@ public struct VPNHomeView: View {
         // Raw config body (JSON / Clash / WG / URI list) — not a bare URL.
         if DirectLocalProfileImporter.looksLikeConfigContent(trimmed) {
             model.pendingImportConfigText = trimmed
-            model.selectedTab = .subscriptions
+            model.selectedTab = .management
             model.openDetail(.importConfigText)
             return
         }

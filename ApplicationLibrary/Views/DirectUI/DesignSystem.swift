@@ -12,6 +12,8 @@ enum DS {
     static let acid = Color(red: 0.66, green: 0.94, blue: 0.41)
     static let green = Color(red: 0.18, green: 0.55, blue: 0.31)
     static let danger = Color(red: 0.82, green: 0.24, blue: 0.20)
+    /// Top inset for page kickers / PageHeading — matches Home & Profile.
+    static let pageTop: CGFloat = 24
 }
 
 extension View {

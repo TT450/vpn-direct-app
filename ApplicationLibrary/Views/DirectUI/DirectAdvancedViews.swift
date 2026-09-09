@@ -11,7 +11,7 @@ private struct DetailBackButton: View {
 
     var body: some View {
         Button {
-            model.detailPage = nil
+            model.goBack()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.left")
@@ -150,14 +150,14 @@ struct DirectSubscriptionDetailView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                DetailBackButton(model: model, title: "Все подписки")
+
                 if let subscription {
                     PageHeading(
                         kicker: "КОНФИГУРАЦИЯ / \(String(format: "%02d", (model.subscriptions.firstIndex(where: { $0.id == subscriptionID }) ?? 0) + 1))",
                         title: subscription.name,
                         subtitle: subscription.source.capitalized
                     )
-                    .padding(.top, 17)
+                    .padding(.top, DS.pageTop)
 
                     VStack(spacing: 0) {
                         HStack {
@@ -300,8 +300,8 @@ struct DirectSecurityCenterView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                DetailBackButton(model: model, title: "Профиль")
-                PageHeading(kicker: "ЗАЩИТА / \(String(format: "%02d", enabled)) ИЗ 05", title: "Безопасность", subtitle: "Автоматика, DNS, маршрутизация и контроль соединения").padding(.top, 17)
+
+                PageHeading(kicker: "ЗАЩИТА / \(String(format: "%02d", enabled)) ИЗ 05", title: "Безопасность", subtitle: "Автоматика, DNS, маршрутизация и контроль соединения").padding(.top, DS.pageTop)
 
                 HStack(spacing: 17) {
                     ZStack {
@@ -471,8 +471,8 @@ struct DirectConnectionSettingsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                DetailBackButton(model: model, title: "Профиль")
-                PageHeading(kicker: "СЕТЬ / УМНЫЙ РЕЖИМ", title: "Подключение", subtitle: "Маршрутизация и восстановление").padding(.top, 17)
+
+                PageHeading(kicker: "СЕТЬ / УМНЫЙ РЕЖИМ", title: "Подключение", subtitle: "Маршрутизация и восстановление").padding(.top, DS.pageTop)
 
                 VStack(alignment: .leading, spacing: 18) {
                     HStack { Text("ЯДРО / DIRECT NETWORK").microLabel(color: .white.opacity(0.42)); Spacer(); Text(model.connectionMode.uppercased()).microLabel(color: DS.acid) }
@@ -511,8 +511,8 @@ struct DirectDiagnosticsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                DetailBackButton(model: model, title: "Профиль")
-                PageHeading(kicker: "СИСТЕМА / ПРОВЕРЕНО СЕЙЧАС", title: "Диагностика", subtitle: "Понятная проверка без технического шума").padding(.top, 17)
+
+                PageHeading(kicker: "СИСТЕМА / ПРОВЕРЕНО СЕЙЧАС", title: "Диагностика", subtitle: "Понятная проверка без технического шума").padding(.top, DS.pageTop)
 
                 HStack(spacing: 13) {
                     Text(model.isProtected ? "✓" : "!")
@@ -561,7 +561,7 @@ struct DirectDiagnosticsView: View {
                     }
                     .padding(.horizontal, 14).frame(height: 74).background(Color(red: 0.2, green: 0.18, blue: 0.15)).foregroundStyle(.white)
                 }
-                .buttonStyle(HapticButtonStyle()).padding(.top, 17)
+                .buttonStyle(HapticButtonStyle()).padding(.top, DS.pageTop)
 
                 DirectSectionHeader(title: "ДАННЫЕ ДЛЯ ПОДДЕРЖКИ", meta: "БЕЗ ЛИЧНЫХ ДАННЫХ").padding(.top, 18)
                 HStack { Text("Скопировать отчёт диагностики").font(.system(size: 10)); Spacer(); Text("КОПИРОВАТЬ").microLabel(color: DS.green) }
@@ -581,8 +581,8 @@ struct DirectActivityView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                DetailBackButton(model: model, title: "Профиль")
-                PageHeading(kicker: "ЛОКАЦИИ / \(String(format: "%02d", favorites.count)) ИЗБРАННЫХ", title: "Мои серверы", subtitle: "Избранное и недавние подключения").padding(.top, 17)
+
+                PageHeading(kicker: "ЛОКАЦИИ / \(String(format: "%02d", favorites.count)) ИЗБРАННЫХ", title: "Мои серверы", subtitle: "Избранное и недавние подключения").padding(.top, DS.pageTop)
                 DirectSectionHeader(title: "★ / ИЗБРАННОЕ", meta: String(format: "%02d", favorites.count)).padding(.top, 22)
                 if favorites.isEmpty {
                     Text("Добавьте серверы в избранное из списка локаций")
@@ -773,7 +773,7 @@ struct DirectRecoveryView: View {
                 HStack { Text(fixed ? "Готово — закрыть" : "Исправить автоматически"); Spacer(); Image(systemName: fixed ? "checkmark" : "arrow.right") }
                     .padding(.horizontal, 14).frame(height: 50).foregroundStyle(DS.acid).background(DS.ink)
             }
-            .buttonStyle(HapticButtonStyle()).padding(.top, 17)
+            .buttonStyle(HapticButtonStyle()).padding(.top, DS.pageTop)
         }
         .onAppear { HapticManager.shared.play(.warning) }
     }

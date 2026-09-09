@@ -83,7 +83,7 @@ struct DirectProfilePage: View {
                 .padding(.top, 15)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+            .padding(.vertical, DS.pageTop)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

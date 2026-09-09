@@ -11,6 +11,8 @@ import UIKit
 public final class VPNConnectionModel: ObservableObject {
     @Published public var selectedTab: AppTab = .home
     @Published public var detailPage: DetailPage?
+    /// Previous detail pages for logical back navigation (not shown in UI).
+    private var detailStack: [DetailPage] = []
     @Published public var activeSheet: AppSheet?
     @Published public var connectionMode = "Авто"
     @Published public var isMenuOpen = false
@@ -36,17 +38,20 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var freeHours = 0
     @Published public var freeTrafficMB = 0
     @Published public var freeExpiresAt: Date?
-    @Published public var watchedAds = 0
     @Published public var hasPremiumEntitlement = false
     @Published public var premiumRemainingDays = 0
     @Published public var premiumTrafficGB = 300
+    @Published public var premiumWhitelistGB = 0
     @Published public var premiumDevicesUsed = 1
     @Published public var premiumDeviceLimit = 5
-    @Published public var selectedPlanMonths = 1
-    @Published public var selectedPlanPrice = 249
+    /// Active plan configuration for presets / constructor checkout.
+    @Published public var selectedPlan: PlanConfiguration = VPNDirectPlanCatalog.defaultConfiguration()
+    @Published public var planBrowseMode: VPNDirectPlanMode = .presets
+    @Published public var selectedPresetID: String = VPNDirectPlanCatalog.featured.id
+    @Published public var autoRenewPremium = true
     @Published public var paymentMethod: PaymentMethod = .apple
-    @Published public var checkoutTitle = "1 месяц Premium"
-    @Published public var checkoutPrice = 249
+    @Published public var checkoutTitle = "Plus · 30 дней"
+    @Published public var checkoutPrice = 799
     @Published public var checkoutReturnPage: DetailPage = .premiumPlans
     @Published public var pendingAddOnTrafficGB = 0
     @Published public var pendingAddOnDevice = false
@@ -93,14 +98,17 @@ public final class VPNConnectionModel: ObservableObject {
     private static let freeHoursKey = "vpndirect.access.free.hours"
     private static let freeTrafficKey = "vpndirect.access.free.traffic.mb"
     private static let freeExpiresAtKey = "vpndirect.access.free.expires_at"
-    private static let watchedAdsKey = "vpndirect.access.free.ads"
     private static let accessSourceKey = "vpndirect.access.source"
     private static let premiumEntitlementKey = "vpndirect.access.premium.enabled"
     private static let premiumDaysKey = "vpndirect.access.premium.days"
     private static let premiumTrafficKey = "vpndirect.access.premium.traffic.gb"
+    private static let premiumWhitelistKey = "vpndirect.access.premium.whitelist.gb"
     private static let premiumDevicesUsedKey = "vpndirect.access.premium.devices.used"
     private static let premiumDeviceLimitKey = "vpndirect.access.premium.devices.limit"
+    private static let premiumAutoRenewKey = "vpndirect.access.premium.autorenew"
     private static let builtinsSeededKey = "vpndirect.access.builtins.seeded.v1"
+    /// Sentinel for Unlimited traffic in local demo entitlement.
+    public static let unlimitedTrafficGB = 100_000
 
     public init() {
         if let stored = UserDefaults.standard.array(forKey: Self.favoritesKey) as? [String] {
@@ -118,16 +126,31 @@ public final class VPNConnectionModel: ObservableObject {
             freeExpiresAt = Date().addingTimeInterval(TimeInterval(freeHours * 3600))
             persistFreeBalance()
         }
-        watchedAds = UserDefaults.standard.integer(forKey: Self.watchedAdsKey)
         hasPremiumEntitlement = UserDefaults.standard.bool(forKey: Self.premiumEntitlementKey)
         premiumRemainingDays = UserDefaults.standard.integer(forKey: Self.premiumDaysKey)
         let traffic = UserDefaults.standard.integer(forKey: Self.premiumTrafficKey)
         premiumTrafficGB = traffic > 0 ? traffic : 300
+        premiumWhitelistGB = max(0, UserDefaults.standard.integer(forKey: Self.premiumWhitelistKey))
         let used = UserDefaults.standard.integer(forKey: Self.premiumDevicesUsedKey)
         premiumDevicesUsed = used > 0 ? used : 1
         let limit = UserDefaults.standard.integer(forKey: Self.premiumDeviceLimitKey)
         premiumDeviceLimit = limit > 0 ? limit : 5
+        if UserDefaults.standard.object(forKey: Self.premiumAutoRenewKey) != nil {
+            autoRenewPremium = UserDefaults.standard.bool(forKey: Self.premiumAutoRenewKey)
+        }
+        selectedPlan = VPNDirectPlanCatalog.defaultConfiguration()
+        checkoutTitle = Self.checkoutTitle(for: selectedPlan)
+        checkoutPrice = VPNDirectPricingEngine.price(for: selectedPlan)
         activeAccess = Self.loadAccessSource()
+    }
+
+    public var selectedPlanPrice: Int {
+        VPNDirectPricingEngine.price(for: selectedPlan)
+    }
+
+    public var premiumTrafficDisplayLabel: String {
+        if premiumTrafficGB >= Self.unlimitedTrafficGB { return "Unlimited" }
+        return "\(premiumTrafficGB) ГБ"
     }
 
     public var isBusy: Bool { phase != .idle }
@@ -163,6 +186,7 @@ public final class VPNConnectionModel: ObservableObject {
             return "\(freeTrafficMB)"
         }
         if case .premium = activeAccess, hasPremiumEntitlement {
+            if premiumTrafficGB >= Self.unlimitedTrafficGB { return "∞" }
             return formatTrafficValue(Double(premiumTrafficGB))
         }
         guard activeSubscriptionID != 0,
@@ -192,7 +216,8 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public var isPremiumAccessReady: Bool {
-        hasPremiumEntitlement && premiumRemainingDays > 0 && premiumTrafficGB > 0
+        guard hasPremiumEntitlement, premiumRemainingDays > 0 else { return false }
+        return premiumTrafficGB > 0
     }
 
     public var isExternalAccessReady: Bool {
@@ -259,6 +284,79 @@ public final class VPNConnectionModel: ObservableObject {
         subscriptions.first(where: { DirectBuiltinProfile.kind(for: $0.profile.remoteURL) == .premium })
     }
 
+    /// Live Direct outbounds only (builtin + `bot.vpn-direct.com`). Never Remnawave panel, never third-party imports.
+    public var liveDirectServers: [VPNServer] {
+        let directItems = subscriptions.filter { DirectBuiltinProfile.isDirectOwned($0.profile.remoteURL) }
+        // Prefer premium builtin, then free builtin, then any Direct-owned remote with nodes.
+        let ordered = directItems.sorted { lhs, rhs in
+            Self.builtinSortRank(lhs.profile.remoteURL) < Self.builtinSortRank(rhs.profile.remoteURL)
+        }
+        for item in ordered {
+            let servers = item.servers.filter { server in
+                let id = server.id.lowercased()
+                return !id.isEmpty && id != "direct" && id != "auto"
+            }
+            if !servers.isEmpty { return servers }
+        }
+        return []
+    }
+
+    /// Whether the Локации tab can switch the tunnel (same role as the server sheet).
+    public var canSwitchDirectLocations: Bool {
+        isPremiumAccessReady && !liveDirectServers.isEmpty
+    }
+
+    /// Servers for the Direct «Локации» tab — Direct only, never external imports.
+    public var directServerItems: [DirectServerItem] {
+        let live = liveDirectServers
+        if !live.isEmpty {
+            return live.map(DirectServerItem.from(server:))
+        }
+        // Showcase catalog (seed/CDN). Never fall back to active imported subscription.
+        return DirectLocationsCatalog.shared.items
+    }
+
+    public func openPremiumPlans(mode: VPNDirectPlanMode) {
+        planBrowseMode = mode
+        if mode == .presets {
+            if let preset = VPNDirectPlanCatalog.preset(id: selectedPresetID) {
+                let days = VPNDirectPlanCatalog.presetPeriodDays.contains(selectedPlan.days)
+                    || (preset.id == "travel" && selectedPlan.days == 7)
+                    ? selectedPlan.days
+                    : preset.defaultDays
+                applySelectedPlan(preset.configuration(days: days), presetID: preset.id)
+            }
+            openDetail(.premiumPlans)
+        } else {
+            var custom = selectedPlan
+            custom.name = nil
+            applySelectedPlan(custom)
+            openDetail(.planConstructor)
+        }
+    }
+
+    public func ensureDirectProfileActive() {
+        if let premiumID = premiumProfileID {
+            if activeSubscriptionID != premiumID {
+                setActiveAccess(.premium)
+                activate(subscriptionID: premiumID)
+            } else {
+                setActiveAccess(.premium)
+            }
+            return
+        }
+        if let freeID = freeProfileID, activeSubscriptionID != freeID {
+            setActiveAccess(.free)
+            activate(subscriptionID: freeID)
+        }
+    }
+
+    public func setImportedAccessAndActivate(_ subscriptionID: Int64) {
+        setActiveAccess(.imported(subscriptionID))
+        activate(subscriptionID: subscriptionID)
+        selectedTab = .home
+    }
+
     public func isSubscriptionActive(_ id: Int64) -> Bool {
         switch activeAccess {
         case .free:
@@ -287,7 +385,8 @@ public final class VPNConnectionModel: ObservableObject {
             return freeRemainingDisplayText
         case .premium:
             if hasPremiumEntitlement {
-                return "\(premiumExpiryShortLabel) · \(premiumTrafficGB) ГБ · \(premiumDevicesUsed)/\(premiumDeviceLimit)"
+                let wl = premiumWhitelistGB > 0 ? " · \(premiumWhitelistGB) GB WL" : ""
+                return "\(premiumExpiryShortLabel) · \(premiumTrafficDisplayLabel) · \(premiumDevicesUsed)/\(premiumDeviceLimit)\(wl)"
             }
             return "Нет тарифа"
         case .imported:
@@ -311,9 +410,9 @@ public final class VPNConnectionModel: ObservableObject {
 
     public var accessStripActionTitle: String {
         switch activeAccess {
-        case .free: return "+1 ЧАС"
+        case .free: return "ТАРИФЫ"
         case .premium: return hasPremiumEntitlement ? "УПРАВЛЯТЬ" : "ТАРИФ"
-        case .imported: return "ПОДПИСКИ"
+        case .imported: return "УПРАВЛЕНИЕ"
         }
     }
 
@@ -394,23 +493,71 @@ public final class VPNConnectionModel: ObservableObject {
 
     public func select(tab: AppTab) {
         selectedTab = tab
-        detailPage = nil
+        closeDetail()
         isMenuOpen = false
         HapticManager.shared.play(.navigation)
     }
 
     public func openDetail(_ page: DetailPage) {
+        if let current = detailPage, current != page {
+            detailStack.append(current)
+        }
         detailPage = page
+        isMenuOpen = false
+    }
+
+    /// Leave all detail pages and return to the current tab root.
+    public func closeDetail() {
+        detailStack.removeAll()
+        detailPage = nil
+    }
+
+    /// Pop one detail level (or return to the tab root).
+    public func goBack() {
+        if let previous = detailStack.popLast() {
+            detailPage = previous
+        } else {
+            detailPage = nil
+        }
+    }
+
+    /// Title for the chrome back control (previous page or current tab).
+    public var chromeBackTitle: String {
+        if let previous = detailStack.last {
+            return Self.shortTitle(for: previous)
+        }
+        return selectedTab.title
+    }
+
+    private static func shortTitle(for page: DetailPage) -> String {
+        switch page {
+        case .premiumPlans, .freeAccess: return "Тарифы"
+        case .planConstructor: return "Конструктор"
+        case .payment: return "Оплата"
+        case .accessChoice: return "Доступ"
+        case .addOns: return "Дополнения"
+        case .systemSettings: return "Настройки"
+        case .systemWarning: return "Системные"
+        case .about: return "О приложении"
+        case .serviceLog: return "Журнал"
+        case .security: return "Безопасность"
+        case .connection: return "Подключение"
+        case .diagnostics: return "Диагностика"
+        case .activity: return "Мои серверы"
+        case .subscription: return "Подписка"
+        case .newConfiguration, .importFile, .importConfigText: return "Импорт"
+        case .applicationSettings, .coreSettings, .tunnelSettings, .onDemandSettings: return "Настройки"
+        }
     }
 
     public func openAccessStripAction() {
         switch activeAccess {
         case .free:
-            openDetail(.freeAccess)
+            openDetail(.premiumPlans)
         case .premium:
             openDetail(hasPremiumEntitlement ? .addOns : .premiumPlans)
         case .imported:
-            select(tab: .subscriptions)
+            select(tab: .management)
         }
     }
 
@@ -421,7 +568,7 @@ public final class VPNConnectionModel: ObservableObject {
         guard let item = subscriptions.first(where: { $0.id == targetID }),
               !DirectBuiltinProfile.isBuiltin(item.profile.remoteURL)
         else {
-            select(tab: .subscriptions)
+            select(tab: .management)
             return
         }
         guard activeSubscriptionID == targetID else {
@@ -453,7 +600,7 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func openChangeSubscription() {
-        select(tab: .subscriptions)
+        select(tab: .management)
     }
 
     public func openChangeServer() {
@@ -497,13 +644,8 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func activateFreeAccess() {
-        guard let freeID = freeProfileID else {
-            openDetail(.freeAccess)
-            return
-        }
-        guard !isSubscriptionActive(freeID) else { return }
-        setActiveAccess(.free)
-        activate(subscriptionID: freeID)
+        // Free-via-ads removed — open Direct tariff picker instead.
+        openDetail(.premiumPlans)
     }
 
     public func clearAccessChoiceContext() {
@@ -511,44 +653,31 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func handleAccessChoiceFree() {
-        if isFreeAccessReady {
-            guard let freeID = freeProfileID else {
-                detailPage = .freeAccess
-                return
-            }
-            setActiveAccess(.free)
-            if activeSubscriptionID != freeID {
-                activate(subscriptionID: freeID)
-            }
-            detailPage = nil
-            Task { await connectAfterAccessChoice() }
-        } else {
-            detailPage = .freeAccess
-        }
+        openDetail(.premiumPlans)
     }
 
     public func handleAccessChoicePremium() {
         if isPremiumAccessReady {
             guard let premiumID = premiumProfileID else {
-                detailPage = .premiumPlans
+                openDetail(.premiumPlans)
                 return
             }
             setActiveAccess(.premium)
             if activeSubscriptionID != premiumID {
                 activate(subscriptionID: premiumID)
             }
-            detailPage = nil
+            closeDetail()
             Task { await connectAfterAccessChoice() }
         } else if !hasPremiumEntitlement {
-            detailPage = .premiumPlans
+            openDetail(.premiumPlans)
         } else {
-            detailPage = .addOns
+            openDetail(.addOns)
         }
     }
 
     public func handleAccessChoicePickSubscription() {
-        selectedTab = .subscriptions
-        detailPage = nil
+        selectedTab = .management
+        closeDetail()
     }
 
     public func handleAccessChoiceAddURL() {
@@ -560,7 +689,7 @@ public final class VPNConnectionModel: ObservableObject {
         importFromAccessChoice = false
         setActiveAccess(.imported(subscriptionID))
         activate(subscriptionID: subscriptionID)
-        detailPage = nil
+        closeDetail()
         Task { await connectAfterAccessChoice() }
     }
 
@@ -569,7 +698,7 @@ public final class VPNConnectionModel: ObservableObject {
         importFromAccessChoice = false
         setActiveAccess(.imported(subscriptionID))
         activate(subscriptionID: subscriptionID)
-        detailPage = nil
+        closeDetail()
         selectedTab = .home
         if connect {
             Task { await connectAfterAccessChoice() }
@@ -587,13 +716,13 @@ public final class VPNConnectionModel: ObservableObject {
         if let reason {
             accessChoiceContext = reason
         }
-        detailPage = .accessChoice
+        openDetail(.accessChoice)
     }
 
     private func entitlementExpiredMessage() -> String {
         switch activeAccess {
         case .free:
-            return "Срок бесплатного доступа истёк или закончился трафик."
+            return "Нужен тариф VPN Direct или внешняя подписка."
         case .premium:
             return "Срок Premium истёк или закончился трафик."
         case .imported:
@@ -658,40 +787,33 @@ public final class VPNConnectionModel: ObservableObject {
         }
     }
 
-    public func completeRewardPack() {
-        let now = Date()
-        let base = max(now, freeExpiresAt ?? now)
-        freeExpiresAt = base.addingTimeInterval(3600)
-        freeHours = max(freeHours, Int(ceil(freeExpiresAt!.timeIntervalSince(now) / 3600)))
-        freeTrafficMB += 200
-        watchedAds = 0
-        persistFreeBalance()
-        HapticManager.shared.play(.rewardGranted)
-    }
-
-    /// Returns `true` when a full 3-ad pack was completed and balance was credited.
-    @discardableResult
-    public func watchNextAd() -> Bool {
-        watchedAds = min(watchedAds + 1, 3)
-        UserDefaults.standard.set(watchedAds, forKey: Self.watchedAdsKey)
-        if watchedAds >= 3 {
-            completeRewardPack()
-            return true
+    public func applySelectedPlan(_ plan: PlanConfiguration, presetID: String? = nil, playHaptic: Bool = true) {
+        selectedPlan = plan
+        if let presetID {
+            selectedPresetID = presetID
+        } else if let name = plan.name,
+                  let match = VPNDirectPlanCatalog.presets.first(where: { $0.name == name })
+        {
+            selectedPresetID = match.id
         }
-        return false
-    }
-
-    public func selectPlan(months: Int, price: Int) {
-        selectedPlanMonths = months
-        selectedPlanPrice = price
-        checkoutTitle = months == 1
-            ? "1 месяц Premium"
-            : (months == 2 || months == 3 ? "\(months) месяца Premium" : "\(months) месяцев Premium")
-        checkoutPrice = price
+        checkoutTitle = Self.checkoutTitle(for: plan)
+        checkoutPrice = VPNDirectPricingEngine.price(for: plan)
         pendingAddOnTrafficGB = 0
         pendingAddOnDevice = false
         pendingAddOnDay = false
-        HapticManager.shared.play(.selection)
+        if playHaptic {
+            HapticManager.shared.play(.selection)
+        }
+    }
+
+    public func selectPlan(months: Int, price: Int) {
+        // Legacy entry point — map months onto Plus-like resources.
+        let days = max(30, months * 30)
+        var plan = selectedPlan
+        plan.days = days
+        if plan.name == nil { plan.name = "Plus" }
+        applySelectedPlan(plan)
+        checkoutPrice = price
     }
 
     public func prepareAddOnsCheckout(trafficGB: Int, device: Bool, day: Bool, price: Int) {
@@ -706,7 +828,9 @@ public final class VPNConnectionModel: ObservableObject {
     public func completeCheckout() {
         if checkoutReturnPage == .addOns {
             if pendingAddOnTrafficGB > 0 {
-                premiumTrafficGB += pendingAddOnTrafficGB
+                if premiumTrafficGB < Self.unlimitedTrafficGB {
+                    premiumTrafficGB += pendingAddOnTrafficGB
+                }
             }
             if pendingAddOnDevice {
                 premiumDeviceLimit += 1
@@ -720,18 +844,32 @@ public final class VPNConnectionModel: ObservableObject {
             hasPremiumEntitlement = true
         } else {
             hasPremiumEntitlement = true
-            premiumRemainingDays += selectedPlanMonths * 30
-            if premiumTrafficGB < 300 { premiumTrafficGB = 300 }
-            if premiumDeviceLimit < 5 { premiumDeviceLimit = 5 }
+            premiumRemainingDays = selectedPlan.days
+            if let gb = selectedPlan.trafficGB {
+                premiumTrafficGB = gb
+            } else {
+                premiumTrafficGB = Self.unlimitedTrafficGB
+            }
+            premiumWhitelistGB = selectedPlan.whitelistGB
+            premiumDeviceLimit = max(1, selectedPlan.devices)
+            premiumDevicesUsed = min(premiumDevicesUsed, premiumDeviceLimit)
         }
         persistPremiumState()
         setActiveAccess(.premium)
         if let premiumID = premiumProfileID {
             activate(subscriptionID: premiumID)
         }
-        selectedTab = .subscriptions
-        detailPage = nil
+        selectedTab = .management
+        closeDetail()
         HapticManager.shared.play(.purchaseCompleted)
+    }
+
+    private static func checkoutTitle(for plan: PlanConfiguration) -> String {
+        let period = VPNDirectPlanCatalog.periodLabel(days: plan.days)
+        if let name = plan.name, !name.isEmpty {
+            return "\(name) · \(period)"
+        }
+        return "Свой тариф · \(period)"
     }
 
     private func setActiveAccess(_ source: AccessSource) {
@@ -742,7 +880,6 @@ public final class VPNConnectionModel: ObservableObject {
     private func persistFreeBalance() {
         UserDefaults.standard.set(freeHours, forKey: Self.freeHoursKey)
         UserDefaults.standard.set(freeTrafficMB, forKey: Self.freeTrafficKey)
-        UserDefaults.standard.set(watchedAds, forKey: Self.watchedAdsKey)
         if let expires = freeExpiresAt {
             UserDefaults.standard.set(expires.timeIntervalSince1970, forKey: Self.freeExpiresAtKey)
         } else {
@@ -754,8 +891,14 @@ public final class VPNConnectionModel: ObservableObject {
         UserDefaults.standard.set(hasPremiumEntitlement, forKey: Self.premiumEntitlementKey)
         UserDefaults.standard.set(premiumRemainingDays, forKey: Self.premiumDaysKey)
         UserDefaults.standard.set(premiumTrafficGB, forKey: Self.premiumTrafficKey)
+        UserDefaults.standard.set(premiumWhitelistGB, forKey: Self.premiumWhitelistKey)
         UserDefaults.standard.set(premiumDevicesUsed, forKey: Self.premiumDevicesUsedKey)
         UserDefaults.standard.set(premiumDeviceLimit, forKey: Self.premiumDeviceLimitKey)
+        UserDefaults.standard.set(autoRenewPremium, forKey: Self.premiumAutoRenewKey)
+    }
+
+    public func persistAutoRenewPreference() {
+        UserDefaults.standard.set(autoRenewPremium, forKey: Self.premiumAutoRenewKey)
     }
 
     private static func loadAccessSource() -> AccessSource {
@@ -1130,7 +1273,7 @@ public final class VPNConnectionModel: ObservableObject {
                 }
                 try await ProfileManager.delete(profile)
                 if detailPage == .subscription(subscriptionID) {
-                    detailPage = nil
+                    closeDetail()
                 }
                 if case let .imported(id) = activeAccess, id == subscriptionID {
                     setActiveAccess(.free)
@@ -1527,6 +1670,16 @@ public final class VPNConnectionModel: ObservableObject {
                 return lhs.id < rhs.id
             }
             subscriptions = items
+
+            // Catalog: Direct-owned remotes only (never third-party imports).
+            let directServers = items
+                .filter { DirectBuiltinProfile.isDirectOwned($0.profile.remoteURL) }
+                .flatMap(\.servers)
+            if !directServers.isEmpty {
+                DirectLocationsCatalog.shared.replace(with: directServers)
+            }
+            // CDN refresh is TTL/ETag gated — safe at 2M+ clients.
+            Task { await DirectLocationsCatalog.shared.refreshFromRemoteIfNeeded() }
             let selected = await SharedPreferences.selectedProfileID.get()
             if selected > 0, items.contains(where: { $0.id == selected }) {
                 activeSubscriptionID = selected
@@ -1726,6 +1879,26 @@ public final class VPNConnectionModel: ObservableObject {
         }
     }
 
+    /// Локации tab: switch when entitled + live Direct config, otherwise open tariffs.
+    public func selectDirectLocation(serverID: String?) {
+        if canSwitchDirectLocations {
+            // Always switch on a Direct-owned profile, never a third-party import.
+            if let direct = subscriptions.first(where: {
+                DirectBuiltinProfile.isDirectOwned($0.profile.remoteURL) && !$0.servers.isEmpty
+            }) {
+                if activeSubscriptionID != direct.id {
+                    setActiveAccess(DirectBuiltinProfile.isBuiltin(direct.profile.remoteURL) ? .premium : .imported(direct.id))
+                    activate(subscriptionID: direct.id)
+                }
+            } else {
+                ensureDirectProfileActive()
+            }
+            select(serverID: serverID)
+            return
+        }
+        openPremiumPlans(mode: .presets)
+    }
+
     public func toggleConnection() {
         // Tap during hang/connecting cancels instead of ignoring input.
         if phase == .connecting || phase == .switching {
@@ -1889,12 +2062,12 @@ public final class VPNConnectionModel: ObservableObject {
         guard let environments else { return }
         guard !environments.emptyProfiles else {
             alert = AlertState(errorMessage: String(localized: "Добавьте подписку, чтобы подключить VPN."))
-            selectedTab = .subscriptions
+            selectedTab = .management
             return
         }
         guard activeSubscriptionID > 0 else {
             alert = AlertState(errorMessage: String(localized: "Выберите подписку на вкладке «Подписки»."))
-            selectedTab = .subscriptions
+            selectedTab = .management
             return
         }
         do {

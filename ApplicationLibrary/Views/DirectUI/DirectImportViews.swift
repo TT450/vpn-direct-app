@@ -18,13 +18,13 @@ struct DirectImportFileView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SystemBackButton(model: model, title: "Подписки", destination: nil)
+
                 PageHeading(
                     kicker: "ИМПОРТ / ФАЙЛ",
                     title: "Импорт файла",
                     subtitle: "JSON, Clash, WireGuard и другие конфиги"
                 )
-                .padding(.top, 17)
+                .padding(.top, DS.pageTop)
 
                 HStack {
                     VStack(alignment: .leading, spacing: 7) {
@@ -186,13 +186,13 @@ struct DirectImportConfigTextView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SystemBackButton(model: model, title: "Подписки", destination: nil)
+
                 PageHeading(
                     kicker: "ИМПОРТ / КОНФИГ",
                     title: "Вставить конфиг",
                     subtitle: "JSON, Clash YAML, WireGuard или список URI"
                 )
-                .padding(.top, 17)
+                .padding(.top, DS.pageTop)
 
                 HStack {
                     VStack(alignment: .leading, spacing: 7) {

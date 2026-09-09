@@ -18,16 +18,6 @@ struct DirectSubscriptionsPage: View {
         imported.filter { !model.isSubscriptionActive($0.id) }
     }
 
-    private var showFreeInCatalog: Bool { !model.isFreeAccessActive }
-    private var showPremiumInCatalog: Bool {
-        guard let id = model.premiumProfileID else { return true }
-        return !model.isSubscriptionActive(id)
-    }
-
-    private var vpndirectCatalogCount: Int {
-        (showFreeInCatalog ? 1 : 0) + (showPremiumInCatalog ? 1 : 0)
-    }
-
     var body: some View {
         GeometryReader { geo in
             ScrollView(.vertical, showsIndicators: false) {
@@ -35,14 +25,14 @@ struct DirectSubscriptionsPage: View {
                     PageHeading(
                         kicker: "ИСТОЧНИКИ / \(String(format: "%02d", max(model.subscriptions.count, 1)))",
                         title: "Подписки",
-                        subtitle: "Выберите один для подключения"
+                        subtitle: "VPN Direct — основной доступ; внешние — по желанию"
                     )
 
                     Button(action: openAddMenu) {
                         HStack(spacing: 12) {
                             Text("＋").font(.system(size: 23, weight: .light)).foregroundStyle(DS.acid)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Добавить подписку").font(.system(size: 14, weight: .semibold))
+                                Text("Добавить внешнюю подписку").font(.system(size: 14, weight: .semibold))
                                     .lineLimit(1)
                                 Text("QR, буфер, ссылка, файл или конфиг").font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
                                     .lineLimit(1)
@@ -68,22 +58,49 @@ struct DirectSubscriptionsPage: View {
                     activeSectionCard
                         .padding(.top, 10)
 
-                    if vpndirectCatalogCount > 0 {
-                        SourceSectionHeader(title: "DIRECT ACCESS", count: vpndirectCatalogCount)
-                            .padding(.top, 22)
-                        if showFreeInCatalog {
-                            FreeBalanceCard(model: model)
-                                .padding(.top, 10)
+                    SourceSectionHeader(title: "VPN DIRECT", count: 1)
+                        .padding(.top, 22)
+                    if model.activeAccess != .premium {
+                        PremiumAccessCard(model: model)
+                            .padding(.top, 10)
+                    } else {
+                        Text("Тариф Direct уже активен выше. Можно сменить пакет или докупить ресурсы.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DS.muted)
+                            .padding(.top, 10)
+                        HStack(spacing: 8) {
+                            Button {
+                                model.openDetail(.premiumPlans)
+                            } label: {
+                                Text("Сменить тариф")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(DS.ink)
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .overlay(Rectangle().stroke(DS.line))
+                            }
+                            .buttonStyle(HapticButtonStyle())
+                            Button {
+                                model.openDetail(.addOns)
+                            } label: {
+                                Text("Управление")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(DS.acid)
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .background(DS.ink)
+                            }
+                            .buttonStyle(HapticButtonStyle())
                         }
-                        if showPremiumInCatalog {
-                            PremiumAccessCard(model: model)
-                                .padding(.top, showFreeInCatalog ? 12 : 10)
-                        }
+                        .padding(.top, 10)
                     }
 
-                    if !inactiveImported.isEmpty {
-                        SourceSectionHeader(title: "ДОБАВЛЕННЫЕ ИЗВНЕ", count: inactiveImported.count)
-                            .padding(.top, 22)
+                    SourceSectionHeader(title: "ДРУГИЕ ПРОВАЙДЕРЫ", count: max(inactiveImported.count, 0))
+                        .padding(.top, 22)
+                    if inactiveImported.isEmpty {
+                        Text("Пока нет внешних подписок. Добавьте URL или файл, если нужен другой провайдер.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DS.muted)
+                            .padding(.top, 10)
+                    } else {
                         ForEach(Array(inactiveImported.enumerated()), id: \.element.id) { index, subscription in
                             ExternalSubscriptionCard(model: model, subscription: subscription)
                                 .padding(.top, index == 0 ? 10 : 12)
@@ -91,7 +108,7 @@ struct DirectSubscriptionsPage: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 24)
+                .padding(.vertical, DS.pageTop)
                 .frame(width: geo.size.width, alignment: .leading)
             }
         }
@@ -103,20 +120,51 @@ struct DirectSubscriptionsPage: View {
     private var activeSectionCard: some View {
         switch model.activeAccess {
         case .free:
-            FreeBalanceCard(model: model)
+            DirectNeedsPlanCard(model: model)
         case .premium:
             PremiumAccessCard(model: model)
         case .imported:
             if let activeImported {
                 ExternalSubscriptionCard(model: model, subscription: activeImported)
             } else {
-                Text("Нет активной подписки")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(DS.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 12)
+                DirectNeedsPlanCard(model: model)
             }
         }
+    }
+}
+
+private struct DirectNeedsPlanCard: View {
+    @ObservedObject var model: VPNConnectionModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("НЕТ АКТИВНОГО DIRECT").microLabel(color: DS.muted)
+            Text("Выберите тариф VPN Direct")
+                .font(.system(size: 17, weight: .semibold))
+            Text("Пресеты Start–Ultra или конструктор под ваши лимиты.")
+                .font(.system(size: 12))
+                .foregroundStyle(DS.muted)
+            Button {
+                model.openDetail(.premiumPlans)
+            } label: {
+                HStack {
+                    Text("Открыть тарифы")
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(DS.acid)
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .background(DS.ink)
+            }
+            .buttonStyle(HapticButtonStyle())
+            .padding(.top, 4)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.72))
+        .overlay(Rectangle().stroke(DS.line))
     }
 }
 
@@ -132,103 +180,6 @@ private struct SourceSectionHeader: View {
         }
         .frame(height: 36)
         .overlay(alignment: .top) { Hairline(color: DS.ink) }
-    }
-}
-
-// MARK: - Direct Free
-
-private struct FreeBalanceCard: View {
-    @ObservedObject var model: VPNConnectionModel
-    private var isActive: Bool { model.isFreeAccessActive }
-
-    private var balanceLine: String {
-        "\(model.freeRemainingDisplayText) · \(model.freeTrafficMB) МБ · 1 устройство"
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("БЕСПЛАТНЫЙ БАЛАНС").microLabel(color: DS.muted)
-                Spacer()
-                Text(isActive ? "АКТИВНА" : "НА ПАУЗЕ")
-                    .microLabel(color: isActive ? DS.green : DS.ink)
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
-
-            Hairline()
-
-            HStack(spacing: 12) {
-                Text("FREE")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(DS.acid)
-                    .frame(width: 52, height: 52)
-                    .background(DS.ink)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("VPN Direct Free")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(DS.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                    Text(balanceLine)
-                        .font(.system(size: 12))
-                        .foregroundStyle(DS.muted)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                if isActive {
-                    Text("СЕЙЧАС")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundStyle(DS.green)
-                        .padding(.horizontal, 8)
-                        .frame(height: 28)
-                        .overlay(Rectangle().stroke(DS.green, lineWidth: 1))
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Hairline()
-
-            HStack(spacing: 0) {
-                Button {
-                    model.detailPage = .freeAccess
-                } label: {
-                    Text("Получить ещё")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(DS.ink)
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                }
-                .buttonStyle(HapticButtonStyle())
-
-                Rectangle().fill(DS.line).frame(width: 1, height: 28)
-
-                Button {
-                    if !isActive { model.activateFreeAccess() }
-                } label: {
-                    Text(isActive ? "Подключено" : "Активировать")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(isActive ? DS.green : DS.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                }
-                .buttonStyle(HapticButtonStyle())
-                .disabled(isActive || model.isBusy)
-            }
-        }
-        .background(isActive ? DS.acid.opacity(0.22) : Color.white.opacity(0.72))
-        .overlay(alignment: .leading) {
-            if isActive {
-                Rectangle().fill(DS.green).frame(width: 4)
-            }
-        }
-        .overlay(Rectangle().stroke(DS.line))
     }
 }
 
@@ -250,15 +201,16 @@ private struct PremiumAccessCard: View {
 
     private var detailLine: String {
         if model.hasPremiumEntitlement {
-            return "\(model.premiumRemainingDays) дн · \(model.premiumTrafficGB) ГБ · \(model.premiumDevicesUsed)/\(model.premiumDeviceLimit)"
+            let wl = model.premiumWhitelistGB > 0 ? " · \(model.premiumWhitelistGB) GB WL" : ""
+            return "\(model.premiumRemainingDays) дн · \(model.premiumTrafficDisplayLabel) · \(model.premiumDevicesUsed)/\(model.premiumDeviceLimit)\(wl)"
         }
-        return "От 1 месяца · расширяемые лимиты"
+        return "Пресеты и конструктор · Plus рекомендуем"
     }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("ДОСТУП БЕЗ РЕКЛАМЫ").microLabel(color: DS.muted)
+                Text("VPN DIRECT").microLabel(color: DS.muted)
                 Spacer()
                 Text(statusLabel).microLabel(color: isActive ? DS.green : DS.ink)
             }
@@ -269,10 +221,10 @@ private struct PremiumAccessCard: View {
             Hairline()
 
             Button {
-                if let premiumID, !isActive {
+                if let premiumID, !isActive, model.hasPremiumEntitlement {
                     model.activate(subscriptionID: premiumID)
                 } else {
-                    model.detailPage = model.hasPremiumEntitlement ? .addOns : .premiumPlans
+                    model.openDetail(model.hasPremiumEntitlement ? .addOns : .premiumPlans)
                 }
             } label: {
                 HStack(spacing: 12) {
@@ -283,7 +235,7 @@ private struct PremiumAccessCard: View {
                         .background(DS.ink)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("VPN Direct Premium")
+                        Text("VPN Direct")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(DS.ink)
                             .lineLimit(1)
@@ -320,7 +272,7 @@ private struct PremiumAccessCard: View {
 
             HStack(spacing: 0) {
                 Button {
-                    model.detailPage = .premiumPlans
+                    model.openDetail(.premiumPlans)
                 } label: {
                     Text("Выбрать тариф")
                         .font(.system(size: 13, weight: .semibold))
@@ -332,7 +284,7 @@ private struct PremiumAccessCard: View {
                 Rectangle().fill(DS.line).frame(width: 1, height: 28)
 
                 Button {
-                    model.detailPage = model.hasPremiumEntitlement ? .addOns : .premiumPlans
+                    model.openDetail(model.hasPremiumEntitlement ? .addOns : .premiumPlans)
                 } label: {
                     Text(isActive ? "Подключено" : "Управление")
                         .font(.system(size: 13, weight: .semibold))
