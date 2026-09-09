@@ -124,7 +124,17 @@ public enum CompatibilityFieldPolicy {
         "peer_count",
         "xraytag", "extra", "xmux", "scmaxeachpostbytes", "scminpostsintervalms",
         "sc_max_each_post_bytes", "sc_min_posts_interval_ms", "sc_max_concurrent_posts",
-        "x_padding_bytes", "session", "seq", "uplink", "eh", "ed",
+        "sc_max_buffered_posts", "sc_stream_up_server_secs",
+        "x_padding_bytes", "x_padding_key", "x_padding_header", "x_padding_placement",
+        "x_padding_method", "x_padding_obfs_mode",
+        "seq_placement", "seq_key", "session_placement", "session_key", "session_table",
+        "session_length", "uplink_data_placement", "uplink_data_key", "uplink_chunk_size",
+        "uplink_http_method", "no_grpc_header", "download_settings",
+        "xmux_max_concurrency", "xmux_max_connections", "xmux_c_max_reuse_times",
+        "xmux_h_max_request_times", "xmux_h_max_reusable_secs", "xmux_h_keep_alive_period",
+        "xmux_no_grpc_header", "xmux_json", "no_sse_header", "server_max_header_bytes",
+        "network", "net", "host", "path", "mode",
+        "session", "seq", "uplink", "eh", "ed",
         "allow_insecure", "allowinsecure", "allowInsecure",
         "max_early_data", "maxEarlyData", "early_data_header_name", "earlyDataHeaderName",
         "client-fingerprint", "servername", "skip-cert-verify", "udp", "tls",
@@ -142,6 +152,8 @@ public enum CompatibilityFieldPolicy {
         "server_address", "server_port", "serveraddress", "serverport",
         "profilename", "profile_name", "userdataencryption",
         "maxconcurrency", "maxconnections",
+        // XHTTP share-link / xmux alias (must not trip substring "enc" in "concurrency")
+        "concurrency",
         "disable_sni", "disablesni",
         "publickey", "privatekey", "presharedkey", "preshared_key",
         "wnoise", "wnoisecount", "wnoisedelay", "wpayloadsize",
@@ -167,7 +179,7 @@ public enum CompatibilityFieldPolicy {
             let knownDumpLeaves: Set<String> = [
                 "network", "security", "servername", "fingerprint", "publickey", "shortid",
                 "spiderx", "show", "allowinsecure", "alpn", "path", "host", "mode", "extra",
-                "headers", "maxconcurrency", "maxconnections", "cmaxreuse",
+                "headers", "maxconcurrency", "maxconnections", "concurrency", "cmaxreuse",
                 "hmaxrequesttimes", "hmaxreusabletimes", "hkeepaliveperiod",
                 "scmaxeachpostbytes", "scminpostsintervalms", "scmaxconcurrentposts",
                 "xpaddingbytes", "xmux", "vnext", "address", "port", "users", "id",
@@ -188,8 +200,9 @@ public enum CompatibilityFieldPolicy {
             return .protocolExtension
         }
         // Heuristic: keys that look like handshake knobs are critical until proven otherwise.
+        // Short tokens (≤3) must match as whole segments — "enc" must not match inside "concurrency".
         let criticalHints = ["enc", "crypt", "token", "secret", "reality", "xhttp", "awg", "obfs", "mux", "padding", "cookie", "rekey", "handshake"]
-        if criticalHints.contains(where: { k.contains($0) }) {
+        if criticalHints.contains(where: { matchesCriticalHint(key: k, hint: $0) }) {
             return .connectionCritical
         }
         // Bare "key" / "_key" suffix often means crypto material.
@@ -198,6 +211,17 @@ public enum CompatibilityFieldPolicy {
         }
         if value.count > 256 { return .futureField }
         return .connectionCritical
+    }
+
+    /// Whether `key` matches a critical hint without false positives on short substrings.
+    private static func matchesCriticalHint(key: String, hint: String) -> Bool {
+        if hint.count <= 3 {
+            if key == hint { return true }
+            let seps = CharacterSet(charactersIn: "-_")
+            let parts = key.components(separatedBy: seps).filter { !$0.isEmpty }
+            return parts.contains(hint)
+        }
+        return key.contains(hint)
     }
 
     /// Throws if any unknown key is connection-critical and not already consumed by the builder.

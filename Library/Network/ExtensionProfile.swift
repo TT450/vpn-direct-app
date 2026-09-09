@@ -266,7 +266,17 @@ public class ExtensionProfile: ObservableObject {
         // Fail closed: do not start the tunnel with an unmigrated / invalid config.
         let migrated = try SingBoxConfigMigrator.migrate(rawContent)
         let bypassRU = await SharedPreferences.bypassRussianSites.get()
-        let configContent = RussianBypassRouting.apply(to: migrated, enabled: bypassRU)
+        var configContent = RussianBypassRouting.apply(to: migrated, enabled: bypassRU)
+        // INCY-style: never dial public VLESS without TLS/Reality/encryption.
+        // Strip bad leaves so other servers still start; if only plaintext remains — fail closed.
+        if let firstBad = VLESSPlaintextGuard.firstInsecureOutboundTag(inJSON: configContent) {
+            do {
+                configContent = try VLESSPlaintextGuard.strippingInsecurePublicVLESS(fromJSON: configContent)
+                VPNDebugLog.write("prepareStartOptions stripped plaintext VLESS tag=\(firstBad)")
+            } catch {
+                throw error
+            }
+        }
         options["configContent"] = NSString(string: configContent)
         VPNDebugLog.write("prepareStartOptions bypass=\(bypassRU) profile=\(profileID) bytes=\(configContent.count)")
 

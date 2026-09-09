@@ -7,6 +7,10 @@ struct DirectServerPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var tab = PickerTab.all
+    /// Snapshot so 1 Hz runtime / traffic publishes do not re-sort the whole list.
+    @State private var snapshotServers: [VPNServer] = []
+    @State private var snapshotName = ""
+    @State private var snapshotUpdated = ""
 
     private enum PickerTab: String, CaseIterable {
         case all = "Все"
@@ -19,27 +23,54 @@ struct DirectServerPickerView: View {
         let source: [VPNServer]
         switch tab {
         case .all:
-            source = model.activeSubscription?.servers ?? []
+            source = snapshotServers
         case .favorites:
-            source = model.favoriteServers(for: model.activeSubscription)
+            let favs = model.favoriteServerIDs
+            source = snapshotServers.filter { favs.contains($0.id) }
         case .history:
-            source = model.recentServers(for: model.activeSubscription)
+            let recent = model.recentServerIDs
+            source = recent.compactMap { id in snapshotServers.first(where: { $0.id == id }) }
         }
-        guard !value.isEmpty else { return source }
-        return source.filter {
-            $0.city.localizedCaseInsensitiveContains(value)
-                || $0.country.localizedCaseInsensitiveContains(value)
-                || (model.activeSubscription?.name.localizedCaseInsensitiveContains(value) ?? false)
+        let filtered: [VPNServer]
+        if value.isEmpty {
+            filtered = source
+        } else {
+            filtered = source.filter {
+                $0.locationLabel.localizedCaseInsensitiveContains(value)
+                    || $0.city.localizedCaseInsensitiveContains(value)
+                    || $0.country.localizedCaseInsensitiveContains(value)
+                    || snapshotName.localizedCaseInsensitiveContains(value)
+            }
+        }
+        // Happ-style: measured first (lowest ping), unmeasured at the end.
+        return filtered.sorted { lhs, rhs in
+            switch (lhs.ping > 0, rhs.ping > 0) {
+            case (true, true): return lhs.ping < rhs.ping
+            case (true, false): return true
+            case (false, true): return false
+            case (false, false): return lhs.locationLabel.localizedCaseInsensitiveCompare(rhs.locationLabel) == .orderedAscending
+            }
         }
     }
 
+    private var pingModeLabel: String {
+        ServerEndpointPing.preferredMode(isConnected: model.isConnected).label
+    }
+
     var body: some View {
+        let selectedID = model.selectedServerID
+        let favorites = model.favoriteServerIDs
+        let usesAuto = model.usesAutoSelection
+        let activeLabel = model.activeServer?.locationLabel ?? "—"
+        let activePing = model.activeServer?.pingLabel ?? "—"
+        let list = servers
+
         VStack(spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("ПОДПИСКА / \(model.activeSubscription?.servers.count ?? 0) ЛОКАЦИЙ").microLabel()
+                    Text("ПОДПИСКА / \(snapshotServers.count) ЛОКАЦИЙ").microLabel()
                     Text("Выбор локации").font(.system(size: 31, weight: .semibold))
-                    Text("\(model.activeSubscription?.name ?? "") · только серверы активной подписки")
+                    Text("\(snapshotName) · только серверы активной подписки")
                         .font(.system(size: 11)).foregroundStyle(DS.muted)
                 }
                 Spacer()
@@ -74,7 +105,7 @@ struct DirectServerPickerView: View {
                         HStack(spacing: 4) {
                             Text(item.rawValue)
                             if item == .favorites {
-                                Text(String(format: "%02d", model.favoriteServers(for: model.activeSubscription).count))
+                                Text(String(format: "%02d", favorites.count))
                                     .microLabel(color: tab == item ? DS.green : DS.muted)
                             }
                         }
@@ -115,7 +146,7 @@ struct DirectServerPickerView: View {
                     Text(model.isPingingServers ? "Пинг…" : "Пинг")
                         .font(.system(size: 14, weight: .semibold))
                     Spacer()
-                    Text(model.isPingingServers ? "ИЗМЕРЕНИЕ" : "ВСЕ СЕРВЕРЫ")
+                    Text(model.isPingingServers ? "ИЗМЕРЕНИЕ · \(pingModeLabel)" : pingModeLabel)
                         .microLabel(color: .white.opacity(0.45))
                 }
                 .padding(.horizontal, 16)
@@ -125,26 +156,40 @@ struct DirectServerPickerView: View {
                 .background(DS.ink)
             }
             .buttonStyle(HapticButtonStyle())
-            .disabled(model.isPingingServers || (model.activeSubscription?.servers.isEmpty ?? true))
+            .disabled(model.isPingingServers || snapshotServers.isEmpty)
             .padding(.horizontal, 20)
             .padding(.top, 12)
 
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 0) {
-                    if query.isEmpty, tab == .all { AutoSelectionRow(model: model) }
+                    if query.isEmpty, tab == .all {
+                        AutoSelectionRow(
+                            usesAuto: usesAuto,
+                            activeLabel: activeLabel,
+                            activePing: activePing,
+                            onSelect: { model.select(serverID: nil) }
+                        )
+                    }
 
-                    if !servers.isEmpty {
+                    if !list.isEmpty {
                         HStack {
-                            Text("01 / \((model.activeSubscription?.name ?? "").uppercased())").microLabel()
+                            Text("01 / \(snapshotName.uppercased())").microLabel()
                             Spacer()
-                            Text("\(servers.count) ЛОКАЦИЙ · \((model.activeSubscription?.updated ?? "").uppercased())").microLabel()
+                            Text("\(list.count) ЛОКАЦИЙ · \(snapshotUpdated.uppercased())").microLabel()
                         }
                         .padding(.horizontal, 20)
                         .frame(height: 42)
                         .background(DS.ink.opacity(0.05))
 
-                        ForEach(Array(servers.enumerated()), id: \.element.id) { index, server in
-                            ServerRow(model: model, index: index + 1, server: server)
+                        ForEach(Array(list.enumerated()), id: \.element.id) { index, server in
+                            ServerRow(
+                                index: index + 1,
+                                server: server,
+                                isSelected: selectedID == server.id,
+                                isFavorite: favorites.contains(server.id),
+                                onSelect: { model.select(serverID: server.id) },
+                                onToggleFavorite: { model.toggleFavorite(serverID: server.id) }
+                            )
                         }
                     } else {
                         VStack(spacing: 8) {
@@ -161,16 +206,30 @@ struct DirectServerPickerView: View {
         .background(DS.paper.ignoresSafeArea())
         .hapticScrollThresholds()
         .hapticSelection(tab)
+        .onAppear(perform: captureSnapshot)
+        .onChangeCompat(of: model.activeSubscriptionID) { _ in captureSnapshot() }
+        .onChangeCompat(of: model.isPingingServers) { pinging in
+            // Refresh measured pings into the snapshot when a run finishes.
+            if !pinging { captureSnapshot() }
+        }
+    }
+
+    private func captureSnapshot() {
+        let sub = model.activeSubscription
+        snapshotServers = sub?.servers ?? []
+        snapshotName = sub?.name ?? ""
+        snapshotUpdated = sub?.updated ?? ""
     }
 }
 
 private struct AutoSelectionRow: View {
-    @ObservedObject var model: VPNConnectionModel
+    let usesAuto: Bool
+    let activeLabel: String
+    let activePing: String
+    let onSelect: () -> Void
 
     var body: some View {
-        Button {
-            model.select(serverID: nil)
-        } label: {
+        Button(action: onSelect) {
             HStack(spacing: 12) {
                 Text("A")
                     .font(.system(size: 16, weight: .bold, design: .monospaced))
@@ -185,15 +244,15 @@ private struct AutoSelectionRow: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 3) {
                     Text("СЕЙЧАС").microLabel()
-                    Text(model.activeServer?.locationLabel ?? "—").font(.system(size: 12, weight: .semibold))
-                    Text(model.activeServer?.pingLabel ?? "—").microLabel()
+                    Text(activeLabel).font(.system(size: 12, weight: .semibold))
+                    Text(activePing).microLabel()
                 }
-                Image(systemName: model.usesAutoSelection ? "checkmark" : "arrow.right")
+                Image(systemName: usesAuto ? "checkmark" : "arrow.right")
                     .foregroundStyle(DS.green)
             }
             .padding(.horizontal, 20)
             .frame(height: 92)
-            .background(model.usesAutoSelection ? DS.acid.opacity(0.11) : .clear)
+            .background(usesAuto ? DS.acid.opacity(0.11) : .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(HapticButtonStyle())
@@ -202,15 +261,15 @@ private struct AutoSelectionRow: View {
 }
 
 private struct ServerRow: View {
-    @ObservedObject var model: VPNConnectionModel
     let index: Int
     let server: VPNServer
-    private var isSelected: Bool { model.selectedServerID == server.id }
+    let isSelected: Bool
+    let isFavorite: Bool
+    let onSelect: () -> Void
+    let onToggleFavorite: () -> Void
 
     var body: some View {
-        Button {
-            model.select(serverID: server.id)
-        } label: {
+        Button(action: onSelect) {
             HStack(spacing: 11) {
                 Text(String(format: "%02d", index)).microLabel()
                 FlagImage(code: server.countryCode, width: 30, height: 20)
@@ -218,10 +277,8 @@ private struct ServerRow: View {
                     .font(.system(size: 14, weight: .semibold))
                     .lineLimit(1)
                 Spacer()
-                Button {
-                    model.toggleFavorite(serverID: server.id)
-                } label: {
-                    Image(systemName: model.favoriteServerIDs.contains(server.id) ? "star.fill" : "star")
+                Button(action: onToggleFavorite) {
+                    Image(systemName: isFavorite ? "star.fill" : "star")
                         .font(.system(size: 11))
                         .foregroundStyle(DS.green)
                 }

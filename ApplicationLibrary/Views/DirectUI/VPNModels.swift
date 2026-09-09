@@ -92,6 +92,8 @@ public struct VPNServer: Identifiable, Hashable {
     public let ping: Int
     public let load: Int
     public let groupTag: String
+    /// Precomputed once at init — never re-run country catalog on every SwiftUI tick.
+    public let locationLabel: String
 
     public init(
         id: String,
@@ -100,7 +102,8 @@ public struct VPNServer: Identifiable, Hashable {
         countryCode: String,
         ping: Int = 0,
         load: Int = 0,
-        groupTag: String = "proxy"
+        groupTag: String = "proxy",
+        locationLabel: String? = nil
     ) {
         self.id = id
         self.city = city
@@ -109,33 +112,46 @@ public struct VPNServer: Identifiable, Hashable {
         self.ping = ping
         self.load = load
         self.groupTag = groupTag
+        self.locationLabel = locationLabel ?? Self.makeLocationLabel(id: id, city: city, country: country)
     }
 
     public var pingLabel: String {
         ping > 0 ? "\(ping) MS" : "— MS"
     }
 
-    /// Single location line — never "Швеция, Швеция" / "USA / США".
-    public var locationLabel: String {
-        let cityName = Self.normalizeLocationToken(city)
-        let countryName = Self.normalizeLocationToken(country)
+    /// Single location line — never "Швеция, Швеция" / "USA / США" / "Dubai, United Arab Emirates".
+    private static func makeLocationLabel(id: String, city: String, country: String) -> String {
+        let cityName = normalizeLocationToken(city)
+        let countryName = normalizeLocationToken(country)
+        if let emirate = VPNCountryCatalog.emirateEnglishName(in: "\(city) \(country) \(id)") {
+            return emirate
+        }
+        if VPNCountryCatalog.isUnitedArabEmiratesLabel(cityName)
+            || VPNCountryCatalog.isUnitedArabEmiratesLabel(countryName)
+        {
+            // Bare UAE profile without a specific emirate → short "UAE".
+            return "UAE"
+        }
         let raw: String
         if cityName.isEmpty {
             raw = countryName.isEmpty ? "—" : countryName
         } else if countryName.isEmpty || cityName.caseInsensitiveCompare(countryName) == .orderedSame {
             raw = cityName
-        } else if Self.looksLikeCountryAlias(cityName, countryName) {
+        } else if looksLikeCountryAlias(cityName, countryName) {
             raw = preferredLocaleName(city: cityName, country: countryName)
+        } else if VPNCountryCatalog.isUnitedArabEmiratesLabel(countryName) {
+            raw = cityName
         } else {
             raw = "\(cityName), \(countryName)"
         }
-        return Self.collapseDuplicatedCommaPair(raw)
+        return collapseDuplicatedCommaPair(raw)
     }
 
     private static func normalizeLocationToken(_ value: String) -> String {
-        value
+        let cleaned = value
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+        return VPNCountryCatalog.englishPlaceName(for: cleaned)
     }
 
     private static func collapseDuplicatedCommaPair(_ value: String) -> String {
@@ -150,16 +166,23 @@ public struct VPNServer: Identifiable, Hashable {
     }
 
     private static func looksLikeCountryAlias(_ a: String, _ b: String) -> Bool {
-        // Short labels without separators are usually country-level, not "City, Country".
-        !a.contains(",") && !b.contains(",") && a.count <= 16 && b.count <= 16
+        // Only collapse true duplicates (USA / США), never "United" vs "United Kingdom".
+        let na = VPNCountryCatalog.normalize(a)
+        let nb = VPNCountryCatalog.normalize(b)
+        if na.isEmpty || nb.isEmpty { return false }
+        if na == nb { return true }
+        let ca = VPNCountryCatalog.exactCode(for: na) ?? VPNCountryCatalog.containsCode(in: na)
+        let cb = VPNCountryCatalog.exactCode(for: nb) ?? VPNCountryCatalog.containsCode(in: nb)
+        guard let ca, let cb else { return false }
+        return ca == cb
     }
 
-    private func preferredLocaleName(city: String, country: String) -> String {
-        // Prefer Cyrillic when present (app UI is Russian).
+    private static func preferredLocaleName(city: String, country: String) -> String {
+        // Prefer English / Latin over Cyrillic duplicates (e.g. USA vs США).
         let cityCyrillic = city.unicodeScalars.contains { (0x0400 ... 0x04FF).contains($0.value) }
         let countryCyrillic = country.unicodeScalars.contains { (0x0400 ... 0x04FF).contains($0.value) }
-        if countryCyrillic, !cityCyrillic { return country }
-        if cityCyrillic, !countryCyrillic { return city }
+        if cityCyrillic, !countryCyrillic { return country }
+        if countryCyrillic, !cityCyrillic { return city }
         return city
     }
 }
@@ -203,11 +226,19 @@ public enum VPNServerNameParser {
         "TW", // TimeWeb
     ]
 
+    /// Tokens that must never become a country code (Wi-Fi → Fi → Finland, LTE, etc.).
+    private static let nonCountryNoiseTokens: Set<String> = [
+        "wi", "fi", "wifi", "lte", "5g", "4g", "3g", "tcp", "udp", "tls", "ws", "http", "https",
+        "vpn", "vip", "os", "tv", "ip", "v2", "v3", "x2", "x3", "cdn", "bgp", "asn",
+        "безлим", "лимит", "unlimited", "limit", "mobile", "mobiledata",
+    ]
+
     public static func parse(tag: String, groupTag: String = "proxy", ping: Int = 0, load: Int = 0) -> VPNServer {
         var working = tag.trimmingCharacters(in: .whitespacesAndNewlines)
         // Flag emoji anywhere in the name (Happ puts it first; some panels append it).
         let emojiCode = flagEmojiCountryCode(in: working)
         working = stripAllFlagEmoji(working)
+        working = scrubNetworkNoise(working)
 
         working = working
             .replacingOccurrences(of: "_", with: " ")
@@ -219,12 +250,16 @@ public enum VPNServerNameParser {
             .components(separatedBy: CharacterSet.whitespaces)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+            .filter { !nonCountryNoiseTokens.contains($0.lowercased()) }
 
         var countryCode = emojiCode ?? ""
         var remaining = parts
         if countryCode.isEmpty, let first = parts.first, first.count == 2 {
             let candidate = first.uppercased()
-            if knownCountryCodes.contains(candidate), !ambiguousHosterCodes.contains(candidate) {
+            if knownCountryCodes.contains(candidate),
+               !ambiguousHosterCodes.contains(candidate),
+               !nonCountryNoiseTokens.contains(candidate.lowercased())
+            {
                 countryCode = candidate
                 remaining = Array(parts.dropFirst())
             } else if ambiguousHosterCodes.contains(candidate) {
@@ -233,56 +268,116 @@ public enum VPNServerNameParser {
             }
         }
 
-        if countryCode.isEmpty {
-            for part in parts where part.count == 2 {
-                let candidate = part.uppercased()
-                if knownCountryCodes.contains(candidate), !ambiguousHosterCodes.contains(candidate) {
-                    countryCode = candidate
-                    remaining = parts.filter { $0.uppercased() != candidate }
-                    break
+        // Do NOT scan mid-name 2-letter ISO tokens: Remnawave tags lose flag emoji in sing-box
+        // tags (`Польша-Безлим-Wi-Fi` → `Fi` ⇒ Finland). Prefer named countries via infer.
+
+        var cityRaw: String
+        var countryRaw: String
+        // Smart phrase resolve before naive head/tail split ("United Kingdom", "Great Britain", bare "United").
+        if let phrase = VPNCountryCatalog.resolveCountryPhrase(
+            in: remaining.joined(separator: " "),
+            preferCode: countryCode.isEmpty ? emojiCode : countryCode
+        ) ?? VPNCountryCatalog.resolveCountryPhrase(in: working, preferCode: countryCode.isEmpty ? emojiCode : countryCode) {
+            if countryCode.isEmpty { countryCode = phrase.code }
+            countryRaw = phrase.englishName
+            // Country-normalized label: never invent a capital — show the country name.
+            let phraseNorm = VPNCountryCatalog.normalize(phrase.englishName)
+            let remNorm = VPNCountryCatalog.normalize(remaining.joined(separator: " "))
+            if remNorm == phraseNorm || remNorm.isEmpty {
+                cityRaw = phrase.englishName
+            } else {
+                let countryTokens = Set(phraseNorm.split(separator: " ").map(String.init))
+                let extras = remaining.filter { !countryTokens.contains(VPNCountryCatalog.normalize($0)) }
+                // Extra tokens that are only an index ("2", "#3") stay on the country label.
+                let meaningful = extras.filter { token in
+                    let t = token.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+                    return !(t.count <= 3 && t.allSatisfy(\.isNumber))
+                }
+                if meaningful.isEmpty {
+                    cityRaw = phrase.englishName
+                    if let idx = extras.last {
+                        countryRaw = "\(phrase.englishName) \(idx)"
+                    }
+                } else {
+                    cityRaw = meaningful.joined(separator: " ")
                 }
             }
-        }
-
-        let city: String
-        let country: String
-        if remaining.count >= 2 {
-            let last = remaining.last!
-            let head = remaining.dropLast().joined(separator: " ")
-            if head.caseInsensitiveCompare(last) == .orderedSame {
-                city = last
-                country = countryName(for: countryCode) ?? last
-            } else if last.count <= 3, knownCountryCodes.contains(last.uppercased()) || last.allSatisfy(\.isNumber) {
-                // "Germany 2" / "France DE" → keep country token out of the city when possible.
-                city = head
-                country = countryName(for: countryCode) ?? head
+        } else if remaining.count >= 2 {
+            let joined = remaining.joined(separator: " ")
+            if let multiCode = VPNCountryCatalog.exactCode(for: VPNCountryCatalog.normalize(joined)) {
+                let en = countryName(for: multiCode) ?? joined
+                cityRaw = en
+                countryRaw = en
+                if countryCode.isEmpty { countryCode = multiCode }
             } else {
-                city = head
-                country = last
+                let last = remaining.last!
+                let head = remaining.dropLast().joined(separator: " ")
+                if head.caseInsensitiveCompare(last) == .orderedSame {
+                    cityRaw = last
+                    countryRaw = countryName(for: countryCode) ?? last
+                } else if last.count <= 3, last.allSatisfy(\.isNumber) {
+                    cityRaw = head
+                    countryRaw = countryName(for: countryCode) ?? head
+                } else if last.count == 2,
+                          knownCountryCodes.contains(last.uppercased()),
+                          !nonCountryNoiseTokens.contains(last.lowercased()),
+                          !ambiguousHosterCodes.contains(last.uppercased())
+                {
+                    cityRaw = head
+                    countryRaw = countryName(for: countryCode) ?? head
+                } else {
+                    cityRaw = head
+                    countryRaw = last
+                }
             }
         } else if remaining.count == 1 {
-            city = remaining[0]
-            country = countryName(for: countryCode) ?? remaining[0]
+            cityRaw = remaining[0]
+            countryRaw = countryName(for: countryCode) ?? remaining[0]
         } else {
-            city = tag
-            country = "Сервер"
+            cityRaw = tag
+            countryRaw = "Server"
         }
 
         if countryCode.isEmpty {
-            countryCode = inferCountryCode(from: country)
-                ?? inferCountryCode(from: city)
+            countryCode = inferNamedCountryStem(from: "\(countryRaw) \(cityRaw) \(working) \(tag)")
+                ?? inferCountryCode(from: countryRaw)
+                ?? inferCountryCode(from: cityRaw)
                 ?? inferCountryCode(from: remaining.joined(separator: " "))
                 ?? inferCountryCode(from: working)
                 ?? inferCountryCode(from: tag)
                 ?? "XX"
         }
 
-        let normalized = normalizeCountryCode(countryCode, country: country, city: city, tag: "\(working) \(tag)")
+        let normalized = normalizeCountryCode(countryCode, country: countryRaw, city: cityRaw, tag: "\(working) \(tag)")
+        let placeHaystack = "\(cityRaw) \(countryRaw) \(working) \(tag)"
+        if let emirate = VPNCountryCatalog.emirateEnglishName(in: placeHaystack) {
+            return VPNServer(
+                id: tag,
+                city: emirate,
+                country: emirate,
+                countryCode: "AE",
+                ping: ping,
+                load: load,
+                groupTag: groupTag
+            )
+        }
+        let fallback = countryName(for: normalized)
+        let city = VPNCountryCatalog.englishPlaceName(for: cityRaw.isEmpty ? (fallback ?? cityRaw) : cityRaw)
+        let country = VPNCountryCatalog.englishPlaceName(for: fallback ?? countryRaw)
+        // Prefer a single country label when city is just the country (or empty).
+        let displayCity: String
+        if city.isEmpty || city.caseInsensitiveCompare(country) == .orderedSame {
+            displayCity = country
+        } else if VPNCountryCatalog.exactCode(for: VPNCountryCatalog.normalize(city)) == normalized {
+            displayCity = country
+        } else {
+            displayCity = city
+        }
 
         return VPNServer(
             id: tag,
-            city: city.isEmpty ? (countryName(for: normalized) ?? city) : city,
-            country: countryName(for: normalized) ?? country,
+            city: displayCity,
+            country: country,
             countryCode: normalized,
             ping: ping,
             load: load,
@@ -290,30 +385,103 @@ public enum VPNServerNameParser {
         )
     }
 
-    private static func normalizeCountryCode(_ code: String, country: String, city: String, tag: String) -> String {
-        let haystack = "\(country) \(city) \(tag)".lowercased()
-        if haystack.contains("usa") || haystack.contains("united states") || haystack.contains("сша") || haystack.contains("america") {
-            return "US"
+    /// Strip Wi-Fi / LTE markers so they cannot be tokenized into ISO codes (`Fi` → Finland).
+    private static func scrubNetworkNoise(_ text: String) -> String {
+        var result = text
+        let patterns = [
+            "wi-fi", "wi fi", "wifi", "wi‑fi", // include unicode hyphen
+        ]
+        for pattern in patterns {
+            result = result.replacingOccurrences(of: pattern, with: " ", options: [.caseInsensitive])
         }
+        return result
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func normalizeCountryCode(_ code: String, country: String, city: String, tag: String) -> String {
+        let haystack = scrubNetworkNoise("\(country) \(city) \(tag)".lowercased())
         if code == "UK" { return "GB" }
-        // Named country in the label always wins over an ambiguous hoster code (TW ≠ Taiwan here).
+
+        // TheTochka policy: Cyrillic/English country stems beat accidental ISO tokens
+        // (`Польша-…-Wi-Fi` → Fi must not become Finland).
+        if let named = inferNamedCountryStem(from: haystack) {
+            return named
+        }
+
         if let inferred = inferCountryCode(from: haystack) {
             let inferredNorm = inferred == "UK" ? "GB" : inferred
             if ambiguousHosterCodes.contains(code), inferredNorm != code {
                 return inferredNorm
             }
-            // Also prefer an explicit country name over a conflicting ISO token already chosen.
-            if knownCountryCodes.contains(code), inferredNorm != code,
-               haystackContainsNamedCountry(haystack, code: inferredNorm)
-            {
+            // Named / multi-char inference wins over a conflicting bare ISO code.
+            if knownCountryCodes.contains(code), inferredNorm != code, inferredNorm.count == 2 {
+                let scrubbedCode = nonCountryNoiseTokens.contains(code.lowercased())
+                if scrubbedCode || haystackContainsNamedCountry(haystack, code: inferredNorm) {
+                    return inferredNorm
+                }
+            }
+            if !knownCountryCodes.contains(code) {
                 return inferredNorm
             }
         }
-        if knownCountryCodes.contains(code) { return code }
+        if knownCountryCodes.contains(code), !nonCountryNoiseTokens.contains(code.lowercased()) {
+            return code == "UK" ? "GB" : code
+        }
         if let inferred = inferCountryCode(from: haystack) {
             return inferred == "UK" ? "GB" : inferred
         }
         return code.isEmpty ? "XX" : code
+    }
+
+    /// TheTochka-style stem matcher: `польш`→PL, `сша`→US, `дубай`→AE. Never uses 2-letter ISO.
+    private static func inferNamedCountryStem(from haystack: String) -> String? {
+        let lower = scrubNetworkNoise(VPNCountryCatalog.normalize(haystack))
+        let stems: [(String, String)] = [
+            ("united states", "US"), ("сша", "US"), ("america", "US"), ("usa", "US"),
+            ("united kingdom", "GB"), ("great britain", "GB"), ("britain", "GB"), ("england", "GB"), ("london", "GB"),
+            ("great", "GB"), ("грит", "GB"), ("грейт", "GB"), ("юнайтед", "GB"),
+            ("герман", "DE"), ("germany", "DE"), ("berlin", "DE"), ("frankfur", "DE"),
+            ("нидерл", "NL"), ("голланд", "NL"), ("netherlands", "NL"), ("holland", "NL"), ("amster", "NL"),
+            ("финлянд", "FI"), ("finland", "FI"), ("helsink", "FI"),
+            ("швец", "SE"), ("sweden", "SE"), ("stockhol", "SE"),
+            ("франц", "FR"), ("france", "FR"), ("paris", "FR"),
+            ("турц", "TR"), ("turkey", "TR"), ("istanbul", "TR"), ("стамбул", "TR"),
+            ("польш", "PL"), ("poland", "PL"), ("warsaw", "PL"), ("варшав", "PL"),
+            ("латви", "LV"), ("latvia", "LV"), ("riga", "LV"), ("рига", "LV"),
+            ("литв", "LT"), ("lithuania", "LT"), ("vilnius", "LT"),
+            ("эстон", "EE"), ("estonia", "EE"), ("tallinn", "EE"),
+            ("япон", "JP"), ("japan", "JP"), ("tokyo", "JP"), ("токио", "JP"),
+            ("сингапур", "SG"), ("singapore", "SG"),
+            ("гонконг", "HK"), ("hong kong", "HK"),
+            ("росси", "RU"), ("russia", "RU"), ("moscow", "RU"),
+            ("казах", "KZ"), ("алматы", "KZ"),
+            ("украин", "UA"), ("ukraine", "UA"),
+            ("армен", "AM"), ("armenia", "AM"),
+            ("грузи", "GE"), ("georgia", "GE"), ("тбилис", "GE"),
+            ("азербайдж", "AZ"), ("баку", "AZ"),
+            ("румын", "RO"), ("romania", "RO"),
+            ("израил", "IL"), ("israel", "IL"),
+            ("оаэ", "AE"), ("дубай", "AE"), ("emirates", "AE"), ("uae", "AE"),
+            ("австр", "AT"), ("austria", "AT"),
+            ("швейцар", "CH"), ("switzerland", "CH"),
+            ("чехи", "CZ"), ("czech", "CZ"),
+            ("испан", "ES"), ("spain", "ES"),
+            ("итал", "IT"), ("italy", "IT"),
+            ("канад", "CA"), ("canada", "CA"),
+            ("тайван", "TW"), ("taiwan", "TW"),
+            ("норвег", "NO"), ("norway", "NO"),
+            ("дания", "DK"), ("denmark", "DK"), ("copenhagen", "DK"), ("копенгаген", "DK"),
+            ("албан", "AL"), ("albania", "AL"), ("tirana", "AL"), ("тирана", "AL"),
+            ("бразил", "BR"), ("brazil", "BR"), ("brasil", "BR"),
+            ("инди", "IN"), ("india", "IN"), ("delhi", "IN"),
+            ("нигер", "NG"), ("nigeria", "NG"), ("lagos", "NG"), ("abuja", "NG"),
+        ]
+        // Longer stems first to avoid short false hits.
+        for (stem, code) in stems.sorted(by: { $0.0.count > $1.0.count }) where lower.contains(stem) {
+            return code
+        }
+        return nil
     }
 
     /// True when `haystack` contains a clear country/city alias for `code` (not just the ISO letters).
@@ -375,19 +543,65 @@ public enum VPNServerNameParser {
             }
         }
         if !locationGroups.isEmpty {
-            return locationGroups
+            return disambiguateDuplicateLabels(locationGroups)
         }
         if !flatLeaves.isEmpty {
-            return flatLeaves
+            return disambiguateDuplicateLabels(flatLeaves)
         }
 
         // Flat configs with no root selector members: every non-group outbound/endpoint.
-        return objectByTag.keys.sorted().compactMap { tag in
+        let flat = objectByTag.keys.sorted().compactMap { tag -> VPNServer? in
             guard let object = objectByTag[tag] else { return nil }
             let type = (object["type"] as? String)?.lowercased() ?? ""
             if ["selector", "urltest", "direct", "block", "dns"].contains(type) { return nil }
             return parse(tag: tag, groupTag: groupTag)
         }
+        return disambiguateDuplicateLabels(flat)
+    }
+
+    /// When several rows share the same display label (e.g. TW France + France → «France»),
+    /// number them «France 1», «France 2» so the picker stays unambiguous.
+    private static func disambiguateDuplicateLabels(_ servers: [VPNServer]) -> [VPNServer] {
+        var totals: [String: Int] = [:]
+        for server in servers {
+            totals[server.locationLabel.lowercased(), default: 0] += 1
+        }
+        var seen: [String: Int] = [:]
+        return servers.map { server in
+            let key = server.locationLabel.lowercased()
+            guard totals[key, default: 0] > 1 else { return server }
+            seen[key, default: 0] += 1
+            let numbered = "\(server.locationLabel) \(seen[key]!)"
+            return VPNServer(
+                id: server.id,
+                city: numbered,
+                country: numbered,
+                countryCode: server.countryCode,
+                ping: server.ping,
+                load: server.load,
+                groupTag: server.groupTag,
+                locationLabel: numbered
+            )
+        }
+    }
+
+    /// 5G / anti-block profile: only nodes whose names mention mobile-bypass keywords.
+    public static func matchesAntiBlockOrMobileProfile(_ server: VPNServer) -> Bool {
+        let hay = "\(server.id) \(server.city) \(server.country)".lowercased()
+        let needles = [
+            "5g",
+            "lte",
+            "обход",
+            "белые списки",
+            "белый список",
+            "whitelist",
+            "white list",
+            "white-list",
+            "ограничен",
+            "антиблок",
+            "antiblock",
+        ]
+        return needles.contains { hay.contains($0) }
     }
 
     /// When the location tag is synthetic (`profile-1`) but the first leaf is `Germany`,
@@ -428,8 +642,8 @@ public enum VPNServerNameParser {
         }
         return VPNServer(
             id: server.id,
-            city: bestCity,
-            country: countryName(for: bestCode) ?? bestCountry,
+            city: VPNCountryCatalog.englishPlaceName(for: bestCity),
+            country: VPNCountryCatalog.englishPlaceName(for: countryName(for: bestCode) ?? bestCountry),
             countryCode: bestCode,
             ping: server.ping,
             load: server.load,
@@ -507,17 +721,23 @@ public enum VPNServerNameParser {
             }
         }
 
-        // Named country tokens first; skip ambiguous hoster codes like TimeWeb `tw`.
-        for token in tokens {
-            if token.count == 2, ambiguousHosterCodes.contains(token.uppercased()) {
-                continue
-            }
+        // Named country tokens first (>2 chars); skip ambiguous hoster codes like TimeWeb `tw`.
+        for token in tokens where token.count > 2 {
             if let exact = VPNCountryCatalog.exactCode(for: token) {
                 return exact == "UK" ? "GB" : exact
             }
         }
 
-        if let code = VPNCountryCatalog.containsCode(in: lower) {
+        // Bare ISO tokens last — never Wi-Fi fragments (`fi`) or other noise.
+        for token in tokens where token.count == 2 {
+            if ambiguousHosterCodes.contains(token.uppercased()) { continue }
+            if nonCountryNoiseTokens.contains(token) { continue }
+            if let exact = VPNCountryCatalog.exactCode(for: token) {
+                return exact == "UK" ? "GB" : exact
+            }
+        }
+
+        if let code = VPNCountryCatalog.containsCode(in: scrubNetworkNoise(lower)) {
             // contains("tw") must not beat germany/france in the same string.
             if ambiguousHosterCodes.contains(code),
                tokens.contains(where: {

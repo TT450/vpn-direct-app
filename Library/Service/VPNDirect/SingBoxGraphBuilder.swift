@@ -14,7 +14,8 @@ public enum SingBoxGraphBuilder {
         static let tunMTUWithoutProtocolHint = 1500
         static let urltestProbe = "https://www.gstatic.com/generate_204"
         static let urltestInterval = "12s"
-        static let urltestTolerance = 80
+        // Upstream default is 50ms. 80 was too sticky; 20 flaps on normal RTT jitter.
+        static let urltestTolerance = 50
         static let urltestIdleTimeout = "30m"
         static let bypassPrivateNetworks = true
     }

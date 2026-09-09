@@ -127,6 +127,25 @@ public enum XrayJSONAdapter {
 
                 let converted: [String: Any]?
                 if proto == "vless" {
+                    // Fail closed early with a clear diagnostic (INCY-style plaintext guard).
+                    let stream = (xray["streamSettings"] as? [String: Any]) ?? [:]
+                    let security = ((stream["security"] as? String) ?? "none").lowercased()
+                    let settings = (xray["settings"] as? [String: Any]) ?? [:]
+                    let address = (settings["address"] as? String)
+                        ?? (((settings["vnext"] as? [[String: Any]])?.first)?["address"] as? String)
+                        ?? ""
+                    let userEnc = (((settings["vnext"] as? [[String: Any]])?.first)?["users"] as? [[String: Any]])?.first?["encryption"] as? String
+                    let encryption = (settings["encryption"] as? String) ?? userEnc
+                    if VLESSPlaintextGuard.isInsecurePublicVLESS(
+                        server: address,
+                        hasTLSOrReality: security == "tls" || security == "reality",
+                        encryption: encryption
+                    ) {
+                        let label = xrayTag.isEmpty ? fallbackTag : xrayTag
+                        convertFailures.append("vless_plaintext:\(label)")
+                        VPNDirectLog.parser.warning("\(VPNDirectRedactor.redact("xray_plaintext_vless_rejected tag=\(label)"))")
+                        continue
+                    }
                     converted = XrayVLESSConverter.convert(xray, fallbackTag: fallbackTag)
                 } else if proto == "hysteria" || proto == "hysteria2" {
                     converted = HysteriaOutboundFactory.fromXray(xray, fallbackTag: fallbackTag)
@@ -174,6 +193,14 @@ public enum XrayJSONAdapter {
                 // Skip finalmask/fragment dumps when already mapped to tls_fragment* / multiplex.
                 let mappedTLSFragment = attributes["tls_fragment"] == "1"
                 let mappedMultiplex = attributes["multiplex"] == "1"
+                let mappedXHTTP: Bool = {
+                    if let transport = outbound["transport"] as? [String: Any],
+                       let type = (transport["type"] as? String)?.lowercased()
+                    {
+                        return type == "xhttp" || type == "splithttp"
+                    }
+                    return false
+                }()
                 if let stream = xray["streamSettings"] as? [String: Any] {
                     for (k, v) in flattenJSON(stream, prefix: "stream") {
                         let lower = k.lowercased()
@@ -184,6 +211,15 @@ public enum XrayJSONAdapter {
                             continue
                         }
                         if mappedMultiplex, lower.hasPrefix("stream.mux") {
+                            continue
+                        }
+                        // XHTTP already mapped by XrayVLESSConverter / XrayXHTTPMapper.
+                        // Nested dumps (seqPlacement, noSSEHeader, …) contain "xhttp" in the path
+                        // and falsely trip connection-critical fail-closed — dropping White LIST rows.
+                        if mappedXHTTP,
+                           lower.hasPrefix("stream.xhttpsettings")
+                            || lower.hasPrefix("stream.splithttpsettings")
+                        {
                             continue
                         }
                         if attributes[k] == nil {
@@ -530,17 +566,29 @@ public enum XrayJSONAdapter {
                 put("host", transport["host"])
             }
             put("mode", transport["mode"])
-            if let extra = transport["extra"] {
-                if let s = extra as? String, !s.isEmpty {
-                    attrs["extra"] = s
-                } else if JSONSerialization.isValidJSONObject(extra),
-                          let data = try? JSONSerialization.data(withJSONObject: extra),
-                          let s = String(data: data, encoding: .utf8)
-                {
-                    attrs["extra"] = s
-                }
-            }
+            // Do not flatten transport.extra — Libbox rejects it; mapper already expanded known fields.
             put("service_name", transport["service_name"])
+            let xhttpKeys = [
+                "sc_max_each_post_bytes", "sc_min_posts_interval_ms", "sc_max_concurrent_posts",
+                "sc_max_buffered_posts", "sc_stream_up_server_secs", "x_padding_bytes",
+                "session_placement", "session_key", "session_table", "session_length",
+                "seq_placement", "seq_key", "uplink_data_placement", "uplink_data_key",
+                "uplink_chunk_size", "uplink_http_method", "x_padding_key", "x_padding_header",
+                "x_padding_placement", "x_padding_method", "server_max_header_bytes",
+            ]
+            for key in xhttpKeys {
+                put(key, transport[key])
+            }
+            if let obfs = transport["x_padding_obfs_mode"] as? Bool { attrs["x_padding_obfs_mode"] = obfs ? "1" : "0" }
+            if let noSSE = transport["no_sse_header"] as? Bool { attrs["no_sse_header"] = noSSE ? "1" : "0" }
+            if let noGRPC = transport["no_grpc_header"] as? Bool { attrs["no_grpc_header"] = noGRPC ? "1" : "0" }
+            if let xmux = transport["xmux"],
+               JSONSerialization.isValidJSONObject(xmux),
+               let data = try? JSONSerialization.data(withJSONObject: xmux),
+               let s = String(data: data, encoding: .utf8)
+            {
+                attrs["xmux_json"] = s
+            }
             put("scMaxEachPostBytes", transport["sc_max_each_post_bytes"] ?? transport["scMaxEachPostBytes"])
             put("scMinPostsIntervalMs", transport["sc_min_posts_interval_ms"] ?? transport["scMinPostsIntervalMs"])
             put("scMaxConcurrentPosts", transport["sc_max_concurrent_posts"] ?? transport["scMaxConcurrentPosts"])

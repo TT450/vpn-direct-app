@@ -2,8 +2,8 @@
 
 import Foundation
 
-/// Country / city / state aliases for VPN server labels (EN + RU).
-/// Used by `VPNServerNameParser` so flags resolve for Remnawave / Happ-style names.
+/// Country / city / state aliases for VPN server labels.
+/// Resolves Remnawave / Happ-style EN+RU names to a single English display label.
 enum VPNCountryCatalog {
     /// All ISO 3166-1 alpha-2 codes known to the system, plus UK → GB alias.
     static let isoCodes: Set<String> = {
@@ -15,13 +15,297 @@ enum VPNCountryCatalog {
     static func displayName(for code: String) -> String? {
         let upper = code.uppercased()
         let normalized = upper == "UK" ? "GB" : upper
-        if let ru = Locale(identifier: "ru_RU").localizedString(forRegionCode: normalized), !ru.isEmpty {
-            return ru
+        // Stable English labels for the picker (never Russian duplicates).
+        switch normalized {
+        case "US": return "USA"
+        case "GB": return "United Kingdom"
+        default:
+            break
         }
         if let en = Locale(identifier: "en_US").localizedString(forRegionCode: normalized), !en.isEmpty {
             return en
         }
         return nil
+    }
+
+    /// English capital (or primary metro) for country-only VPN tags.
+    /// Unused — country-normalized UI shows the country name, never a capital.
+    @available(*, deprecated, message: "Do not invent capitals; show country names.")
+    static func capitalEnglishName(for code: String) -> String? {
+        nil
+    }
+
+    /// Resolve incomplete / multi-word country phrases from VPN tags.
+    /// Handles: "United", "United Kingdom", "Great", "Great Britain", "Czech", "Saudi", …
+    static func resolveCountryPhrase(in raw: String, preferCode: String? = nil) -> (code: String, englishName: String)? {
+        let n = normalize(raw)
+        guard !n.isEmpty else { return nil }
+
+        let cacheKey = "\(preferCode?.uppercased() ?? "")|\(n)" as NSString
+        if let cached = phraseCache.object(forKey: cacheKey) as? PhraseBox {
+            return (cached.code, cached.englishName)
+        }
+
+        let resolved: (code: String, englishName: String)?
+        // Whole-string exact first.
+        if let code = exactCode(for: n), let name = displayName(for: code) {
+            resolved = (code == "UK" ? "GB" : code, name)
+        } else if let hit = matchLeadingISOCountryName(in: n) {
+            resolved = hit
+        } else if let hit = resolveAmbiguousCountryStarter(n, preferCode: preferCode) {
+            resolved = hit
+        } else if let code = containsCode(in: n), let name = displayName(for: code) {
+            resolved = (code == "UK" ? "GB" : code, name)
+        } else {
+            resolved = nil
+        }
+
+        if let resolved {
+            phraseCache.setObject(PhraseBox(code: resolved.code, englishName: resolved.englishName), forKey: cacheKey)
+        }
+        return resolved
+    }
+
+    /// "united kingdom foo" / "south korea bar" — longest prebuilt EN name that is a prefix or exact.
+    private static func matchLeadingISOCountryName(in normalized: String) -> (code: String, englishName: String)? {
+        var best: (code: String, englishName: String, len: Int)?
+
+        // Exact Locale EN name.
+        if let hit = isoEnglishExact[normalized] {
+            return hit
+        }
+
+        // Longest prebuilt name that is a prefix / contained token — no Locale scan per call.
+        for entry in isoEnglishByLength {
+            let enNorm = entry.norm
+            if normalized.hasPrefix(enNorm + " ")
+                || normalized.contains(" " + enNorm)
+                || normalized.contains(" " + enNorm + " ")
+            {
+                let len = enNorm.count
+                if best == nil || len > best!.len {
+                    best = (entry.code, entry.english, len)
+                }
+                // Names are sorted longest-first; first hit is enough for prefix, but
+                // keep scanning briefly for longer contained aliases below.
+                break
+            }
+        }
+
+        // Also common aliases not identical to Locale names.
+        for (alias, code) in multiWordCountryAliases {
+            if normalized == alias || normalized.hasPrefix(alias + " ") || normalized.contains(" " + alias) {
+                let len = alias.count
+                if best == nil || len > best!.len {
+                    best = (code, displayName(for: code) ?? alias, len)
+                }
+            }
+        }
+        guard let best else { return nil }
+        return (best.code, best.englishName)
+    }
+
+    /// Truncated starters: United / Great / Saudi / Czech / South / North / Dominican / …
+    private static func resolveAmbiguousCountryStarter(_ normalized: String, preferCode: String?) -> (code: String, englishName: String)? {
+        let tokens = normalized
+            .replacingOccurrences(of: "-", with: " ")
+            .components(separatedBy: CharacterSet.whitespaces)
+            .filter { !$0.isEmpty }
+        guard let first = tokens.first else { return nil }
+        let rest = tokens.dropFirst().joined(separator: " ")
+
+        func finish(_ code: String) -> (String, String)? {
+            let c = code == "UK" ? "GB" : code
+            guard let name = displayName(for: c) else { return nil }
+            return (c, name)
+        }
+
+        // Prefer emoji / already-known code when starter is ambiguous.
+        if let prefer = preferCode?.uppercased(), prefer != "XX", !prefer.isEmpty {
+            let p = prefer == "UK" ? "GB" : prefer
+            switch first {
+            case "united", "юнайтед", "юнайтедк":
+                if ["GB", "US", "AE"].contains(p) { return finish(p) }
+            case "great", "грейт", "грит", "brit", "britain", "британ":
+                if p == "GB" { return finish("GB") }
+            case "south", "юг", "южн":
+                if ["KR", "ZA", "SS", "SD"].contains(p) { return finish(p) }
+            case "north", "север":
+                if ["KP", "MK", "NO"].contains(p) { return finish(p) }
+            default:
+                break
+            }
+        }
+
+        switch first {
+        case "united", "юнайтед":
+            if rest.hasPrefix("kingdom") || rest.hasPrefix("king") || rest.contains("britain")
+                || rest.hasPrefix("корол") || rest.contains("британ")
+            {
+                return finish("GB")
+            }
+            if rest.hasPrefix("state") || rest.hasPrefix("states") || rest.contains("america")
+                || rest.hasPrefix("штат") || rest.contains("америк")
+            {
+                return finish("US")
+            }
+            if rest.contains("arab") || rest.contains("emirat") || rest.contains("араб") || rest.contains("эмират") {
+                return finish("AE")
+            }
+            // Bare "United" in VPN lists is almost always UK (Durev / Happ tags).
+            if rest.isEmpty { return finish("GB") }
+            return finish("GB")
+
+        case "great", "грейт", "грит", "britain", "brit", "британ":
+            return finish("GB")
+
+        case "kingdom", "корол":
+            return finish("GB")
+
+        case "czech", "czechia", "чехи", "чешск":
+            return finish("CZ")
+
+        case "saudi", "сауд":
+            return finish("SA")
+
+        case "dominican", "доминикан":
+            // "Dominican" alone → Republic (DO), not Dominica (DM)
+            if rest.hasPrefix("republic") || rest.isEmpty { return finish("DO") }
+            return finish("DO")
+
+        case "south", "южн":
+            if rest.hasPrefix("korea") || rest.hasPrefix("коре") { return finish("KR") }
+            if rest.hasPrefix("africa") || rest.hasPrefix("афри") { return finish("ZA") }
+            if rest.hasPrefix("sudan") || rest.hasPrefix("судан") { return finish("SS") }
+            return nil
+
+        case "north", "северн", "север":
+            if rest.hasPrefix("korea") || rest.hasPrefix("коре") { return finish("KP") }
+            if rest.hasPrefix("macedonia") || rest.hasPrefix("македон") { return finish("MK") }
+            return nil
+
+        case "papu", "papua":
+            return finish("PG")
+
+        case "costa":
+            if rest.hasPrefix("rica") { return finish("CR") }
+            return nil
+
+        case "el":
+            if rest.hasPrefix("salvador") { return finish("SV") }
+            return nil
+
+        case "sri":
+            if rest.hasPrefix("lanka") { return finish("LK") }
+            return nil
+
+        case "new":
+            if rest.hasPrefix("zealand") || rest.hasPrefix("зеланд") { return finish("NZ") }
+            if rest.hasPrefix("caledonia") { return finish("NC") }
+            return nil
+
+        case "hong":
+            if rest.hasPrefix("kong") || rest.isEmpty { return finish("HK") }
+            return nil
+
+        default:
+            return nil
+        }
+    }
+
+    /// Emirate-only English label (never "United Arab Emirates").
+    static func emirateEnglishName(in raw: String) -> String? {
+        let n = normalize(raw)
+        let stems: [(String, String)] = [
+            ("abu dhabi", "Abu Dhabi"),
+            ("абу-даби", "Abu Dhabi"),
+            ("абу даби", "Abu Dhabi"),
+            ("абудаби", "Abu Dhabi"),
+            ("ras al khaimah", "Ras Al Khaimah"),
+            ("ras al-khaimah", "Ras Al Khaimah"),
+            ("рас-эль-хайма", "Ras Al Khaimah"),
+            ("umm al quwain", "Umm Al Quwain"),
+            ("umm al-quwain", "Umm Al Quwain"),
+            ("dubai", "Dubai"),
+            ("дубай", "Dubai"),
+            ("sharjah", "Sharjah"),
+            ("шаржа", "Sharjah"),
+            ("ajman", "Ajman"),
+            ("аджаман", "Ajman"),
+            ("аджуман", "Ajman"),
+            ("fujairah", "Fujairah"),
+            ("фуджайра", "Fujairah"),
+        ]
+        for (stem, label) in stems.sorted(by: { $0.0.count > $1.0.count }) where n.contains(stem) {
+            return label
+        }
+        return nil
+    }
+
+    static func isUnitedArabEmiratesLabel(_ raw: String) -> Bool {
+        let n = normalize(raw)
+        return n == "ae"
+            || n == "uae"
+            || n.contains("united arab emirates")
+            || n.contains("оаэ")
+            || n == "emirates"
+            || n.contains("арабск") && n.contains("эмират")
+    }
+
+    /// Normalize a place token (country / city / state) to a single English label when known.
+    static func englishPlaceName(for raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return trimmed }
+        let cacheKey = trimmed as NSString
+        if let cached = placeNameCache.object(forKey: cacheKey) {
+            return cached as String
+        }
+        let resolved = resolveEnglishPlaceName(trimmed)
+        placeNameCache.setObject(resolved as NSString, forKey: cacheKey)
+        return resolved
+    }
+
+    private static func resolveEnglishPlaceName(_ trimmed: String) -> String {
+        if let emirate = emirateEnglishName(in: trimmed) {
+            return emirate
+        }
+        if let phrase = resolveCountryPhrase(in: trimmed) {
+            return phrase.englishName
+        }
+        let n = normalize(trimmed)
+        if let mapped = englishPlaceByNormalized[n] {
+            return mapped
+        }
+        if let code = exactAliases[n] {
+            return displayName(for: code) ?? trimmed
+        }
+        // Preserve trailing index markers: "Швеция 2" / "Sweden #2".
+        if let split = splitTrailingIndex(trimmed) {
+            let head = englishPlaceName(for: split.head)
+            return "\(head) \(split.suffix)"
+        }
+        if containsCyrillic(trimmed), let code = containsCode(in: n) {
+            for (alias, _) in containsAliasesSorted where n.contains(alias) {
+                if let label = englishPlaceByNormalized[alias] {
+                    return label
+                }
+            }
+            return displayName(for: code) ?? trimmed
+        }
+        return trimmed
+    }
+
+    private static func containsCyrillic(_ text: String) -> Bool {
+        text.unicodeScalars.contains { (0x0400 ... 0x04FF).contains($0.value) }
+    }
+
+    private static func splitTrailingIndex(_ text: String) -> (head: String, suffix: String)? {
+        let parts = text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        guard parts.count >= 2, let last = parts.last else { return nil }
+        let marker = last.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard marker.allSatisfy(\.isNumber), !marker.isEmpty else { return nil }
+        let head = parts.dropLast().joined(separator: " ")
+        return (head, last.hasPrefix("#") ? "#\(marker)" : marker)
     }
 
     /// Exact whole-string match (lowercased, ё→е).
@@ -59,8 +343,8 @@ enum VPNCountryCatalog {
         }
 
         // Common VPN / panel short names and English variants Locale misses.
+        put(["uk", "gb", "britain", "great britain", "great", "england", "united kingdom", "united", "великобритания", "англия", "грит", "грейт", "юнайтед"], "GB")
         put(["usa", "us", "u.s.", "u.s.a.", "america", "united states", "united states of america", "сша"], "US")
-        put(["uk", "gb", "britain", "great britain", "england", "united kingdom", "великобритания", "англия"], "GB")
         put(["uae", "оаэ", "emirates", "united arab emirates"], "AE")
         put(["korea", "south korea", "republic of korea", "корея", "южная корея"], "KR")
         put(["north korea", "dprk", "кндр", "северная корея"], "KP")
@@ -90,14 +374,31 @@ enum VPNCountryCatalog {
 
     // MARK: - Substring aliases (capitals, cities, US states, CA/EU metros)
 
-    private static let containsAliasesSorted: [(String, String)] = {
+    private static let placeAliasTables: (contains: [(String, String)], english: [String: String]) = {
         var pairs: [(String, String)] = []
+        var english: [String: String] = [:]
+
+        func isCyrillicWord(_ text: String) -> Bool {
+            text.unicodeScalars.contains { (0x0400 ... 0x04FF).contains($0.value) }
+        }
+
+        func titleCaseEnglish(_ raw: String) -> String {
+            raw.split(separator: " ").map { part in
+                let p = String(part)
+                guard let first = p.first else { return p }
+                return String(first).uppercased() + p.dropFirst().lowercased()
+            }.joined(separator: " ")
+        }
+
         func add(_ keys: [String], _ code: String) {
+            let englishKey = keys.first(where: { !isCyrillicWord($0) }) ?? keys.first ?? code
+            let label = titleCaseEnglish(englishKey)
             for key in keys {
                 let n = normalize(key)
                 // Avoid short stems that false-positive inside other names (e.g. "oman" ⊂ "romania").
                 guard n.count >= 4 || ["usa", "uae"].contains(n) else { continue }
                 pairs.append((n, code))
+                english[n] = label
             }
         }
 
@@ -314,8 +615,10 @@ enum VPNCountryCatalog {
         add(["china", "chinese", "китай"], "CN")
         add(["canada", "canadian", "канад"], "CA")
         add(["australia", "australian", "австрал"], "AU")
-        add(["brazil", "brazilian", "бразил"], "BR")
+        add(["brazil", "brazilian", "brasil", "бразил"], "BR")
         add(["india", "indian", "инди"], "IN")
+        add(["albania", "albanian", "албан"], "AL")
+        add(["nigeria", "nigerian", "нигери"], "NG")
         add(["israel", "израил"], "IL")
         add(["kazakhstan", "казах"], "KZ")
         add(["singapore", "сингапур"], "SG")
@@ -326,13 +629,82 @@ enum VPNCountryCatalog {
         // Dedupe by alias keeping first (longest will sort later).
         var seen = Set<String>()
         var unique: [(String, String)] = []
+        var englishUnique: [String: String] = [:]
         for pair in pairs {
             if seen.insert(pair.0).inserted {
                 unique.append(pair)
+                if let label = english[pair.0] {
+                    englishUnique[pair.0] = label
+                }
             }
         }
-        return unique.sorted { $0.0.count > $1.0.count }
+        return (unique.sorted { $0.0.count > $1.0.count }, englishUnique)
     }()
+
+    private static var containsAliasesSorted: [(String, String)] { placeAliasTables.contains }
+
+    /// RU/EN aliases → single English display label (countries, cities, states).
+    private static let englishPlaceByNormalized: [String: String] = {
+        var map = placeAliasTables.english
+        for (alias, code) in exactAliases {
+            if map[alias] == nil, let en = displayName(for: code) {
+                map[alias] = en
+            }
+        }
+        return map
+    }()
+
+    /// Built once: Locale EN region names, longest first — avoids per-label ISO scans.
+    private static let isoEnglishEntries: [(norm: String, code: String, english: String)] = {
+        var rows: [(String, String, String)] = []
+        let locale = Locale(identifier: "en_US")
+        for code in Locale.isoRegionCodes {
+            let upper = code.uppercased()
+            guard let en = locale.localizedString(forRegionCode: code), !en.isEmpty else { continue }
+            let enNorm = normalize(en)
+            guard enNorm.count >= 4 else { continue }
+            let display = displayName(for: upper) ?? en
+            rows.append((enNorm, upper == "UK" ? "GB" : upper, display))
+        }
+        return rows.sorted { $0.0.count > $1.0.count }
+    }()
+
+    private static let isoEnglishExact: [String: (code: String, englishName: String)] = {
+        var map: [String: (String, String)] = [:]
+        for entry in isoEnglishEntries {
+            map[entry.norm] = (entry.code, entry.english)
+        }
+        return map
+    }()
+
+    private static var isoEnglishByLength: [(norm: String, code: String, english: String)] { isoEnglishEntries }
+
+    private static let multiWordCountryAliases: [(String, String)] = [
+        ("united kingdom", "GB"), ("great britain", "GB"), ("britain", "GB"), ("england", "GB"),
+        ("united states", "US"), ("united states of america", "US"), ("usa", "US"), ("u.s.a.", "US"),
+        ("united arab emirates", "AE"), ("uae", "AE"),
+        ("czech republic", "CZ"), ("czechia", "CZ"),
+        ("south korea", "KR"), ("north korea", "KP"),
+        ("saudi arabia", "SA"), ("south africa", "ZA"),
+        ("new zealand", "NZ"), ("papua new guinea", "PG"),
+        ("sri lanka", "LK"), ("costa rica", "CR"), ("el salvador", "SV"),
+        ("dominican republic", "DO"), ("bosnia and herzegovina", "BA"),
+        ("north macedonia", "MK"), ("trinidad and tobago", "TT"),
+        ("antigua and barbuda", "AG"), ("saint kitts", "KN"),
+        ("vatican", "VA"), ("hong kong", "HK"), ("macau", "MO"), ("macao", "MO"),
+    ].sorted { $0.0.count > $1.0.count }
+
+    private static let phraseCache = NSCache<NSString, PhraseBox>()
+    private static let placeNameCache = NSCache<NSString, NSString>()
+
+    private final class PhraseBox: NSObject {
+        let code: String
+        let englishName: String
+        init(code: String, englishName: String) {
+            self.code = code
+            self.englishName = englishName
+        }
+    }
 
     static func normalize(_ raw: String) -> String {
         raw.lowercased()

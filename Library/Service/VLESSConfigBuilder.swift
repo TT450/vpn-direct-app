@@ -283,8 +283,19 @@ public enum VLESSConfigBuilder {
             if let host, !host.isEmpty {
                 transport["host"] = host
             }
-            let mode = cleanOptional(query["mode"]) ?? "auto"
+            var mode = cleanOptional(query["mode"]) ?? "auto"
+            // Reality + stream-one → auto (same quirk as XrayVLESSConverter / TheTochka framing).
+            let security = clean(query["security"] ?? "none").lowercased()
+            if security == "reality", mode.lowercased() == "stream-one" {
+                mode = "auto"
+            }
             transport["mode"] = mode
+            // URI `concurrency` maps to XHTTP xmux max_concurrency (Durev / Xray share links).
+            if let concurrency = cleanOptional(query["concurrency"]).flatMap(Int.init), concurrency > 0 {
+                var xmux = (transport["xmux"] as? [String: Any]) ?? [:]
+                xmux["max_concurrency"] = concurrency
+                transport["xmux"] = xmux
+            }
             if let extra = cleanOptional(query["extra"]) {
                 transport["extra"] = extra
             }
@@ -322,6 +333,7 @@ public enum VLESSConfigBuilder {
             "fp", "alpn", "pbk", "sid", "spx", "pqv", "allowinsecure", "packetencoding",
             "servicename", "service_name", "mode", "headertype", "extra",
             "scmaxeachpostbytes", "scminpostsintervalms", "x_padding_bytes",
+            "concurrency",
         ]
 
         private let map: [String: String]

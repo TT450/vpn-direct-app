@@ -79,7 +79,7 @@ struct DirectHomePage: View {
             Spacer(minLength: 4)
 
             Button {
-                model.activeSheet = .serverPicker
+                model.openChangeServer()
             } label: {
                 HStack(spacing: HomeBottomBar.indexSpacing) {
                     Text("01")
@@ -104,9 +104,11 @@ struct DirectHomePage: View {
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(model.usesAutoSelection
-                            ? "АВТОВЫБОР · \((model.activeSubscription?.name ?? "").uppercased())"
-                            : (model.activeSubscription?.name ?? "").uppercased())
+                        Text(model.activeSubscription == nil
+                            ? "ПОДПИСКА НЕ ВЫБРАНА"
+                            : (model.usesAutoSelection
+                                ? "АВТОВЫБОР · \((model.activeSubscription?.name ?? "").uppercased())"
+                                : (model.activeSubscription?.name ?? "").uppercased()))
                             .lineLimit(1)
                             .microLabel()
                         Text(serverSubtitle)
@@ -171,6 +173,7 @@ struct DirectHomePage: View {
     }
 
     private var serverSubtitle: String {
+        guard model.activeSubscription != nil else { return "Подписка не выбрана" }
         guard let server = model.activeServer else { return "Нет серверов" }
         if model.usesAutoSelection {
             return "Сейчас: \(server.locationLabel)"
@@ -234,7 +237,7 @@ private struct HomeSubscriptionActions: View {
             }
             Button("Отмена", role: .cancel) {}
         } message: {
-            Text("Подписка останется в списке внешних. Активным станет Free / Premium или другая.")
+            Text("Подписка останется в списке внешних, но на главной больше не будет активной.")
         }
     }
 

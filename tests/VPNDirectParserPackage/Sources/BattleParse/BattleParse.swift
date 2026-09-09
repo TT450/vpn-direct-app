@@ -228,6 +228,8 @@ private func classifyError(_ error: Error) -> FailureClass {
             return .unsupported_transport
         case .unsupportedSecurity:
             return .unsupported_field
+        case .plaintextVLESS:
+            return .unsupported_field
         case .unsupportedFeature(let component, _):
             let c = component.lowercased()
             if c.contains("transport") { return .unsupported_transport }

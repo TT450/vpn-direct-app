@@ -13,7 +13,9 @@ enum XrayXHTTPMapper {
         ("scMinPostsIntervalMs", "sc_min_posts_interval_ms"),
         ("scStreamUpServerSecs", "sc_stream_up_server_secs"),
         ("sessionIDPlacement", "session_placement"),
+        ("sessionPlacement", "session_placement"),
         ("sessionIDKey", "session_key"),
+        ("sessionKey", "session_key"),
         ("sessionIDTable", "session_table"),
         ("sessionIDLength", "session_length"),
         ("seqPlacement", "seq_placement"),
@@ -30,25 +32,27 @@ enum XrayXHTTPMapper {
 
     private static let intFields: [(xray: String, sing: String)] = [
         ("scMaxBufferedPosts", "sc_max_buffered_posts"),
+        ("serverMaxHeaderBytes", "server_max_header_bytes"),
+        ("scMaxConcurrentPosts", "sc_max_concurrent_posts"),
     ]
 
     private static let boolFields: [(xray: String, sing: String)] = [
         ("noGRPCHeader", "no_grpc_header"),
+        ("noSSEHeader", "no_sse_header"),
         ("xPaddingObfsMode", "x_padding_obfs_mode"),
     ]
 
     private static let xmuxStringFields: [(xray: String, sing: String)] = [
-        ("maxConcurrency", "xmux_max_concurrency"),
-        ("hMaxRequestTimes", "xmux_h_max_request_times"),
-        ("hMaxReusableSecs", "xmux_h_max_reusable_secs"),
+        ("maxConcurrency", "max_concurrency"),
+        ("maxConnections", "max_connections"),
+        ("cMaxReuseTimes", "c_max_reuse_times"),
+        ("hMaxRequestTimes", "h_max_request_times"),
+        ("hMaxReusableSecs", "h_max_reusable_secs"),
     ]
 
-    // Pinned lx exposes these as integers. Xray currently models maxConnections and
-    // cMaxReuseTimes as ranges; only an exact/single-valued range is losslessly representable.
+    // Plain integer in pinned lx (not a range).
     private static let xmuxIntFields: [(xray: String, sing: String)] = [
-        ("maxConnections", "xmux_max_connections"),
-        ("cMaxReuseTimes", "xmux_c_max_reuse_times"),
-        ("hKeepAlivePeriod", "xmux_h_keep_alive_period"),
+        ("hKeepAlivePeriod", "h_keep_alive_period"),
     ]
 
     static func merge(from outer: [String: Any], into transport: inout [String: Any]) {
@@ -57,7 +61,7 @@ enum XrayXHTTPMapper {
 
         if extraWasPresent {
             guard let extraObject = decodeObject(outer["extra"]) else {
-                transport["extra"] = String(describing: outer["extra"] ?? "")
+                // Unparseable Xray extra bag — do not emit invalid transport.extra (Libbox rejects it).
                 return
             }
             // Exact Xray semantics: extra replaces the config except Host/Path/Mode, which are
@@ -114,17 +118,16 @@ enum XrayXHTTPMapper {
             }
         }
 
-        if let download = unknown.removeValue(forKey: "downloadSettings") {
-            // Pinned lx intentionally exposes this as `any`; preserve the structured Xray object.
-            transport["download_settings"] = download
-        }
+        // downloadSettings is not on pinned lx V2RayXHTTPOptions — drop (do not emit unknown key).
+        unknown.removeValue(forKey: "downloadSettings")
 
         if let xmuxRaw = unknown.removeValue(forKey: "xmux") {
             if var xmux = xmuxRaw as? [String: Any] {
+                var nested: [String: Any] = [:]
                 for (xrayKey, singKey) in xmuxStringFields {
                     guard let raw = xmux.removeValue(forKey: xrayKey) else { continue }
                     if let value = rangeOrString(raw) {
-                        transport[singKey] = value
+                        nested[singKey] = value
                     } else {
                         xmux[xrayKey] = raw
                     }
@@ -132,17 +135,21 @@ enum XrayXHTTPMapper {
                 for (xrayKey, singKey) in xmuxIntFields {
                     guard let raw = xmux.removeValue(forKey: xrayKey) else { continue }
                     if let value = exactInt(raw) {
-                        transport[singKey] = value
+                        nested[singKey] = value
                     } else {
                         xmux[xrayKey] = raw
                     }
                 }
                 if let raw = xmux.removeValue(forKey: "noGRPCHeader") {
                     if let value = exactBool(raw) {
-                        transport["xmux_no_grpc_header"] = value
+                        // Xray sometimes nests this under xmux; pinned lx keeps it on transport root.
+                        transport["no_grpc_header"] = value
                     } else {
                         xmux["noGRPCHeader"] = raw
                     }
+                }
+                if !nested.isEmpty {
+                    transport["xmux"] = nested
                 }
                 if !xmux.isEmpty { unknown["xmux"] = xmux }
             } else {
@@ -150,18 +157,14 @@ enum XrayXHTTPMapper {
             }
         }
 
-        // Xray fields absent from pinned lx are intentionally left in `unknown`, including
-        // noSSEHeader and serverMaxHeaderBytes. Likewise any future producer field remains here.
-        if !unknown.isEmpty {
-            if JSONSerialization.isValidJSONObject(unknown),
-               let data = try? JSONSerialization.data(withJSONObject: unknown, options: [.sortedKeys]),
-               let json = String(data: data, encoding: .utf8)
-            {
-                transport["extra"] = json
-            } else {
-                transport["extra"] = String(describing: unknown)
-            }
+        // Drop empty header maps left by panels.
+        if let headers = unknown["headers"] as? [String: Any], headers.isEmpty {
+            unknown.removeValue(forKey: "headers")
         }
+
+        // Pinned Libbox has no transport.extra bag — never emit unknown leftovers onto transport
+        // (CheckConfig → "json: unknown field"). Mapped Core fields above are enough for White LIST.
+        _ = unknown
     }
 
     private static func decodeObject(_ raw: Any?) -> [String: Any]? {

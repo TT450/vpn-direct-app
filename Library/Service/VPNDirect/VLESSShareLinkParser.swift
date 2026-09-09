@@ -26,6 +26,14 @@ public struct VLESSShareLinkParser: VPNDirectParser {
         } else {
             security = .none
         }
+        let encryption = outbound["encryption"] as? String
+        if VLESSPlaintextGuard.isInsecurePublicVLESS(
+            server: server,
+            hasTLSOrReality: tlsEnabled || reality,
+            encryption: encryption
+        ) {
+            throw VPNDirectCoreError.plaintextVLESS(tag: parsed.name)
+        }
 
         var attributes: [String: String] = [:]
         var rawExtensions: [String: String] = [:]

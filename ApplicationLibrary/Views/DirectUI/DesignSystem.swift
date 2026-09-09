@@ -72,28 +72,27 @@ struct DarkStat: View {
     }
 }
 
-/// Country flag from bundled PNG assets — never emoji.
+/// Country flag from bundled PNG assets — never emoji (TheTochka placeholder square).
 struct FlagImage: View {
     let code: String
     var width: CGFloat = 30
     var height: CGFloat = 20
 
+    private static let imageCache = NSCache<NSString, UIImage>()
+    private static let missToken = UIImage()
+
     var body: some View {
-        let normalized = code.uppercased() == "UK" ? "GB" : code.uppercased()
+        let normalized = Self.normalizedCode(code)
         let name = "flag-\(normalized.lowercased())"
         Group {
-            if let image = Self.loadImage(named: name) {
+            if let image = Self.cachedImage(named: name) {
                 Image(uiImage: image)
                     .resizable()
                     .interpolation(.high)
                     .scaledToFill()
-            } else if let emoji = Self.flagEmoji(for: normalized) {
-                Text(emoji)
-                    .font(.system(size: min(width, height) * 0.85))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(DS.ink.opacity(0.35))
             } else {
-                Text(normalized)
+                // Same ink square + ISO letters as TheTochka — no broken emoji glyphs.
+                Text(normalized.isEmpty ? "XX" : normalized)
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
                     .foregroundStyle(DS.acid)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -103,6 +102,25 @@ struct FlagImage: View {
         .frame(width: width, height: height)
         .clipped()
         .overlay(Rectangle().stroke(Color.black.opacity(0.12), lineWidth: 0.5))
+    }
+
+    private static func normalizedCode(_ code: String) -> String {
+        let upper = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if upper.isEmpty { return "XX" }
+        return upper == "UK" ? "GB" : upper
+    }
+
+    private static func cachedImage(named name: String) -> UIImage? {
+        let key = name as NSString
+        if let cached = imageCache.object(forKey: key) {
+            return cached === missToken ? nil : cached
+        }
+        if let image = loadImage(named: name) {
+            imageCache.setObject(image, forKey: key)
+            return image
+        }
+        imageCache.setObject(missToken, forKey: key)
+        return nil
     }
 
     private static func loadImage(named name: String) -> UIImage? {
@@ -126,21 +144,6 @@ struct FlagImage: View {
             }
         }
         return UIImage(named: name)
-    }
-
-    /// Regional-indicator flag for any ISO 3166-1 alpha-2 code (covers countries without assets).
-    private static func flagEmoji(for code: String) -> String? {
-        let upper = code.uppercased()
-        guard upper.count == 2, upper.unicodeScalars.allSatisfy({ CharacterSet.uppercaseLetters.contains($0) }) else {
-            return nil
-        }
-        let base: UInt32 = 0x1F1E6
-        var scalars = String.UnicodeScalarView()
-        for scalar in upper.unicodeScalars {
-            guard let flag = UnicodeScalar(base + (scalar.value - 65)) else { return nil }
-            scalars.append(flag)
-        }
-        return String(scalars)
     }
 }
 

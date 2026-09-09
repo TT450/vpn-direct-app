@@ -74,6 +74,14 @@ enum XrayVLESSConverter {
 
         let security = ((stream["security"] as? String) ?? "none").lowercased()
         guard security == "none" || security == "tls" || security == "reality" || security.isEmpty else { return nil }
+        let hasTLSOrReality = security == "tls" || security == "reality"
+        if VLESSPlaintextGuard.isInsecurePublicVLESS(
+            server: address,
+            hasTLSOrReality: hasTLSOrReality,
+            encryption: encryption
+        ) {
+            return nil
+        }
         if security == "tls" || security == "reality" {
             let tlsSettings = (stream["tlsSettings"] as? [String: Any]) ?? [:]
             let realitySettings = (stream["realitySettings"] as? [String: Any]) ?? [:]

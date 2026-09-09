@@ -277,41 +277,60 @@ public enum UniversalOutboundBuilder {
             var xhttp: [String: Any] = ["type": "xhttp"]
             if let path = attr(node, "path") { xhttp["path"] = path } else { xhttp["path"] = "/" }
             if let host = attr(node, "host") { xhttp["host"] = host }
-            xhttp["mode"] = attr(node, "mode") ?? "auto"
-            if let extra = attr(node, "extra") {
-                // Prefer structured JSON object when possible.
-                if let data = extra.data(using: .utf8),
-                   let obj = try? JSONSerialization.jsonObject(with: data)
-                {
-                    xhttp["extra"] = obj
-                } else {
-                    xhttp["extra"] = extra
-                }
+            var mode = attr(node, "mode") ?? "auto"
+            let securityRaw = (node.security?.rawValue ?? attr(node, "security") ?? "").lowercased()
+            let hasReality = securityRaw == "reality"
+                || attr(node, "pbk") != nil
+                || node.attributes.keys.contains(where: { $0.hasPrefix("reality-opts") || $0 == "public-key" })
+            if hasReality, mode.lowercased() == "stream-one" {
+                mode = "auto"
             }
-            if let sc = attr(node, "scMaxEachPostBytes") ?? attr(node, "sc_max_each_post_bytes"),
-               let n = Int(sc)
+            xhttp["mode"] = mode
+            // Never emit transport.extra — pinned Libbox rejects unknown field "extra".
+            // Re-apply Xray extra JSON into known Core fields when present as an attribute bag.
+            if let extra = attr(node, "extra"),
+               let data = extra.data(using: .utf8),
+               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             {
-                xhttp["sc_max_each_post_bytes"] = n
-            } else if let sc = attr(node, "scMaxEachPostBytes") ?? attr(node, "sc_max_each_post_bytes") {
-                xhttp["sc_max_each_post_bytes"] = sc
+                XrayXHTTPMapper.merge(from: ["extra": obj], into: &xhttp)
             }
-            if let sc = attr(node, "scMinPostsIntervalMs") ?? attr(node, "sc_min_posts_interval_ms"),
-               let n = Int(sc)
-            {
-                xhttp["sc_min_posts_interval_ms"] = n
-            } else if let sc = attr(node, "scMinPostsIntervalMs") ?? attr(node, "sc_min_posts_interval_ms") {
-                xhttp["sc_min_posts_interval_ms"] = sc
+            let stringKeys = [
+                "x_padding_bytes", "sc_max_each_post_bytes", "sc_min_posts_interval_ms",
+                "sc_stream_up_server_secs", "session_placement", "session_key", "session_table",
+                "session_length", "seq_placement", "seq_key", "uplink_data_placement",
+                "uplink_data_key", "uplink_chunk_size", "uplink_http_method", "x_padding_key",
+                "x_padding_header", "x_padding_placement", "x_padding_method",
+            ]
+            for key in stringKeys {
+                if let value = attr(node, key), !value.isEmpty { xhttp[key] = value }
             }
-            if let sc = attr(node, "scMaxConcurrentPosts") ?? attr(node, "sc_max_concurrent_posts"),
-               let n = Int(sc)
-            {
+            if let n = attr(node, "sc_max_concurrent_posts").flatMap(Int.init) {
                 xhttp["sc_max_concurrent_posts"] = n
-            } else if let sc = attr(node, "scMaxConcurrentPosts") ?? attr(node, "sc_max_concurrent_posts") {
-                xhttp["sc_max_concurrent_posts"] = sc
             }
-            if let pad = attr(node, "x_padding_bytes") ?? attr(node, "xPaddingBytes") {
-                xhttp["x_padding_bytes"] = pad
+            if let n = attr(node, "sc_max_buffered_posts").flatMap(Int.init) {
+                xhttp["sc_max_buffered_posts"] = n
             }
+            if let n = attr(node, "server_max_header_bytes").flatMap(Int.init) {
+                xhttp["server_max_header_bytes"] = n
+            }
+            if attr(node, "x_padding_obfs_mode") == "1" { xhttp["x_padding_obfs_mode"] = true }
+            if attr(node, "no_sse_header") == "1" { xhttp["no_sse_header"] = true }
+            if attr(node, "no_grpc_header") == "1" { xhttp["no_grpc_header"] = true }
+            if let xmuxJSON = attr(node, "xmux_json"),
+               let data = xmuxJSON.data(using: .utf8),
+               let obj = try? JSONSerialization.jsonObject(with: data)
+            {
+                xhttp["xmux"] = obj
+            }
+            // Share-link `concurrency` (Durev / Xray URI) → xmux.max_concurrency when xmux absent.
+            if xhttp["xmux"] == nil,
+               let concurrency = attr(node, "concurrency").flatMap(Int.init),
+               concurrency > 0
+            {
+                xhttp["xmux"] = ["max_concurrency": concurrency]
+            }
+            xhttp.removeValue(forKey: "extra")
+            xhttp.removeValue(forKey: "_vpndirect_xhttp_unmapped")
             return xhttp
         case "kcp", "mkcp", "quic", "domainsocket", "ds":
             throw VPNDirectCoreError.unsupportedFeature(
@@ -366,6 +385,14 @@ public enum UniversalOutboundBuilder {
         }
         if let packet = attr(node, "packet_encoding") { outbound["packet_encoding"] = packet }
         applyMultiplexAndTLSFragment(from: node, into: &outbound)
+        let hasTLSOrReality = outbound["tls"] != nil
+        if VLESSPlaintextGuard.isInsecurePublicVLESS(
+            server: node.server,
+            hasTLSOrReality: hasTLSOrReality,
+            encryption: outbound["encryption"] as? String
+        ) {
+            throw VPNDirectCoreError.plaintextVLESS(tag: node.name)
+        }
         return outbound
     }
 

@@ -584,6 +584,8 @@ public enum VPNDirectCoreError: LocalizedError {
     case coreRejected(ecosystem: String?, protocolID: String?, detail: String)
     case unsupportedTransport(transport: String, detail: String)
     case unsupportedSecurity(security: String, detail: String)
+    /// Public VLESS without TLS/Reality and without VLESS encryption (INCY-style fail-closed).
+    case plaintextVLESS(tag: String)
 
     public var errorDescription: String? {
         switch self {
@@ -597,6 +599,8 @@ public enum VPNDirectCoreError: LocalizedError {
             return String(localized: "This server uses transport \(transport), which is not supported yet.")
         case let .unsupportedSecurity(security, _):
             return String(localized: "This server uses security \(security), which is not supported yet.")
+        case let .plaintextVLESS(tag):
+            return VLESSPlaintextGuard.userMessage(tag: tag)
         }
     }
 
@@ -616,6 +620,8 @@ public enum VPNDirectCoreError: LocalizedError {
             head = "unsupportedTransport(\(transport))"
         case let .unsupportedSecurity(security, _):
             head = "unsupportedSecurity(\(security))"
+        case let .plaintextVLESS(tag):
+            head = "plaintextVLESS(\(tag))"
         }
         if let field = failure.field, !field.isEmpty {
             return VPNDirectRedactor.redact("\(head) field=\(field): \(failure.detail)")
@@ -684,6 +690,15 @@ public enum VPNDirectCoreError: LocalizedError {
                 field: field ?? "security",
                 retryable: false,
                 detail: "\(security): \(detail)"
+            )
+        case let .plaintextVLESS(tag):
+            return VPNDirectImportFailure(
+                ecosystem: ecosystem,
+                format: format ?? "vless",
+                protocolID: protocolID ?? "vless",
+                field: field ?? "security",
+                retryable: false,
+                detail: VLESSPlaintextGuard.userMessage(tag: tag)
             )
         }
     }

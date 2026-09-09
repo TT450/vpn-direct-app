@@ -89,6 +89,7 @@ public final class VPNConnectionModel: ObservableObject {
     private static let favoritesKey = "vpndirect.favorite.servers"
     private static let recentKey = "vpndirect.recent.servers"
     private static let urltestMigratedKey = "vpndirect.config.urltest.migrated.v1"
+    private static let urltestToleranceMigratedKey = "vpndirect.config.urltest.tolerance.v50"
     private static let freeHoursKey = "vpndirect.access.free.hours"
     private static let freeTrafficKey = "vpndirect.access.free.traffic.mb"
     private static let freeExpiresAtKey = "vpndirect.access.free.expires_at"
@@ -334,7 +335,8 @@ public final class VPNConnectionModel: ObservableObject {
     public var usesAutoSelection: Bool { selectedServerID == nil }
 
     public var activeSubscription: VPNSubscriptionItem? {
-        subscriptions.first(where: { $0.id == activeSubscriptionID }) ?? subscriptions.first
+        guard activeSubscriptionID > 0 else { return nil }
+        return subscriptions.first(where: { $0.id == activeSubscriptionID })
     }
 
     public var activeServer: VPNServer? {
@@ -345,9 +347,16 @@ public final class VPNConnectionModel: ObservableObject {
             return selected
         }
         if let assignedServerID,
+           assignedServerID != "auto",
            let assigned = sub.servers.first(where: { $0.id == assignedServerID })
+               ?? sub.servers.first(where: { assignedServerID.hasPrefix($0.id) || $0.id.hasPrefix(assignedServerID) })
         {
             return assigned
+        }
+        // Auto mode: never fall back to list order (Germany-first) — prefer measured best ping.
+        if usesAutoSelection {
+            let ranked = sub.servers.filter { $0.ping > 0 }.sorted { $0.ping < $1.ping }
+            if let best = ranked.first { return best }
         }
         return sub.servers.first
     }
@@ -406,6 +415,7 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     /// Soft-remove: stop using an imported subscription on this device; profile stays in the list.
+    /// Clears the home selection — never auto-activates another imported subscription.
     public func removeImportedFromClient(subscriptionID: Int64? = nil) {
         let targetID = subscriptionID ?? activeSubscriptionID
         guard let item = subscriptions.first(where: { $0.id == targetID }),
@@ -414,23 +424,24 @@ public final class VPNConnectionModel: ObservableObject {
             select(tab: .subscriptions)
             return
         }
-        if activeSubscriptionID == targetID {
-            if let freeID = freeProfileID, isFreeAccessReady {
-                setActiveAccess(.free)
-                activate(subscriptionID: freeID)
-            } else if let premiumID = premiumProfileID, isPremiumAccessReady {
-                setActiveAccess(.premium)
-                activate(subscriptionID: premiumID)
-            } else if let other = subscriptions.first(where: {
-                $0.id != targetID && !DirectBuiltinProfile.isBuiltin($0.profile.remoteURL)
-            }) {
-                activate(subscriptionID: other.id)
-            } else if let freeID = freeProfileID {
-                setActiveAccess(.free)
-                activate(subscriptionID: freeID)
-            }
+        guard activeSubscriptionID == targetID else {
+            HapticManager.shared.play(.selection)
+            return
         }
-        HapticManager.shared.play(.selection)
+        Task {
+            if phase == .connecting || phase == .switching || isBusy {
+                await cancelPendingConnection(showError: false)
+            }
+            activeSubscriptionID = 0
+            selectedServerID = nil
+            assignedServerID = nil
+            setActiveAccess(.free)
+            await SharedPreferences.selectedProfileID.set(-1)
+            await SharedPreferences.preferredOutboundTag.set("")
+            await disableVPNAutoConnect()
+            environments?.selectedProfileUpdate.send()
+            HapticManager.shared.play(.selection)
+        }
     }
 
     public func refreshActiveSubscription() {
@@ -446,7 +457,11 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func openChangeServer() {
-        activeSheet = .serverPicker
+        // Defer so the tap can finish; mounting the picker on the same runloop
+        // felt like a dead button when the main thread was already busy.
+        Task { @MainActor in
+            activeSheet = .serverPicker
+        }
     }
 
     /// Fetches current egress IP. While VPN is up this is the VPN exit IP; otherwise the device WAN IP.
@@ -1111,6 +1126,7 @@ public final class VPNConnectionModel: ObservableObject {
                 if activeSubscriptionID == subscriptionID {
                     activeSubscriptionID = 0
                     selectedServerID = nil
+                    await SharedPreferences.selectedProfileID.set(-1)
                 }
                 try await ProfileManager.delete(profile)
                 if detailPage == .subscription(subscriptionID) {
@@ -1179,6 +1195,15 @@ public final class VPNConnectionModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 400_000_000)
             await refreshAssignedFromGroups()
             await mergeLivePings()
+        case "Пользовательский":
+            // Stick to the manually chosen outbound; never fall back to urltest `auto`.
+            let stickyID = selectedServerID
+                ?? assignedServerID.flatMap { id in servers.contains(where: { $0.id == id }) ? id : nil }
+            if let stickyID, let server = servers.first(where: { $0.id == stickyID }) {
+                try await commitServerPick(server, manualSelection: true)
+            } else if let first = servers.first {
+                try await commitServerPick(first, manualSelection: true)
+            }
         case "Максимальная скорость":
             try await pickAndApplyServer(
                 groupTag: groupTag,
@@ -1211,9 +1236,12 @@ public final class VPNConnectionModel: ObservableObject {
                 manualSelection: true,
                 preferFreshPings: true,
                 chooser: { [assignedServerID, selectedServerID] list in
-                    let sorted = list.filter { $0.ping > 0 }.sorted(by: { $0.ping < $1.ping })
+                    let pool = list.filter { VPNServerNameParser.matchesAntiBlockOrMobileProfile($0) }
+                    guard !pool.isEmpty else { return nil }
+                    let sorted = pool.filter { $0.ping > 0 }.sorted(by: { $0.ping < $1.ping })
+                    let ranked = sorted.isEmpty ? pool : sorted
                     let current = assignedServerID ?? selectedServerID
-                    return sorted.first(where: { $0.id != current }) ?? sorted.first ?? list.first
+                    return ranked.first(where: { $0.id != current }) ?? ranked.first
                 }
             )
         default:
@@ -1326,6 +1354,7 @@ public final class VPNConnectionModel: ObservableObject {
             try? await environments.ensureExtensionProfileReady()
             await applySecuritySettings()
             await migrateUrlTestBalancerIfNeeded()
+            await migrateUrlTestToleranceIfNeeded()
         }
         startTicker()
     }
@@ -1499,9 +1528,14 @@ public final class VPNConnectionModel: ObservableObject {
             }
             subscriptions = items
             let selected = await SharedPreferences.selectedProfileID.get()
-            if items.contains(where: { $0.id == selected }) {
+            if selected > 0, items.contains(where: { $0.id == selected }) {
                 activeSubscriptionID = selected
+            } else if selected <= 0 {
+                // Explicitly cleared («Убрать из клиента») — keep home empty even if
+                // other imported / builtin profiles remain in the list.
+                activeSubscriptionID = 0
             } else if let first = items.first {
+                // Stored id pointed at a deleted profile — recover to something valid.
                 activeSubscriptionID = first.id
                 await SharedPreferences.selectedProfileID.set(first.id)
             } else {
@@ -1513,6 +1547,8 @@ public final class VPNConnectionModel: ObservableObject {
                !DirectBuiltinProfile.isBuiltin(item.profile.remoteURL)
             {
                 setActiveAccess(.imported(item.id))
+            } else if activeSubscriptionID == 0 {
+                setActiveAccess(.free)
             }
             await mergeLivePings()
         } catch {
@@ -1543,6 +1579,32 @@ public final class VPNConnectionModel: ObservableObject {
             changed = true
         }
         UserDefaults.standard.set(true, forKey: Self.urltestMigratedKey)
+        if changed {
+            await reloadSubscriptions()
+        }
+    }
+
+    /// Rebuild remote graphs that still embed a sticky/flappy urltest tolerance.
+    private func migrateUrlTestToleranceIfNeeded() async {
+        if UserDefaults.standard.bool(forKey: Self.urltestToleranceMigratedKey) { return }
+        defer { UserDefaults.standard.set(true, forKey: Self.urltestToleranceMigratedKey) }
+        let profiles = (try? await ProfileManager.list()) ?? []
+        var changed = false
+        for profile in profiles where profile.type == .remote {
+            guard let remoteURL = profile.remoteURL, !remoteURL.isEmpty else { continue }
+            let json = (try? await profile.readAsync()) ?? ""
+            // Migrate away from the old sticky 80 and the brief flappy 20.
+            let needsRebuild =
+                json.contains("\"tolerance\" : 80")
+                || json.contains("\"tolerance\": 80")
+                || json.contains("\"tolerance\":80")
+                || json.contains("\"tolerance\" : 20")
+                || json.contains("\"tolerance\": 20")
+                || json.contains("\"tolerance\":20")
+            guard needsRebuild else { continue }
+            try? await profile.updateRemoteProfile()
+            changed = true
+        }
         if changed {
             await reloadSubscriptions()
         }
@@ -1617,11 +1679,19 @@ public final class VPNConnectionModel: ObservableObject {
             return
         }
         selectedServerID = serverID
+        // Manual pick leaves "Авто" mode → next connect/applyConnectionModeBehavior
+        // would wipe the selection and put urltest back. Mirror Happ/INCY: picking a
+        // server implies user mode; picking Auto restores auto mode.
+        let mode = serverID == nil ? "Авто" : "Пользовательский"
+        if connectionMode != mode {
+            connectionMode = mode
+        }
         rememberRecentServer(serverID)
         activeSheet = nil
         HapticManager.shared.play(.selection)
         Task {
             await SharedPreferences.preferredOutboundTag.set(serverID ?? "")
+            await SharedPreferences.connectionMode.set(mode)
             // Only switch live outbound when tunnel + command.sock are actually up.
             guard isConnected,
                   !isStarting,
@@ -1689,12 +1759,15 @@ public final class VPNConnectionModel: ObservableObject {
         guard isConnected, let groupTag = activeServer?.groupTag ?? activeSubscription?.servers.first?.groupTag else { return }
         Task {
             try? await LibboxNewStandaloneCommandClient()!.urlTest(groupTag)
+            try? await LibboxNewStandaloneCommandClient()!.urlTest("auto")
             try? await Task.sleep(nanoseconds: 500_000_000)
             await mergeLivePings()
         }
     }
 
-    /// Happ-style: when connected use Libbox urlTest; when offline probe node host:port (TCP RTT).
+    /// Happ-style list ping (https://www.happ.su/main/dev-docs/ping):
+    /// - VPN on → **via Proxy** (`urlTestOutbound` GET to gstatic generate_204 through each node)
+    /// - VPN off → **TCP** connect RTT to node host:port
     public func pingAllServers() {
         guard let subscription = activeSubscription, !subscription.servers.isEmpty else {
             alert = AlertState(errorMessage: String(localized: "Нет серверов для проверки."))
@@ -1707,53 +1780,59 @@ public final class VPNConnectionModel: ObservableObject {
         let profile = subscription.profile
         let groupTag = activeServer?.groupTag ?? servers.first?.groupTag
         let wasConnected = isConnected
+        let mode = ServerEndpointPing.preferredMode(isConnected: wasConnected)
 
         Task {
             defer {
                 Task { @MainActor in self.isPingingServers = false }
             }
 
-            if wasConnected, let groupTag {
-                try? await LibboxNewStandaloneCommandClient()!.urlTest(groupTag)
-                try? await LibboxNewStandaloneCommandClient()!.urlTest("auto")
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                await mergeLivePings()
-                let hasPing = await MainActor.run {
-                    self.activeSubscription?.servers.contains(where: { $0.ping > 0 }) ?? false
-                }
-                await MainActor.run {
-                    HapticManager.shared.play(hasPing ? .selection : .error)
-                    if !hasPing {
-                        self.alert = AlertState(errorMessage: String(localized: "Не удалось измерить задержку. Попробуйте ещё раз."))
+            let delays: [String: Int]
+            switch mode {
+            case .viaProxy:
+                // Per-node via Proxy (does not flip the live selector). More accurate than
+                // group urlTest history alone — same path Happ uses for list latency.
+                let measured = await ServerEndpointPing.measureViaProxyAll(tags: servers.map(\.id))
+                if measured.isEmpty, let groupTag {
+                    // Fallback: classic group urlTest + history merge.
+                    try? await LibboxNewStandaloneCommandClient()!.urlTest(groupTag)
+                    try? await LibboxNewStandaloneCommandClient()!.urlTest("auto")
+                    try? await Task.sleep(nanoseconds: 600_000_000)
+                    await mergeLivePings()
+                    let hasPing = await MainActor.run {
+                        self.activeSubscription?.servers.contains(where: { $0.ping > 0 }) ?? false
                     }
-                }
-                return
-            }
-
-            // Offline (Happ-style): TCP connect timing to each node endpoint from config.
-            let json: String
-            do {
-                json = try await profile.origin.readAsync()
-            } catch {
-                await MainActor.run {
-                    self.alert = AlertState(action: "read profile for ping", error: error)
-                }
-                return
-            }
-
-            let endpoints = ServerEndpointPing.index(fromJSON: json)
-            var delays: [String: Int] = [:]
-            await withTaskGroup(of: (String, Int?).self) { group in
-                for server in servers {
-                    guard let endpoint = endpoints[server.id] else { continue }
-                    group.addTask {
-                        let ms = await ServerEndpointPing.measure(host: endpoint.host, port: endpoint.port)
-                        return (server.id, ms)
+                    await MainActor.run {
+                        HapticManager.shared.play(hasPing ? .selection : .error)
+                        if !hasPing {
+                            self.alert = AlertState(errorMessage: String(localized: "Не удалось измерить задержку. Попробуйте ещё раз."))
+                        }
                     }
+                    return
                 }
-                for await (id, ms) in group {
-                    if let ms { delays[id] = ms }
+                // Refresh Auto/group history for balancer, then keep per-node via-Proxy as source of truth for the list.
+                if let groupTag {
+                    try? await LibboxNewStandaloneCommandClient()!.urlTest(groupTag)
+                    try? await LibboxNewStandaloneCommandClient()!.urlTest("auto")
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    await mergeLivePings()
                 }
+                delays = measured
+            case .tcp:
+                let json: String
+                do {
+                    json = try await profile.origin.readAsync()
+                } catch {
+                    await MainActor.run {
+                        self.alert = AlertState(action: "read profile for ping", error: error)
+                    }
+                    return
+                }
+                let endpoints = ServerEndpointPing.index(fromJSON: json)
+                delays = await ServerEndpointPing.measureTCPAll(
+                    endpoints: endpoints,
+                    serverIDs: servers.map(\.id)
+                )
             }
 
             await MainActor.run {
@@ -1780,7 +1859,8 @@ public final class VPNConnectionModel: ObservableObject {
                     countryCode: server.countryCode,
                     ping: ping,
                     load: load,
-                    groupTag: server.groupTag
+                    groupTag: server.groupTag,
+                    locationLabel: server.locationLabel
                 )
             }
             return VPNSubscriptionItem(
@@ -1796,6 +1876,9 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func updateFromGroups() {
+        // Large subscriptions (Durev ~30 leaves) + open picker: group pushes must not
+        // rebuild the entire server list on every Libbox tick.
+        if activeSheet == .serverPicker { return }
         Task {
             await refreshAssignedFromGroups()
             await mergeLivePings()
@@ -1806,6 +1889,11 @@ public final class VPNConnectionModel: ObservableObject {
         guard let environments else { return }
         guard !environments.emptyProfiles else {
             alert = AlertState(errorMessage: String(localized: "Добавьте подписку, чтобы подключить VPN."))
+            selectedTab = .subscriptions
+            return
+        }
+        guard activeSubscriptionID > 0 else {
+            alert = AlertState(errorMessage: String(localized: "Выберите подписку на вкладке «Подписки»."))
             selectedTab = .subscriptions
             return
         }
@@ -2047,32 +2135,77 @@ public final class VPNConnectionModel: ObservableObject {
 
     private func refreshAssignedFromGroups() async {
         guard let groups = environments?.commandClient.groups else { return }
+        if let pick = resolveAutoOutboundPick(from: groups) {
+            assignedServerID = pick
+            return
+        }
         let selectable = groups.filter { $0.selectable }
         guard let group = selectable.first(where: { $0.type == "selector" }) ?? selectable.first else { return }
-        if !group.selected.isEmpty {
+        if group.selected == "auto", let pick = resolveAutoOutboundPick(from: groups) {
+            assignedServerID = pick
+        } else if !group.selected.isEmpty, group.selected != "auto" {
             assignedServerID = group.selected
         }
+    }
+
+    /// Prefer the live pick inside urltest `auto`, not the parent selector's `"auto"` token
+    /// (that previously made UI fall back to the first country — usually Germany).
+    private func resolveAutoOutboundPick(from groups: [LibboxOutboundGroup]) -> String? {
+        guard let auto = groups.first(where: { $0.tag == "auto" }) else { return nil }
+        let selected = auto.selected.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !selected.isEmpty, selected != "auto" {
+            return selected
+        }
+        // Fallback: lowest measured delay among auto members.
+        guard let iterator = auto.getItems() else { return nil }
+        var bestTag: String?
+        var bestDelay = Int.max
+        while iterator.hasNext() {
+            guard let item = iterator.next() else { continue }
+            let delay = Int(item.urlTestDelay)
+            if delay > 0, delay < bestDelay {
+                bestDelay = delay
+                bestTag = item.tag
+            }
+        }
+        return bestTag
     }
 
     private func mergeLivePings() async {
         guard let groups = environments?.commandClient.groups else { return }
         let selectable = groups.filter { $0.selectable }
-        guard let group = selectable.first(where: { $0.type == "selector" }) ?? selectable.first,
-              let iterator = group.getItems()
-        else { return }
+        guard let group = selectable.first(where: { $0.type == "selector" }) ?? selectable.first else { return }
 
         var delays: [String: Int] = [:]
-        while iterator.hasNext() {
-            guard let item = iterator.next() else { continue }
-            let delay = Int(item.urlTestDelay)
-            if delay > 0 { delays[item.tag] = delay }
+        if let iterator = group.getItems() {
+            while iterator.hasNext() {
+                guard let item = iterator.next() else { continue }
+                let delay = Int(item.urlTestDelay)
+                if delay > 0 { delays[item.tag] = delay }
+            }
         }
-        guard !delays.isEmpty else { return }
+        // urltest `auto` holds the real per-country delays used for selection.
+        if let auto = groups.first(where: { $0.tag == "auto" }), let iterator = auto.getItems() {
+            while iterator.hasNext() {
+                guard let item = iterator.next() else { continue }
+                let delay = Int(item.urlTestDelay)
+                if delay > 0 { delays[item.tag] = delay }
+            }
+        }
+        guard !delays.isEmpty else {
+            if let pick = resolveAutoOutboundPick(from: groups) {
+                assignedServerID = pick
+            }
+            return
+        }
 
         subscriptions = subscriptions.map { sub in
-            let servers = sub.servers.map { server in
+            var changed = false
+            let servers = sub.servers.map { server -> VPNServer in
                 guard let ping = delays[server.id] else { return server }
                 let load = min(95, max(18, ping / 2 + (abs(server.id.hashValue) % 40)))
+                if server.ping == ping, server.load == load { return server }
+                changed = true
                 return VPNServer(
                     id: server.id,
                     city: server.city,
@@ -2080,9 +2213,11 @@ public final class VPNConnectionModel: ObservableObject {
                     countryCode: server.countryCode,
                     ping: ping,
                     load: load,
-                    groupTag: server.groupTag
+                    groupTag: server.groupTag,
+                    locationLabel: server.locationLabel
                 )
             }
+            guard changed else { return sub }
             return VPNSubscriptionItem(
                 profile: sub.profile,
                 servers: servers,
@@ -2093,9 +2228,32 @@ public final class VPNConnectionModel: ObservableObject {
                 displayName: sub.name
             )
         }
-        if !group.selected.isEmpty {
+        if let pick = resolveAutoOutboundPick(from: groups) {
+            assignedServerID = pick
+        } else if !group.selected.isEmpty, group.selected != "auto" {
             assignedServerID = group.selected
         }
+
+        // If Auto is on and a measured node is clearly faster than the sticky pick, nudge urltest.
+        await nudgeAutoIfStale(delays: delays)
+    }
+
+    private func nudgeAutoIfStale(delays: [String: Int]) async {
+        guard usesAutoSelection, isConnected, !delays.isEmpty else { return }
+        let ranked = delays.filter { $0.value > 0 }.sorted { $0.value < $1.value }
+        guard let best = ranked.first else { return }
+        let currentID = assignedServerID
+        let currentDelay = currentID.flatMap { id in
+            delays[id] ?? delays.first(where: { $0.key.hasPrefix(id) || id.hasPrefix($0.key) })?.value
+        } ?? Int.max
+        // Client-side Auto nudge: only move when clearly better (≈100ms+ cases),
+        // not on normal 10–40ms jitter between FR/NL/DE.
+        let switchMargin = 80
+        guard best.value + switchMargin < currentDelay else { return }
+        let groupTag = activeSubscription?.servers.first?.groupTag ?? "proxy"
+        try? await LibboxNewStandaloneCommandClient()!.urlTest("auto")
+        try? await LibboxNewStandaloneCommandClient()!.selectOutbound(groupTag, outboundTag: best.key)
+        assignedServerID = best.key
     }
 
     private func ensureAutoConnectSettings() async {
@@ -2119,10 +2277,15 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     private func updateRuntime() {
+        // Publishing every second while the server picker is open rebuilds ~30 rows
+        // and makes the sheet feel stuck / untappable.
+        if activeSheet == .serverPicker { return }
         guard isProtected,
               let connectedDate = environments?.extensionProfile?.connectedDate
         else {
-            runtimeText = "00:00:00"
+            if runtimeText != "00:00:00" {
+                runtimeText = "00:00:00"
+            }
             lastPeriodicURLTestAt = nil
             return
         }
@@ -2130,12 +2293,18 @@ public final class VPNConnectionModel: ObservableObject {
         let hours = Int(interval) / 3600
         let minutes = Int(interval) / 60 % 60
         let seconds = Int(interval) % 60
-        runtimeText = String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+        let next = String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+        if runtimeText != next {
+            runtimeText = next
+        }
     }
 
     /// Same Libbox urlTest path as the Ping button — every 12 seconds while connected.
+    /// Skip while the server picker sheet is open so a large subscription (30+ nodes)
+    /// does not thrash the sheet with group updates + full list rebuilds.
     private func maybePeriodicURLTest() {
         guard isProtected, !isPingingServers else { return }
+        if activeSheet == .serverPicker { return }
         let now = Date()
         if let last = lastPeriodicURLTestAt, now.timeIntervalSince(last) < 12 { return }
         lastPeriodicURLTestAt = now
@@ -2143,8 +2312,10 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     private func updateTraffic() {
+        if activeSheet == .serverPicker { return }
         let persisted = DailyTrafficStore.storedBytesForToday()
 
+        let next: String
         if isProtected, let status = environments?.commandClient.status {
             let sessionTotal = status.uplinkTotal &+ status.downlinkTotal
             lastSessionTrafficTotal = sessionTotal
@@ -2152,14 +2323,14 @@ public final class VPNConnectionModel: ObservableObject {
                 sessionTrafficBaseline = sessionTotal
             }
             let delta = max(0, sessionTotal - sessionTrafficBaseline)
-            trafficText = Self.formatBytes(persisted &+ delta)
-            return
-        }
-
-        if persisted > 0 {
-            trafficText = Self.formatBytes(persisted)
+            next = Self.formatBytes(persisted &+ delta)
+        } else if persisted > 0 {
+            next = Self.formatBytes(persisted)
         } else {
-            trafficText = "—"
+            next = "—"
+        }
+        if trafficText != next {
+            trafficText = next
         }
     }
 
