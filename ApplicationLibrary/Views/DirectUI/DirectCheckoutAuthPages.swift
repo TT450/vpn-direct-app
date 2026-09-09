@@ -281,98 +281,6 @@ struct DirectAuthSuccessView: View {
     }
 }
 
-// MARK: - Auth actions (model)
-
-extension VPNConnectionModel {
-    private static let appleAuthCoordinator = AppleSignInCoordinator()
-
-    func sendEmailCodeForAuth(email: String) async {
-        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.contains("@") else {
-            checkoutAuthError = "Введите корректный email"
-            return
-        }
-        checkoutAuthBusy = true
-        checkoutAuthError = nil
-        defer { checkoutAuthBusy = false }
-        do {
-            try await DirectBackendAPI.shared.registerDevice()
-            try await DirectBackendAPI.shared.sendEmailCode(email: trimmed)
-            checkoutAuthEmail = trimmed
-            checkoutAuthCode = ""
-            HapticManager.shared.play(.selection)
-            openDetail(.authCode)
-        } catch {
-            checkoutAuthError = error.localizedDescription
-        }
-    }
-
-    func resendEmailCodeForAuth() async {
-        guard !checkoutAuthEmail.isEmpty else {
-            openDetail(.authEmail)
-            return
-        }
-        await sendEmailCodeForAuth(email: checkoutAuthEmail)
-    }
-
-    func verifyEmailCodeForAuth() async {
-        checkoutAuthBusy = true
-        checkoutAuthError = nil
-        defer { checkoutAuthBusy = false }
-        do {
-            let me = try await DirectBackendAPI.shared.verifyEmailCode(
-                email: checkoutAuthEmail,
-                code: checkoutAuthCode.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-            await applyDirectAuth(me: me)
-            finishAuthFlowLocally()
-        } catch {
-            checkoutAuthError = error.localizedDescription
-        }
-    }
-
-    func linkBotCodeForAuth() async {
-        checkoutAuthBusy = true
-        checkoutAuthError = nil
-        defer { checkoutAuthBusy = false }
-        do {
-            try await DirectBackendAPI.shared.registerDevice()
-            let me = try await DirectBackendAPI.shared.linkBotCode(
-                checkoutAuthBotCode.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-            await applyDirectAuth(me: me)
-            finishAuthFlowLocally()
-        } catch {
-            checkoutAuthError = error.localizedDescription
-        }
-    }
-
-    func signInWithAppleForAuth() async {
-        checkoutAuthBusy = true
-        checkoutAuthError = nil
-        defer { checkoutAuthBusy = false }
-        do {
-            try await DirectBackendAPI.shared.registerDevice()
-            let result = try await Self.appleAuthCoordinator.signIn()
-            let me = try await DirectBackendAPI.shared.authApple(
-                identityToken: result.identityToken,
-                email: result.email,
-                appleUserId: result.userId
-            )
-            await applyDirectAuth(me: me)
-            finishAuthFlowLocally()
-        } catch {
-            checkoutAuthError = error.localizedDescription
-        }
-    }
-
-    private func finishAuthFlowLocally() {
-        UserDefaults.standard.set(true, forKey: "vpndirect.authenticated")
-        HapticManager.shared.play(.selection)
-        openDetail(.authSuccess)
-    }
-}
-
 // MARK: - Shared auth chrome
 
 private struct DirectAuthPageShell<Content: View>: View {
@@ -686,7 +594,11 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
               let tokenData = credential.identityToken,
               let token = String(data: tokenData, encoding: .utf8)
         else {
-            continuation?.resume(throwing: DirectBackendError.message("Apple не вернул токен"))
+            continuation?.resume(throwing: NSError(
+                domain: "DirectAuth",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Apple не вернул токен"]
+            ))
             continuation = nil
             return
         }

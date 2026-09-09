@@ -8,8 +8,8 @@ All notable changes to VPN Direct (Apple client) are documented here.
 
 - Tabs: Главная · Локации · Управление · Профиль; ad free-flow removed
 - Plans / constructor / pricing engine; sales path through payment method (guest OK)
-- Locations catalog (seed + cache/ETag); Direct-only servers via `bot.vpn-direct.com`
-- `DirectBackend` ownership: never Remnawave from client; imports stay separate
+- Locations catalog (seed + cache/ETag); Direct-only servers in the product catalog
+- Direct ownership rules: imports stay separate from Direct catalog
 - Management page wired to Direct entitlement; AppBar back chrome + page top inset
 
 ## [1.0.11.81] — 2026-09-09

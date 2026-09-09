@@ -126,6 +126,7 @@ public final class VPNConnectionModel: ObservableObject {
     public static let unlimitedTrafficGB = 100_000
 
     public init() {
+        DirectBackendRuntime.warmUp()
         if let stored = UserDefaults.standard.array(forKey: Self.favoritesKey) as? [String] {
             favoriteServerIDs = Set(stored)
         }
@@ -299,7 +300,7 @@ public final class VPNConnectionModel: ObservableObject {
         subscriptions.first(where: { DirectBuiltinProfile.kind(for: $0.profile.remoteURL) == .premium })
     }
 
-    /// Live Direct outbounds only (builtin + `bot.vpn-direct.com`). Never Remnawave panel, never third-party imports.
+    /// Live Direct outbounds only (builtin + Direct-owned hosts). Never third-party imports.
     public var liveDirectServers: [VPNServer] {
         let directItems = subscriptions.filter { DirectBuiltinProfile.isDirectOwned($0.profile.remoteURL) }
         // Prefer premium builtin, then free builtin, then any Direct-owned remote with nodes.
@@ -867,8 +868,8 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public var isDirectAuthenticated: Bool {
-        DirectBackendAPI.shared.isAuthenticated
-            || UserDefaults.standard.bool(forKey: "vpndirect.authenticated")
+        DirectBackendRuntime.warmUp()
+        return DirectBackendRuntime.isAuthenticated()
     }
 
     public func savePendingCheckout() {
@@ -911,29 +912,14 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func startAuthenticatedCheckout() async {
-        openDetail(.paymentProcessing)
-        paymentActivationPending = true
-        do {
-            try await DirectBackendAPI.shared.registerDevice()
-            let created = try await DirectBackendAPI.shared.createCheckout(
-                title: checkoutTitle,
-                price: checkoutPrice,
-                periodDays: selectedPlan.days,
-                paymentMethod: paymentMethod,
-                planName: selectedPlan.name
-            )
-            lastPaymentId = created.paymentId
-            if paymentMethod == .external, let raw = created.payUrl, let url = URL(string: raw) {
-                openDetail(.externalPay(url))
-                return
-            }
-            // Apple / demo: client reports success → backend grants subscription URL.
-            await finalizeCheckoutSuccess(paymentId: created.paymentId ?? UUID().uuidString)
-        } catch {
-            paymentErrorMessage = error.localizedDescription
-            openDetail(.paymentError)
-            HapticManager.shared.play(.error)
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.startCheckout {
+            await run(self)
+            return
         }
+        paymentErrorMessage = "Сервис оплаты недоступен"
+        openDetail(.paymentError)
+        HapticManager.shared.play(.error)
     }
 
     public func cancelExternalCheckout() {
@@ -945,56 +931,22 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func finalizeCheckoutSuccess(paymentId: String) async {
-        openDetail(.paymentProcessing)
-        paymentActivationPending = true
-        do {
-            let pending = PendingCheckout.current
-            let verified = try await DirectBackendAPI.shared.verifyCheckout(
-                paymentId: paymentId,
-                periodDays: pending?.periodDays ?? selectedPlan.days,
-                trafficGB: pending?.trafficGB ?? selectedPlan.trafficGB,
-                devices: pending?.devices ?? selectedPlan.devices,
-                title: pending?.title ?? checkoutTitle
-            )
-            if let url = verified.subscriptionUrl {
-                directSubscriptionURL = url
-                await attachDirectSubscription(url: url)
-            }
-            applyLocalPremiumFromCheckout(pending: pending)
-            if let me = verified.me {
-                await applyDirectAuth(me: me)
-            }
-            lastSuccessTitle = pending?.title ?? checkoutTitle
-            lastSuccessPrice = pending?.price ?? checkoutPrice
-            lastSuccessPeriodDays = pending?.periodDays ?? selectedPlan.days
-            paymentActivationPending = false
-            clearPendingCheckout()
-            openDetail(.paymentSuccess)
-            HapticManager.shared.play(.purchaseCompleted)
-        } catch {
-            paymentErrorMessage = error.localizedDescription
-            openDetail(.paymentError)
-            HapticManager.shared.play(.error)
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.finalizeCheckout {
+            await run(self, paymentId)
+            return
         }
-    }
-
-    public func applyDirectAuth(me: DirectBackendAPI.Me) async {
-        UserDefaults.standard.set(true, forKey: "vpndirect.authenticated")
-        directAccountEmail = me.email
-        if let url = me.subscriptionUrl, !(url.isEmpty) {
-            directSubscriptionURL = url
-            await attachDirectSubscription(url: url)
-            if me.hasSubscription == true {
-                hasPremiumEntitlement = true
-                persistPremiumState()
-                setActiveAccess(.premium)
-            }
-        }
-        objectWillChange.send()
+        paymentErrorMessage = "Сервис оплаты недоступен"
+        openDetail(.paymentError)
+        HapticManager.shared.play(.error)
     }
 
     public func logoutDirectAccount() async {
-        await DirectBackendAPI.shared.logout()
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.logout {
+            await run(self)
+            return
+        }
         directAccountEmail = nil
         directSubscriptionURL = nil
         UserDefaults.standard.set(false, forKey: "vpndirect.authenticated")
@@ -1002,13 +954,55 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func refreshDirectAccount() async {
-        guard DirectBackendAPI.shared.isAuthenticated else { return }
-        do {
-            let me = try await DirectBackendAPI.shared.fetchMe()
-            await applyDirectAuth(me: me)
-        } catch {
-            // Session may have expired — keep local flag until user re-auths at pay.
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.refreshAccount {
+            await run(self)
         }
+    }
+
+    func sendEmailCodeForAuth(email: String) async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.sendEmailCode {
+            await run(self, email)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+    }
+
+    func resendEmailCodeForAuth() async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.resendEmailCode {
+            await run(self)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+    }
+
+    func verifyEmailCodeForAuth() async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.verifyEmailCode {
+            await run(self)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+    }
+
+    func linkBotCodeForAuth() async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.linkBotCode {
+            await run(self)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+    }
+
+    func signInWithAppleForAuth() async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.signInWithApple {
+            await run(self)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
     }
 
     public func attachDirectSubscription(url: String) async {
@@ -1699,10 +1693,9 @@ public final class VPNConnectionModel: ObservableObject {
                 await SharedPreferences.connectionMode.set(connectionMode)
             }
             await reloadSubscriptions()
-            try? await DirectBackendAPI.shared.registerDevice()
-            await refreshDirectAccount()
-            Task { @MainActor in
-                await DirectLocationsCatalog.shared.refreshFromBackendIfNeeded()
+            DirectBackendRuntime.warmUp()
+            if let run = DirectBackendRuntime.bootstrapSession {
+                await run(self)
             }
             try? await environments.ensureExtensionProfileReady()
             await applySecuritySettings()

@@ -53,24 +53,26 @@ private struct DirectLocationsPayload: Codable {
     let locations: [DirectLocationRecord]
 }
 
-/// Direct locations catalog — **only** via `bot.vpn-direct.com` stack (or a static
-/// JSON that ops publish from that backend). Never calls Remnawave; never mixes
-/// third-party imported subscription nodes.
+/// Direct locations catalog — Direct product servers only (seed / cache / optional CDN).
+/// Never mixes third-party imported subscription nodes.
 ///
 /// Sources (priority):
 /// 1. Disk cache (last good fetch / ingest)
-/// 2. Remote JSON from Direct backend / CDN (ETag + long TTL)
-/// 3. Bundled seed (offline / first launch)
-///
-/// Entitled clients that refresh their **Direct** subscription JSON (xuiweb `/sub`)
-/// also ingest into this catalog — no extra Remnawave/panel traffic from the app.
+/// 2. Local Direct API binding (if installed)
+/// 3. Remote JSON CDN URL if configured
+/// 4. Bundled seed (offline / first launch)
 @MainActor
 public final class DirectLocationsCatalog: ObservableObject {
     public static let shared = DirectLocationsCatalog()
 
-    /// Ops: public locations JSON on the Direct backend (no secrets). Empty = disabled.
-    /// Intended origin: `https://bot.vpn-direct.com/…` (xuiweb), not remna.
+    /// Ops: optional public locations JSON URL (no secrets). Empty = disabled.
     public static var remoteCatalogURLString: String = ""
+
+    /// Injected by local backend hooks. Default returns empty.
+    public static var fetchLocationsHandler: () async throws -> [DirectLocationRecord] = {
+        DirectBackendRuntime.warmUp()
+        return try await DirectBackendRuntime.fetchLocations()
+    }
 
     /// Minimum interval between CDN fetches (also respects ETag 304).
     public static let remoteTTL: TimeInterval = 12 * 60 * 60
@@ -132,7 +134,7 @@ public final class DirectLocationsCatalog: ObservableObject {
         replace(with: servers)
     }
 
-    /// Refresh from Direct backend `/api/v1/locations` (bot.vpn-direct.com).
+    /// Refresh from Direct product API when local bindings are installed.
     public func refreshFromBackendIfNeeded(force: Bool = false) async {
         if !force, let fetched = UserDefaults.standard.object(forKey: fetchedAtKey) as? Date,
            Date().timeIntervalSince(fetched) < Self.remoteTTL
@@ -143,7 +145,7 @@ public final class DirectLocationsCatalog: ObservableObject {
         isRefreshing = true
         defer { isRefreshing = false }
         do {
-            let remote = try await DirectBackendAPI.shared.fetchLocations()
+            let remote = try await Self.fetchLocationsHandler()
             guard !remote.isEmpty else {
                 await refreshFromRemoteIfNeeded(force: force)
                 return
@@ -214,7 +216,6 @@ public final class DirectLocationsCatalog: ObservableObject {
     }
 
     /// Offline seed — Direct-shaped metadata only (not third-party imports).
-    /// Replace via publish from bot.vpn-direct.com (xuiweb), never Remnawave panel.
     public static let seed: [DirectLocationRecord] = [
         .init(id: "de-frankfurt", countryCode: "DE", country: "Germany", city: "Frankfurt", region: "EUROPE"),
         .init(id: "nl-amsterdam", countryCode: "NL", country: "Netherlands", city: "Amsterdam", region: "EUROPE"),

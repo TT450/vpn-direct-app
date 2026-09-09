@@ -35,7 +35,7 @@ struct DirectProfilePage: View {
                             .font(.system(size: 19, weight: .semibold))
                             .lineLimit(1)
                         Text(model.isDirectAuthenticated
-                             ? "Синхронизация с \(DirectBackend.host)"
+                             ? "Сессия синхронизирована"
                              : "Оплата и привязка бота")
                             .font(.system(size: 10))
                             .foregroundStyle(.white.opacity(0.5))

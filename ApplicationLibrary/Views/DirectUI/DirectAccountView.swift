@@ -15,7 +15,7 @@ struct DirectAccountView: View {
                     kicker: "VPN DIRECT / АККАУНТ",
                     title: model.isDirectAuthenticated ? "Аккаунт" : "Вход",
                     subtitle: model.isDirectAuthenticated
-                        ? "Управление Direct-сессией на \(DirectBackend.host)"
+                        ? "Управление Direct-сессией"
                         : "Нужен только для оплаты и синхронизации с ботом"
                 )
                 .padding(.top, DS.pageTop)
@@ -46,7 +46,7 @@ struct DirectAccountView: View {
                             message = "Обновлено"
                         }
                     } label: {
-                        row("Обновить с бека", "GET /api/v1/me")
+                        row("Обновить аккаунт", "Синхронизация подписки")
                     }
 
                     Button {
@@ -70,7 +70,7 @@ struct DirectAccountView: View {
                             busy = false
                         }
                     } label: {
-                        row("Выйти", "Сбросить session token")
+                        row("Выйти", "Завершить сессию")
                     }
                 } else {
                     Text(

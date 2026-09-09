@@ -10,25 +10,26 @@ alwaysApply: true
 Never add to git, never `git commit`, never `git push` anything that exposes Direct backend ops or the private API client:
 
 - The entire folder `VPNDirectPatch/` (installer, patches, `payloads/mobile_api.py`, docs)
-- TZ / SoW / runbooks under `VPNDirectPatch/docs/` (including `LOCATION_TRAFFIC_CAPS_TZ_SOW.md`)
-- **`ApplicationLibrary/Views/DirectUI/DirectBackendAPI.swift`** and any other Direct backend HTTP client / endpoint catalog
-- Server copies under `/root/bot/`, nginx secrets, admin secret paths, SSH keys, DB dumps
-- Backend hostnames/IPs, Remnawave admin URLs, webhook secrets, payment keys, when writing **committed** project docs
-- Any new local folders meant for backend-only ops (`_private_vpndirect/`, `private_backend/`, etc.)
+- TZ / SoW / runbooks under `VPNDirectPatch/docs/`
+- **`DirectBackendAPI.swift`**, **`DirectBackendHooks.swift`**, and any other Direct backend HTTP client / endpoint catalog / host installers
+- Backend hostnames, IPs, admin secret paths, Remnawave admin URLs, webhook secrets, payment keys in **committed** code or docs
+- Server copies under `/root/bot/`, nginx secrets, SSH keys, DB dumps
+- Private ops folders (`_private_vpndirect/`, `private_backend/`, etc.)
 
 These paths are listed in `.gitignore`. If `git status` still shows them, stop and fix ignore — do not force-add (`git add -f`).
 
 ## Allowed on GitHub
 
-- iOS/macOS app UI and product code under `ApplicationLibrary/`, `Library/`, etc. **without** the Direct backend API client file
-- Public product docs that do **not** describe server layout, patch internals, API routes, or credentials
+- iOS/macOS app UI under `ApplicationLibrary/` **without** private API/hooks/host files
+- Public facade only: `DirectBackendRuntime.swift` (empty defaults, no real hosts/routes)
+- Product docs that do **not** describe server layout, hosts, API routes, or credentials
 
 ## If the user asks to commit/push
 
-1. Exclude `VPNDirectPatch/`, `DirectBackendAPI.swift`, and any backend-private files from the commit.
-2. Warn explicitly if the requested commit would include backend patch/API/TZ material.
-3. Never suggest uploading `payloads/mobile_api.py`, `DirectBackendAPI.swift`, or server SSH details to GitHub Releases/Gists.
+1. Exclude `VPNDirectPatch/`, `DirectBackendAPI.swift`, `DirectBackendHooks.swift`, and any backend-private files.
+2. Warn if the commit would include hosts, API routes, admin paths, or patch/TZ material.
+3. Never suggest uploading `payloads/mobile_api.py` or server SSH details to GitHub.
 
 ## When working on backend / Direct API
 
-Keep API client and server patch changes local (and/or on the server). Sync backend with scp/rsync/SSH — not via the public git remote.
+Keep API client, hooks, and server patches local (and/or on the server). Sync backend with scp/rsync/SSH — not via the public git remote.

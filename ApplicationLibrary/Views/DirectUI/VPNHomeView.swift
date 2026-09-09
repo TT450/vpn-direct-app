@@ -98,7 +98,7 @@ public struct VPNHomeView: View {
                             case .paymentProcessing:
                                 DirectPaymentProcessingView(
                                     title: "Оплата",
-                                    subtitle: "Связываемся с \(DirectBackend.host)…"
+                                    subtitle: "Подтверждаем оплату…"
                                 )
                             case .paymentCancelled:
                                 DirectPaymentCancelledView(
