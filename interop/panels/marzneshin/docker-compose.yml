@@ -1,0 +1,12 @@
+# Prefer official script.sh install + marznode. Stub compose:
+services:
+  marzneshin:
+    image: marzneshin/marzneshin:latest
+    profiles: ["lab"]
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - marzneshin_data:/var/lib/marzneshin
+volumes:
+  marzneshin_data:

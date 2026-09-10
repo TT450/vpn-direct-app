@@ -1,0 +1,43 @@
+---
+description: Never commit or push anything related to Direct backend, private API, hosts, or ops
+alwaysApply: true
+---
+
+# Backend — never GitHub
+
+Hard ban. Applies to every commit, PR, gist, release, and `git push`. History rewrite / force-push is allowed only when the user explicitly asks to erase leaked backend material.
+
+## Never add, stage, commit, or push
+
+Anything that is **backend, private API, ops, or server-side**:
+
+- Entire trees: `VPNDirectPatch/`, `_private_vpndirect/`, `private_backend/`, `ops/backend/`
+- HTTP clients, endpoint catalogs, host installers: `DirectBackendAPI.swift`, `DirectBackendHooks.swift`, `DirectBackendConfig.swift`, `DirectBackend*.local.swift`
+- Payloads / patches: `mobile_api.py`, nginx/admin patch modules, TZ/SoW/runbooks
+- **Any** backend hostname, IP, port map, admin secret path, Remnawave/panel URL, webhook secret, payment key, SSH key, DB dump
+- **Any** `/api/v1/…` Direct product routes, checkout/auth/device/me/locations wiring that talks to the private API
+- Comments, CHANGELOG, WHATS_NEW, Cursor rules, GitHub docs that name those hosts/routes/secrets
+- Server paths (`/root/bot/`, nginx secrets)
+
+`.gitignore` lists the local files. If `git status` still shows them, **stop and fix ignore**. Never `git add -f`.
+
+If a public UI file currently contains hosts, IPs, API routes, or admin paths: **move that into a gitignored local file** (or strip it). Do not leave it tracked “temporarily”.
+
+## Allowed on GitHub
+
+- App UI/product code with **no** private API client, **no** real hosts/IPs/routes/secrets
+- Public facade only: `DirectBackendRuntime.swift` (empty defaults, no real hosts, no route strings)
+- Weak install stub with no backend details
+- Product docs that do not describe server layout, API, or credentials
+
+A public clone may not compile Direct checkout. That is intended. Do not “fix” that by committing the private client.
+
+## If the user asks to commit/push
+
+1. Exclude every backend-private path above.
+2. Scan the staged diff for hosts, IPs, admin paths, `/api/v1`, panel names, patch/TZ material. If any hit — refuse and unstage.
+3. Never upload `mobile_api.py`, API clients, or server SSH details.
+
+## When working on backend
+
+Keep API client, hooks, hosts, and patches **local and/or on the server**. Sync with scp/rsync/SSH — never the public git remote.

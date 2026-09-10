@@ -1,0 +1,391 @@
+import Foundation
+import Libbox
+import NetworkExtension
+import os
+#if os(iOS)
+    import FileProvider
+#endif
+
+private let logger = Logger(category: "ExtensionProfile")
+
+@MainActor
+public class ExtensionProfile: ObservableObject {
+    public static let controlKind = AppConfiguration.widgetControlKind
+
+    private let manager: NEVPNManager?
+    private var connection: NEVPNConnection?
+    private var observer: Any?
+    private let isMock: Bool
+
+    @Published public var status: NEVPNStatus
+    @Published public var connectedDate: Date?
+
+    public init(_ manager: NEVPNManager) {
+        self.manager = manager
+        connection = manager.connection
+        status = manager.connection.status
+        connectedDate = manager.connection.connectedDate
+        isMock = false
+    }
+
+    private init(mockStatus: NEVPNStatus, mockConnectedDate: Date?) {
+        manager = nil
+        connection = nil
+        status = mockStatus
+        connectedDate = mockConnectedDate
+        isMock = true
+    }
+
+    private static var _mock: ExtensionProfile?
+
+    public static var mock: ExtensionProfile {
+        if _mock == nil {
+            _mock = ExtensionProfile(mockStatus: .connected, mockConnectedDate: Date().addingTimeInterval(-3600))
+        }
+        return _mock!
+    }
+
+    public func register() {
+        guard !isMock, let manager else { return }
+        if let observer {
+            NotificationCenter.default.removeObserver(observer)
+            self.observer = nil
+        }
+        // Observe ALL VPN status changes — after saveToPreferences() the connection
+        // object can be replaced, so filtering by a stale NEVPNConnection misses `.connected`.
+        observer = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.NEVPNStatusDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.refreshStatus()
+            }
+        }
+        refreshStatus()
+    }
+
+    /// Pull the live system VPN status into `@Published` fields.
+    public func refreshStatus() {
+        guard !isMock, let manager else { return }
+        connection = manager.connection
+        let live = manager.connection.status
+        let date = manager.connection.connectedDate
+        if status != live {
+            status = live
+        }
+        if connectedDate != date {
+            connectedDate = date
+        }
+        #if os(iOS)
+            if #available(iOS 16.0, *) {
+                if live == .connected || live == .disconnected {
+                    Self.signalFileProviderChanges()
+                }
+            }
+        #endif
+    }
+
+    #if os(iOS)
+        @available(iOS 16.0, *)
+        private static func signalFileProviderChanges() {
+            Task.detached {
+                guard let domain = try? await NSFileProviderManager.domains()
+                    .first(where: { $0.identifier.rawValue == AppConfiguration.fileProviderDomainID }),
+                    let manager = NSFileProviderManager(for: domain)
+                else {
+                    return
+                }
+                try? await manager.signalEnumerator(for: .workingSet)
+            }
+        }
+    #endif
+
+    deinit {
+        if let observer {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    private static func makeDefaultOnDemandRules() -> [NEOnDemandRule] {
+        let rule = NEOnDemandRuleConnect()
+        rule.interfaceTypeMatch = .any
+        rule.probeURL = URL(string: "http://captive.apple.com")
+        return [rule]
+    }
+
+    private func setOnDemandRules(useDefaultRules: Bool) async {
+        guard let manager else { return }
+        if useDefaultRules {
+            manager.onDemandRules = Self.makeDefaultOnDemandRules()
+        } else {
+            let rules = await SharedPreferences.onDemandRules.get()
+            // Empty custom rules must NOT fall back to "connect on any" — that black-holes Wi‑Fi
+            // when the tunnel fails with includeAllNetworks / kill switch.
+            manager.onDemandRules = rules.map { $0.toNERule() }
+        }
+    }
+
+    public func updateOnDemand(enabled: Bool, useDefaultRules: Bool) async throws {
+        guard let manager else { return }
+        manager.isOnDemandEnabled = enabled
+        if !enabled {
+            manager.onDemandRules = []
+            if let proto = manager.protocolConfiguration as? NETunnelProviderProtocol {
+                var config = proto.providerConfiguration ?? [:]
+                if config.removeValue(forKey: "wasOnDemandEnabled") != nil {
+                    proto.providerConfiguration = config
+                }
+            }
+        } else {
+            await setOnDemandRules(useDefaultRules: useDefaultRules)
+        }
+        try await manager.saveToPreferences()
+    }
+
+    /// Completely disable system VPN auto-connect and stop any active tunnel.
+    public func forceDisableVPNSystemWide() async throws {
+        guard let manager else { return }
+        manager.isOnDemandEnabled = false
+        manager.onDemandRules = []
+        manager.isEnabled = false
+        if let proto = manager.protocolConfiguration as? NETunnelProviderProtocol {
+            var config = proto.providerConfiguration ?? [:]
+            config.removeValue(forKey: "wasOnDemandEnabled")
+            proto.providerConfiguration = config
+            #if !os(tvOS)
+                protocolSafeClearIncludeAll(proto)
+            #endif
+        }
+        try await manager.saveToPreferences()
+        manager.connection.stopVPNTunnel()
+    }
+
+    #if !os(tvOS)
+        private func protocolSafeClearIncludeAll(_ proto: NEVPNProtocol) {
+            proto.includeAllNetworks = false
+            proto.enforceRoutes = false
+        }
+    #endif
+
+    @available(iOS 16.0, macOS 13.0, tvOS 17.0, *)
+    public func fetchLastDisconnectError() async throws {
+        guard let connection else { return }
+        try await connection.fetchLastDisconnectError()
+    }
+
+    public func start() async throws {
+        if isMock {
+            status = .connecting
+            try await Task.sleep(nanoseconds: 500_000_000)
+            status = .connected
+            connectedDate = Date()
+            return
+        }
+        guard let manager else {
+            throw NSError(domain: "ExtensionProfile", code: -2, userInfo: [
+                NSLocalizedDescriptionKey: "VPN manager unavailable",
+            ])
+        }
+        try await fetchProfile()
+        manager.isEnabled = true
+        // Manual dial must never race On-Demand / Always-On.
+        manager.isOnDemandEnabled = false
+        manager.onDemandRules = []
+        if let proto = manager.protocolConfiguration as? NETunnelProviderProtocol {
+            var config = proto.providerConfiguration ?? [:]
+            config.removeValue(forKey: "wasOnDemandEnabled")
+            proto.providerConfiguration = config
+        }
+        #if !os(tvOS)
+            if let protocolConfiguration = manager.protocolConfiguration {
+                // Kill Switch permanently disabled.
+                protocolConfiguration.includeAllNetworks = false
+                protocolConfiguration.excludeLocalNetworks = await SharedPreferences.excludeLocalNetworks.get()
+                protocolConfiguration.enforceRoutes = await SharedPreferences.enforceRoutes.get()
+                if #available(iOS 16.4, macOS 13.3, *) {
+                    protocolConfiguration.excludeAPNs = await SharedPreferences.excludeAPNs.get()
+                    protocolConfiguration.excludeCellularServices = await SharedPreferences.excludeCellularServices.get()
+                }
+                if #available(iOS 17.4, macOS 14.4, *) {
+                    protocolConfiguration.excludeDeviceCommunication = await SharedPreferences.excludeDeviceCommunication.get()
+                }
+            }
+        #endif
+        try await manager.saveToPreferences()
+        // Required after save — otherwise startVPNTunnel often attaches to a stale session
+        // that connects for a second and dies (matches our OOM/stop breadcrumbs).
+        try await manager.loadFromPreferences()
+        register()
+        let options = try await prepareStartOptions()
+        VPNDebugLog.write("startVPNTunnel profile=\(await SharedPreferences.selectedProfileID.get()) optionsKeys=\(options.keys.sorted())")
+        try manager.connection.startVPNTunnel(options: options)
+        refreshStatus()
+        VPNDebugLog.write("after start status=\(status.rawValue)")
+    }
+
+    public func reloadService() async throws {
+        if isMock { return }
+        let options = try await prepareStartOptions()
+        let data = try ExtensionStartOptions.encode(options)
+        guard let session = connection as? NETunnelProviderSession else {
+            throw NSError(domain: "ExtensionStartOptions", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Tunnel session unavailable",
+            ])
+        }
+        let response = try await withCheckedThrowingContinuation { continuation in
+            do {
+                try session.sendProviderMessage(data) { response in
+                    continuation.resume(returning: response)
+                }
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+        if let response, !response.isEmpty {
+            let message = String(data: response, encoding: .utf8) ?? "Unknown error"
+            throw NSError(domain: "ExtensionStartOptions", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: message,
+            ])
+        }
+    }
+
+    private func prepareStartOptions() async throws -> [String: NSObject] {
+        var options: [String: NSObject] = [
+            "manualStart": NSNumber(value: true),
+        ]
+
+        let profileID = await SharedPreferences.selectedProfileID.get()
+        guard let profile = try await ProfileManager.get(profileID) else {
+            throw NSError(domain: "ExtensionProfile", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Missing selected profile",
+            ])
+        }
+
+        let rawContent = try await profile.readAsync()
+        // Fail closed: do not start the tunnel with an unmigrated / invalid config.
+        let migrated = try SingBoxConfigMigrator.migrate(rawContent)
+        let bypassRU = await SharedPreferences.bypassRussianSites.get()
+        var configContent = RussianBypassRouting.apply(to: migrated, enabled: bypassRU)
+        // INCY-style: never dial public VLESS without TLS/Reality/encryption.
+        // Strip bad leaves so other servers still start; if only plaintext remains — fail closed.
+        if let firstBad = VLESSPlaintextGuard.firstInsecureOutboundTag(inJSON: configContent) {
+            do {
+                configContent = try VLESSPlaintextGuard.strippingInsecurePublicVLESS(fromJSON: configContent)
+                VPNDebugLog.write("prepareStartOptions stripped plaintext VLESS tag=\(firstBad)")
+            } catch {
+                throw error
+            }
+        }
+        options["configContent"] = NSString(string: configContent)
+        VPNDebugLog.write("prepareStartOptions bypass=\(bypassRU) profile=\(profileID) bytes=\(configContent.count)")
+
+        #if !os(macOS)
+            options["ignoreMemoryLimit"] = await NSNumber(value: SharedPreferences.ignoreMemoryLimit.get())
+        #endif
+        options["systemProxyEnabled"] = await NSNumber(value: SharedPreferences.systemProxyEnabled.get())
+        options["excludeDefaultRoute"] = await NSNumber(value: SharedPreferences.excludeDefaultRoute.get())
+        options["autoRouteUseSubRangesByDefault"] = await NSNumber(value: SharedPreferences.autoRouteUseSubRangesByDefault.get())
+        options["excludeAPNsRoute"] = await NSNumber(value: SharedPreferences.excludeAPNsRoute.get())
+
+        #if !os(tvOS)
+            options["includeAllNetworks"] = NSNumber(value: false)
+        #endif
+
+        #if os(tvOS)
+            options["commandServerPort"] = await NSNumber(value: SharedPreferences.commandServerPort.get())
+            options["commandServerSecret"] = await NSString(string: SharedPreferences.commandServerSecret.get())
+        #endif
+
+        return options
+    }
+
+    public func fetchProfile() async throws {
+        let profileID = await SharedPreferences.selectedProfileID.get()
+        if let profile = try await ProfileManager.get(profileID), profile.type == .icloud {
+            _ = try await profile.readAsync()
+        }
+    }
+
+    public func stop() async throws {
+        if isMock {
+            status = .disconnecting
+            try await Task.sleep(nanoseconds: 300_000_000)
+            status = .disconnected
+            connectedDate = nil
+            return
+        }
+        guard let manager else { return }
+        if manager.isOnDemandEnabled {
+            if let proto = manager.protocolConfiguration as? NETunnelProviderProtocol {
+                var config = proto.providerConfiguration ?? [:]
+                config["wasOnDemandEnabled"] = true
+                proto.providerConfiguration = config
+            }
+            manager.isOnDemandEnabled = false
+            try await manager.saveToPreferences()
+        }
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                try LibboxNewStandaloneCommandClient()!.serviceClose()
+            }.value
+        } catch {
+            logger.debug("serviceClose error: \(error.localizedDescription)")
+        }
+        manager.connection.stopVPNTunnel()
+    }
+
+    public func restart() async throws {
+        try await stop()
+        var waitSeconds = 0
+        while status != .disconnected {
+            try await Task.sleep(nanoseconds: NSEC_PER_SEC)
+            waitSeconds += 1
+            if waitSeconds >= 5 {
+                throw NSError(domain: "ExtensionProfile", code: 0, userInfo: [NSLocalizedDescriptionKey: String(localized: "Restart service timeout")])
+            }
+        }
+        try await start()
+    }
+
+    public static func load() async throws -> ExtensionProfile? {
+        let managers = try await NETunnelProviderManager.loadAllFromPreferences()
+        if managers.isEmpty {
+            return nil
+        }
+        return ExtensionProfile(managers[0])
+    }
+
+    /// Disables every leftover packet-tunnel profile (fixes Wi‑Fi blackhole after failed kill-switch).
+    public static func disableAllSavedProfiles() async {
+        guard let managers = try? await NETunnelProviderManager.loadAllFromPreferences() else { return }
+        for manager in managers {
+            manager.isOnDemandEnabled = false
+            manager.onDemandRules = []
+            manager.isEnabled = false
+            if let proto = manager.protocolConfiguration {
+                #if !os(tvOS)
+                    proto.includeAllNetworks = false
+                    proto.enforceRoutes = false
+                #endif
+            }
+            try? await manager.saveToPreferences()
+            manager.connection.stopVPNTunnel()
+        }
+    }
+
+    public static func install() async throws {
+        let manager = NETunnelProviderManager()
+        manager.localizedDescription = Variant.applicationName
+        let tunnelProtocol = NETunnelProviderProtocol()
+        if Variant.useSystemExtension {
+            tunnelProtocol.providerBundleIdentifier = AppConfiguration.systemExtensionBundleID
+        } else {
+            tunnelProtocol.providerBundleIdentifier = AppConfiguration.extensionBundleID
+        }
+        tunnelProtocol.serverAddress = "sing-box"
+        manager.protocolConfiguration = tunnelProtocol
+        manager.isEnabled = true
+        try await manager.saveToPreferences()
+    }
+}

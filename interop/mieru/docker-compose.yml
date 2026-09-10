@@ -1,0 +1,9 @@
+services:
+  mita:
+    image: enfein/mieru:latest
+    # Lab-only; replace with your pinned mita image/tag for battles.
+    profiles: ["lab"]
+    ports:
+      - "8964:8964"
+    volumes:
+      - ./server/config.example.json:/etc/mieru/server.json:ro

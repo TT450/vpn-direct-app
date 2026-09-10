@@ -1,0 +1,6 @@
+# Official: pin Amnezia client release + container images the client pulls.
+# AWG semantics: pin amnezia-vpn/amneziawg-go commit.
+# Optional community UI: spcfox/amnezia-wg-easy — set image tag before lab.
+# Example: amnezia-client:X.Y.Z + amneziawg-go:<commit>
+amnezia-client:unpinned-set-before-lab
+# optional-community: amnezia-wg-easy:unpinned-set-before-lab

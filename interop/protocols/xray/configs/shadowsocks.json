@@ -1,0 +1,8 @@
+{
+  "log": { "loglevel": "warning" },
+  "inbounds": [{
+    "port": 8388, "protocol": "shadowsocks",
+    "settings": { "method": "aes-256-gcm", "password": "lab-ss-password", "network": "tcp,udp" }
+  }],
+  "outbounds": [{ "protocol": "freedom" }]
+}

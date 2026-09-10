@@ -1,0 +1,3 @@
+# Pin Xray-core image/tag before battle labs.
+# Example: teddysun/xray:25.9.11
+teddysun/xray:latest

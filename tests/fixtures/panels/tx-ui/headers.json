@@ -1,0 +1,10 @@
+{
+  "Subscription-Userinfo": "upload=0; download=768; total=10737418240; expire=1893456000",
+  "Profile-Title": "base64:dHgtdWkgRml4dHVyZQ==",
+  "Profile-Update-Interval": "12",
+  "Support-Url": "https://example.com/support",
+  "Profile-Web-Page-Url": "https://example.com/profile",
+  "Announce": "base64:QW5ub3VuY2VtZW50",
+  "Routing-Enable": "false",
+  "format_note": "tx-ui ≈ 3x-ui (AghayeCoder / Incognito-Coder forks) — subscription bytes expected compatible"
+}

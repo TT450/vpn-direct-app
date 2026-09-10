@@ -1,0 +1,5 @@
+services:
+  amnezia-placeholder:
+    image: alpine:3.20
+    profiles: ["lab"]
+    command: ["sh", "-c", "echo 'Use a real AmneziaWG server; templates in configs/'; sleep infinity"]

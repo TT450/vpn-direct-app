@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vpndirect.local/interop/evidence/battle-run-schema.json",
+  "title": "VPN Direct battle connection evidence",
+  "description": "One connection/qualification evidence row for public or lab battle runs. Never include secrets. Separate from device RSS SCHEMA.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "core_sha",
+    "core_version",
+    "source",
+    "protocol",
+    "variant",
+    "config_hash",
+    "parser",
+    "builder",
+    "core_validation",
+    "connect",
+    "tcp",
+    "udp",
+    "dns",
+    "timestamp",
+    "error"
+  ],
+  "properties": {
+    "core_sha": {
+      "type": "string",
+      "description": "Git SHA or Core stamp of the build under test"
+    },
+    "core_version": {
+      "type": ["string", "null"],
+      "description": "Human-readable Core / app version when known"
+    },
+    "source": {
+      "type": "string",
+      "description": "Catalog source id, lab family id, or fixture id (never a credentialed URI)"
+    },
+    "protocol": {
+      "type": "string",
+      "description": "Protocol family (vless, hysteria2, warp, ...)"
+    },
+    "variant": {
+      "type": "string",
+      "description": "Variant label (tcp, reality, salamander, ...)"
+    },
+    "config_hash": {
+      "type": "string",
+      "description": "SHA-256 (or similar) of sanitized config bytes — not the secret material"
+    },
+    "parser": {
+      "type": "string",
+      "enum": ["pass", "fail", "not_run", "unsupported", "malformed"],
+      "description": "Parser / detector stage result"
+    },
+    "builder": {
+      "type": "string",
+      "enum": ["pass", "fail", "not_run"],
+      "description": "UniversalOutboundBuilder stage result"
+    },
+    "core_validation": {
+      "type": "string",
+      "enum": ["pass", "fail", "not_run"],
+      "description": "sing-box / Libbox check stage result"
+    },
+    "connect": {
+      "type": "string",
+      "enum": ["pass", "fail", "not_run"],
+      "description": "Live connect stage; not_run when NE connect is stubbed"
+    },
+    "tcp": {
+      "type": ["string", "null"],
+      "description": "TCP probe result summary (pass/fail/not_run/detail without secrets)"
+    },
+    "udp": {
+      "type": ["string", "null"],
+      "description": "UDP probe result summary"
+    },
+    "dns": {
+      "type": ["string", "null"],
+      "description": "DNS probe result summary"
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "ISO-8601 UTC timestamp of the evidence row"
+    },
+    "error": {
+      "type": ["string", "null"],
+      "description": "Redacted error class/message; null on success"
+    },
+    "failure_class": {
+      "type": ["string", "null"],
+      "description": "Optional taxonomy: SOURCE_FETCH_FAILED|SOURCE_EMPTY|PARSE_FAILED|CONFIG_INVALID|CONNECT_FAILED|remote_server_dead|SUCCESS"
+    },
+    "notes": {
+      "type": ["string", "null"]
+    }
+  }
+}

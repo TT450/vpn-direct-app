@@ -1,0 +1,65 @@
+/.idea/
+/Libbox.xcframework/
+/Libbox.xcframework.stock/
+xcuserdata/
+.DS_Store
+/build/
+/sing-box.xcodeproj/project.pbxproj.back
+CLAUDE.md
+/.claude/
+/.mcp.json
+AGENTS.md
+/.codex/
+/screenshots/
+/fastlane/report.xml
+/fastlane/test_output/
+/fastlane/.bundle/
+/fastlane/.cache/
+/fastlane/AuthKey_*.p8
+/fastlane/api_key.json
+*.p8
+*.mobileprovision
+*.cer
+*.p12
+.env
+.env.*
+/tests/fixtures/battle/
+/artifacts/battle/
+*.generated.uri
+*.generated.json
+*.generated.conf
+
+# Swift package test build
+tests/VPNDirectParserPackage/.build/
+
+# Swift package test build
+/tests/fixtures/battle/cache/
+
+# Local agent ship logs / meta
+.ship_*
+
+.build/
+.build/**
+
+# =============================================================================
+# Backend / Direct API / ops — NEVER GitHub (local + server only)
+# Do not force-add these. Do not put real hosts, IPs, routes, or secrets
+# into tracked files either — ignore alone is not enough if they live in UI/docs.
+# =============================================================================
+/VPNDirectPatch/
+/_private_vpndirect/
+/private_backend/
+/backend/
+/ops/backend/
+**/.env.backend
+**/backend.secrets*
+**/mobile_api.py
+**/mobile_api.server.py
+
+# Client ↔ backend (local only)
+**/DirectBackendAPI.swift
+**/DirectBackendHooks.swift
+**/DirectBackendConfig.swift
+**/DirectBackend.secrets*
+**/DirectBackend*.local.swift
+**/DirectBackendPrivate*.swift

@@ -1,0 +1,34 @@
+"main.disconnected" = "Отключен";
+"main.connected" = "Активен";
+"main.days_left" = "Осталось";
+"settings.title" = "Настройки";
+"about.title" = "О приложении";
+"language.select_language" = "Выбрать язык";
+"settings.language" = "Язык";
+"settings.change_config" = "Изменить конфигурацию";
+"settings.telegram" = "Канал в Telegram";
+"settings.about" = "О приложении";
+
+"add_config.title_01" = "Добро пожаловать";
+"add_config.text_01" = "Для начала работы необходимо настроить VPN";
+"add_config.text_02" = "Перейдите в наш телеграм-бот и сгенерируйте собственную конфигурационную ссылку или вставьте скопированную ссылку Vless";
+"add_config.title_02" = "Заменить конфигурацию";
+"add_config.text_03" = "Вы можете ввести её ниже или вставить из буфера обмена";
+"add_config.text_04" = "Перейти в телеграм-бот @vpndirectbot";
+"add_config.paste" = "Вставить";
+"add_config.config_add" = "Добавить конфигурацию";
+"add_config.config_replace" = "Заменить конфигурацию";
+
+"main.download" = "Получено";
+"main.upload" = "Отправлено";
+
+"main.day1" = "день";
+"main.day2" = "дня";
+"main.day5" = "дней";
+
+"main.install_extension.text" = "Для работы VPN необходимо установить расширение";
+"main.install_extension.button" = "Установить расширение сети";
+
+"general.about" = "Назад";
+
+

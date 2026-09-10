@@ -1,0 +1,12 @@
+{
+  "panel": "amnezia",
+  "upstream": "https://github.com/amnezia-vpn/amnezia-client",
+  "commit": "unpinned-fixture-scaffold",
+  "generator": "repo fixture / README-derived",
+  "format": "conf",
+  "sample": "awg2_sample.conf",
+  "captured_from_generator": false,
+  "sanitized": true,
+  "date": "2026-09-07",
+  "note": "Provenance scaffold for REQ-P010; replace with generator-captured output when available."
+}

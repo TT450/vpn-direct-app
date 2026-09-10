@@ -1,0 +1,1 @@
+vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=tls&sni=www.example.com&fp=chrome&type=xhttp&path=%2Fxhttp&host=www.example.com&mode=auto#vless-xhttp

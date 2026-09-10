@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.vpndirect.vpndirectapp.helper</string>
+	<key>BundleProgram</key>
+	<string>Contents/Helpers/RootHelper</string>
+	<key>MachServices</key>
+	<dict>
+		<!-- Replace YOURTEAMID with your Apple Developer Team ID before shipping macOS helper. -->
+		<key>YOURTEAMID.com.vpndirect.vpndirectapp.helper</key>
+		<true/>
+	</dict>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>com.vpndirect.vpndirectapp.standalone</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+</dict>
+</plist>

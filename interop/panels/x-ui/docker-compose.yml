@@ -1,0 +1,13 @@
+services:
+  x-ui:
+    image: ghcr.io/alireza0/x-ui:latest
+    container_name: vpn-direct-x-ui
+    profiles: ["lab"]
+    volumes:
+      - xui_db:/etc/x-ui
+      - xui_cert:/root/cert
+    network_mode: host
+    restart: unless-stopped
+volumes:
+  xui_db:
+  xui_cert:

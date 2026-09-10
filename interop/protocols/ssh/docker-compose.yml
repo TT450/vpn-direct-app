@@ -1,0 +1,8 @@
+# Prefer host danted/tinyproxy/sshd for real auth variants; compose is optional.
+services:
+  ssh-lab:
+    image: alpine:3.20
+    profiles: ["lab"]
+    command: ["sh", "-c", "echo 'Install local ssh per README'; sleep infinity"]
+    ports:
+      - "22:22"

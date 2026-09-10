@@ -1,0 +1,13 @@
+{
+  "profiles": [
+    {
+      "profileName": "Mieru-Fixture",
+      "serverAddress": "203.0.113.21",
+      "serverPort": 8964,
+      "userName": "user",
+      "password": "password123",
+      "transport": "TCP",
+      "multiplexing": "MULTIPLEXING_HIGH"
+    }
+  ]
+}

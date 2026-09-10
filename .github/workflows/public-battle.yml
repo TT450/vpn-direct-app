@@ -1,0 +1,76 @@
+name: Public battle sources
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly Monday 06:17 UTC
+    - cron: "17 6 * * 1"
+
+jobs:
+  public-battle:
+    name: Catalog + fetch + parse
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Catalog check (required)
+        run: ./scripts/battle/check_public_sources_catalog.sh
+
+      - name: Fetch public sources (volatile)
+        id: fetch
+        continue-on-error: true
+        run: |
+          mkdir -p tests/fixtures/battle/cache artifacts/battle
+          python3 scripts/battle/fetch_public_sources.py \
+            --catalog tests/battle/public-sources.json \
+            --out-dir tests/fixtures/battle/cache
+
+      - name: Annotate fetch emptiness
+        if: steps.fetch.outcome != 'success'
+        run: |
+          echo "::warning::Public source fetch reported failures or emptiness (volatile; non-blocking)."
+
+      - name: Parse cached sources (Swift BattleParse)
+        id: parse
+        continue-on-error: true
+        run: |
+          python3 scripts/battle/parse_cached_sources.py \
+            --cache-dir tests/fixtures/battle/cache \
+            --package-path tests/VPNDirectParserPackage \
+            --out artifacts/battle/parse-summary.json \
+            --limit 200
+
+      - name: Generate report
+        if: always()
+        continue-on-error: true
+        run: |
+          if [[ -f tests/fixtures/battle/cache/manifest.json ]]; then
+            python3 scripts/battle/generate_public_source_report.py \
+              --manifest tests/fixtures/battle/cache/manifest.json \
+              --parse-summary artifacts/battle/parse-summary.json \
+              --out-dir artifacts/battle
+          else
+            echo "::warning::No fetch manifest; skipping report."
+          fi
+
+      - name: Golden public-derived regression (if present)
+        id: golden
+        continue-on-error: false
+        run: |
+          # Fail only when sanitized golden fixtures exist and a checker is wired.
+          # Placeholder: presence of fixtures is informational until BattleParse goldens land.
+          if [[ -d tests/fixtures/public-derived ]]; then
+            echo "public-derived fixtures present"
+            find tests/fixtures/public-derived -type f | head -50
+          fi
+
+      - name: Upload battle artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-battle-${{ github.run_id }}
+          path: artifacts/battle/
+          if-no-files-found: warn

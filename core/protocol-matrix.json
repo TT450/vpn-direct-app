@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "core": "0.1",
+  "updated": "2026-09-07",
+  "protocols": [
+    {
+      "id": "vless-baseline",
+      "name": "VLESS",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "vless-xhttp",
+      "name": "VLESS XHTTP",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "vless-encryption",
+      "name": "VLESS encryption",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "notes": "PQ/mlkem string; capability-gated",
+      "evidence": {}
+    },
+    {
+      "id": "hysteria2",
+      "name": "Hysteria2",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "vmess",
+      "name": "VMess",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "trojan",
+      "name": "Trojan",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "shadowsocks",
+      "name": "Shadowsocks",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "shadowsocksr",
+      "name": "ShadowsocksR",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "notes": "Restored under with_shadowsocksr; rebuild Libbox.xcframework required for tunnel",
+      "evidence": {}
+    },
+    {
+      "id": "tuic",
+      "name": "TUIC",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "anytls",
+      "name": "AnyTLS",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "shadowtls",
+      "name": "ShadowTLS",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "naive",
+      "name": "NaiveProxy",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "wireguard",
+      "name": "WireGuard",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "amneziawg",
+      "name": "AmneziaWG",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "masque-connect-ip",
+      "name": "MASQUE CONNECT-IP",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "warp",
+      "name": "WARP",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "notes": "Cloudflare WARP via MASQUE CONNECT-IP profile",
+      "evidence": {}
+    },
+    {
+      "id": "mieru",
+      "name": "Mieru",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "notes": "with_mieru overlays; Interop planned until live mita evidence",
+      "evidence": {}
+    },
+    {
+      "id": "socks-http-ssh",
+      "name": "SSH/SOCKS/HTTP",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {}
+    },
+    {
+      "id": "masque-connect-udp",
+      "name": "MASQUE CONNECT-UDP",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {
+        "note": "RFC 9298 outbound type masque-connect-udp; requires Libbox rebuild with with_quic"
+      }
+    },
+    {
+      "id": "tailscale",
+      "name": "Tailscale",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {
+        "note": "endpoint JSON import; requires Libbox rebuild with with_tailscale"
+      }
+    },
+    {
+      "id": "openvpn",
+      "name": "OpenVPN / OpenConnect",
+      "parser": "yes",
+      "core": true,
+      "status": "parser+runtime",
+      "evidence": {
+        "note": ".ovpn / OpenConnect JSON+XML import; Core tags with_openvpn / with_openconnect already on Darwin libbox"
+      }
+    }
+  ]
+}

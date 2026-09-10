@@ -1,0 +1,13 @@
+{
+  "log": { "loglevel": "warning" },
+  "inbounds": [{
+    "port": 443, "protocol": "vless",
+    "settings": { "clients": [{ "id": "11111111-1111-1111-1111-111111111111" }], "decryption": "none" },
+    "streamSettings": {
+      "network": "httpupgrade", "security": "tls",
+      "tlsSettings": { "certificates": [{ "certificateFile": "/etc/xray/server.crt", "keyFile": "/etc/xray/server.key" }] },
+      "httpupgradeSettings": { "path": "/" }
+    }
+  }],
+  "outbounds": [{ "protocol": "freedom" }]
+}

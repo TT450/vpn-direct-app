@@ -1,0 +1,7 @@
+[submodule "core/sing-box"]
+	path = core/sing-box
+	url = https://github.com/Leadaxe/sing-box-lx.git
+	branch = lx
+[submodule "Frameworks/Runestone"]
+	path = Frameworks/Runestone
+	url = https://github.com/nekohasekai/Runestone.git

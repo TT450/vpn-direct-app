@@ -1,0 +1,25 @@
+{
+  "log": { "loglevel": "warning" },
+  "inbounds": [
+    {
+      "port": 443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [{ "id": "11111111-1111-1111-1111-111111111111", "flow": "" }],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "reality",
+        "realitySettings": {
+          "dest": "www.example.com:443",
+          "serverNames": ["www.example.com"],
+          "privateKey": "REPLACE_WITH_LAB_PRIVATE_KEY",
+          "shortIds": ["abcd"]
+        },
+        "wsSettings": { "path": "/" }
+      }
+    }
+  ],
+  "outbounds": [{ "protocol": "freedom" }]
+}

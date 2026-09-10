@@ -1,0 +1,5 @@
+# // metadata for Hiddify body comment prefixes (REQ-P061)
+# profile-title: Hiddify Test
+# subscription-userinfo: upload=0; download=0; total=1073741824; expire=1893456000
+
+vless://11111111-1111-1111-1111-111111111111@203.0.113.40:443?encryption=none&security=tls&sni=cdn.example.com&type=ws&host=cdn.example.com&path=%2Fhiddify#Hiddify-WS

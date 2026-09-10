@@ -1,0 +1,4 @@
+{
+  "portBindings": [{ "port": 8964, "protocol": "TCP" }],
+  "users": [{ "name": "lab", "password": "lab-password-change-me" }]
+}

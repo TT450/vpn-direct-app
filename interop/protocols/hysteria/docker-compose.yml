@@ -1,0 +1,9 @@
+services:
+  hysteria:
+    image: tobyxdd/hysteria:v2
+    profiles: ["lab"]
+    command: ["server", "-c", "/etc/hysteria/config.yaml"]
+    volumes:
+      - ./configs/hy2-plain.yaml:/etc/hysteria/config.yaml:ro
+    ports:
+      - "10443:443/udp"

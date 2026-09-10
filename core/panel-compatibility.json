@@ -1,0 +1,289 @@
+{
+  "schema": 1,
+  "updated": "2026-09-07",
+  "panels": [
+    {
+      "panel": "remnawave",
+      "status": "researched",
+      "formats": {
+        "uri": true,
+        "xray_json": true,
+        "xray_base64": true,
+        "clash": true,
+        "singbox": true
+      },
+      "features": {
+        "happ_user_agent": true,
+        "hwid": true,
+        "balancers": true,
+        "global_auto": true,
+        "dialer_proxy": true,
+        "response_rules": true
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/remnawave.md"
+    },
+    {
+      "panel": "3x-ui",
+      "status": "researched",
+      "formats": {
+        "uri": true,
+        "xray_json": true,
+        "xray_base64": true,
+        "clash": true,
+        "singbox": false
+      },
+      "features": {
+        "happ_user_agent": true,
+        "hwid": false,
+        "subscription_headers": true,
+        "path_based_formats": true,
+        "routing_header": true,
+        "routing_header_applied": false,
+        "routing_status": "metadata_only_ignored_with_warning"
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/3x-ui.md"
+    },
+    {
+      "panel": "x-ui",
+      "status": "researched",
+      "formats": {
+        "uri": true,
+        "xray_json": false,
+        "xray_base64": true,
+        "clash": false,
+        "singbox": false
+      },
+      "features": {
+        "format_twin_3xui": true,
+        "subscription_headers": true,
+        "hwid": false
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/x-ui.md"
+    },
+    {
+      "panel": "tx-ui",
+      "status": "researched",
+      "formats": {
+        "uri": true,
+        "xray_json": true,
+        "xray_base64": true,
+        "clash": true,
+        "singbox": false
+      },
+      "features": {
+        "format_twin_3xui": true,
+        "forks": [
+          "AghayeCoder/tx-ui",
+          "Incognito-Coder/tx-ui"
+        ],
+        "subscription_headers": true,
+        "hwid": false
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/tx-ui.md"
+    },
+    {
+      "panel": "marzban",
+      "status": "researched",
+      "formats": {
+        "uri": true,
+        "xray_json": false,
+        "xray_base64": true,
+        "clash": true,
+        "singbox": true
+      },
+      "features": {
+        "rest_api": true,
+        "marzban_node": true,
+        "xray_only": true,
+        "subscription_headers": true
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/marzban.md"
+    },
+    {
+      "panel": "marzneshin",
+      "status": "researched",
+      "formats": {
+        "uri": true,
+        "xray_json": false,
+        "xray_base64": true,
+        "clash": true,
+        "singbox": false
+      },
+      "features": {
+        "multi_backend": true,
+        "hysteria2": true,
+        "xray": true,
+        "subscription_headers": true
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/marzneshin.md"
+    },
+    {
+      "panel": "pasarguard",
+      "status": "researched",
+      "formats": {
+        "uri": true,
+        "xray_json": false,
+        "xray_base64": false,
+        "clash": false,
+        "singbox": false,
+        "wireguard": true
+      },
+      "features": {
+        "xray": true,
+        "wireguard": true,
+        "hwid": true,
+        "timescaledb": true
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/pasarguard.md"
+    },
+    {
+      "panel": "hiddify",
+      "status": "researched",
+      "formats": {
+        "uri": true,
+        "xray_json": false,
+        "xray_base64": true,
+        "clash": true,
+        "singbox": true
+      },
+      "features": {
+        "xray_and_singbox": true,
+        "subscription_userinfo": true,
+        "smart_proxy": true,
+        "smart_proxy_status": "nodes_only",
+        "routing_status": "nodes_only_not_full_semantic",
+        "multi_protocol": true
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/hiddify.md"
+    },
+    {
+      "panel": "libertea",
+      "status": "researched",
+      "formats": {
+        "uri": true,
+        "xray_json": false,
+        "xray_base64": false,
+        "clash": true,
+        "singbox": false
+      },
+      "features": {
+        "failover_groups": true,
+        "camouflage_domain": true,
+        "haproxy_80_443": true
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/libertea.md"
+    },
+    {
+      "panel": "s-ui",
+      "status": "researched",
+      "formats": {
+        "uri": true,
+        "xray_json": false,
+        "xray_base64": false,
+        "clash": true,
+        "singbox": true
+      },
+      "features": {
+        "singbox_native": true,
+        "token_api": true,
+        "embedded_singbox_from_1_2_0": true
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/s-ui.md"
+    },
+    {
+      "panel": "wg-easy",
+      "status": "researched",
+      "formats": {
+        "uri": false,
+        "xray_json": false,
+        "xray_base64": false,
+        "clash": false,
+        "singbox": false,
+        "wireguard_conf": true
+      },
+      "features": {
+        "plain_wireguard": true,
+        "web_ui": true
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/wg-easy.md"
+    },
+    {
+      "panel": "amnezia",
+      "status": "researched",
+      "formats": {
+        "uri": true,
+        "xray_json": false,
+        "xray_base64": false,
+        "clash": false,
+        "singbox": false,
+        "amneziawg_conf": true
+      },
+      "features": {
+        "amneziawg": true,
+        "jc_jmin_jmax": true,
+        "client_deployed": true
+      },
+      "evidence": {
+        "fixtures": true,
+        "interop": false,
+        "device": false
+      },
+      "dossier": "docs/compatibility/panels/amnezia.md"
+    }
+  ]
+}

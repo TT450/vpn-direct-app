@@ -1,0 +1,26 @@
+proxies:
+  - name: DE-VLESS
+    type: vless
+    server: 203.0.113.10
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111111
+    network: ws
+    tls: true
+    udp: true
+    servername: cdn.example.com
+    client-fingerprint: chrome
+    reality-opts:
+      public-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      short-id: abcd1234
+    ws-opts:
+      path: /ws
+      headers:
+        Host: cdn.example.com
+  - name: NL-Trojan
+    type: trojan
+    server: 203.0.113.20
+    port: 443
+    password: password-fixture
+    udp: true
+    sni: cdn.example.com
+    skip-cert-verify: false

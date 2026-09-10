@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23094" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="launch-controller">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23084"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+    </dependencies>
+    <scenes>
+        <scene sceneID="launch-scene">
+            <objects>
+                <viewController id="launch-controller" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="launch-view">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="mark-box">
+                                <rect key="frame" x="120" y="324" width="153" height="153"/>
+                                <subviews>
+                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="A" textAlignment="center" translatesAutoresizingMaskIntoConstraints="NO" id="mark-label">
+                                        <rect key="frame" x="0.0" y="27" width="153" height="99"/>
+                                        <fontDescription key="fontDescription" type="system" weight="medium" pointSize="74"/>
+                                        <color key="textColor" red="0.6588235294" green="0.937254902" blue="0.4078431373" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                    </label>
+                                </subviews>
+                                <color key="backgroundColor" white="1" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="153" id="box-width"/>
+                                    <constraint firstAttribute="height" constant="153" id="box-height"/>
+                                    <constraint firstItem="mark-label" firstAttribute="leading" secondItem="mark-box" secondAttribute="leading" id="mark-leading"/>
+                                    <constraint firstAttribute="trailing" secondItem="mark-label" secondAttribute="trailing" id="mark-trailing"/>
+                                    <constraint firstItem="mark-label" firstAttribute="centerY" secondItem="mark-box" secondAttribute="centerY" id="mark-y"/>
+                                </constraints>
+                            </view>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="VPN DIRECT" textAlignment="center" translatesAutoresizingMaskIntoConstraints="NO" id="brand-label">
+                                <rect key="frame" x="107" y="518" width="179" height="30"/>
+                                <fontDescription key="fontDescription" type="system" weight="bold" pointSize="25"/>
+                                <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                            </label>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="PRIVATE NETWORK" textAlignment="center" translatesAutoresizingMaskIntoConstraints="NO" id="subtitle-label">
+                                <rect key="frame" x="143" y="558" width="107" height="12"/>
+                                <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="9"/>
+                                <color key="textColor" white="1" alpha="0.42" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                            </label>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="safe-area"/>
+                        <color key="backgroundColor" red="0.07843137255" green="0.09019607843" blue="0.07843137255" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="mark-box" firstAttribute="centerX" secondItem="launch-view" secondAttribute="centerX" id="box-x"/>
+                            <constraint firstItem="mark-box" firstAttribute="centerY" secondItem="launch-view" secondAttribute="centerY" constant="-26" id="box-y"/>
+                            <constraint firstItem="brand-label" firstAttribute="top" secondItem="mark-box" secondAttribute="bottom" constant="41" id="brand-top"/>
+                            <constraint firstItem="brand-label" firstAttribute="centerX" secondItem="launch-view" secondAttribute="centerX" id="brand-x"/>
+                            <constraint firstItem="subtitle-label" firstAttribute="top" secondItem="brand-label" secondAttribute="bottom" constant="10" id="subtitle-top"/>
+                            <constraint firstItem="subtitle-label" firstAttribute="centerX" secondItem="launch-view" secondAttribute="centerX" id="subtitle-x"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="first-responder" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+        </scene>
+    </scenes>
+</document>

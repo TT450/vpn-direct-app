@@ -1,0 +1,30 @@
+[
+  {
+    "remarks": "RandomFail",
+    "outbounds": [
+      {
+        "protocol": "vless",
+        "tag": "r-leaf-1",
+        "settings": {
+          "vnext": [
+            {
+              "address": "203.0.113.90",
+              "port": 443,
+              "users": [{ "id": "99999999-9999-9999-9999-999999999999", "encryption": "none" }]
+            }
+          ]
+        },
+        "streamSettings": { "network": "tcp", "security": "none" }
+      }
+    ],
+    "routing": {
+      "balancers": [
+        {
+          "tag": "balancer-random",
+          "selector": ["r-leaf-"],
+          "strategy": { "type": "random" }
+        }
+      ]
+    }
+  }
+]

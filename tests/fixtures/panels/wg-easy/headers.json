@@ -1,0 +1,5 @@
+{
+  "note": "wg-easy serves peer .conf / QR via web UI — no Clash subscription-userinfo model",
+  "content-type": "text/plain",
+  "content-disposition": "attachment; filename=\"wg0-client-1.conf\""
+}

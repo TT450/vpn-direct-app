@@ -1,0 +1,20 @@
+proxies:
+  - name: Marzban-DE-VLESS
+    type: vless
+    server: 203.0.113.10
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111111
+    network: tcp
+    tls: true
+    udp: true
+    servername: www.cloudflare.com
+    client-fingerprint: chrome
+    reality-opts:
+      public-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      short-id: abcd1234
+  - name: Marzban-SS
+    type: ss
+    server: 203.0.113.13
+    port: 8388
+    cipher: aes-256-gcm
+    password: password-fixture

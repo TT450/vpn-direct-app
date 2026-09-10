@@ -1,0 +1,7 @@
+{
+  "Subscription-Userinfo": "upload=0; download=8192; total=10737418240; expire=1893456000",
+  "Profile-Update-Interval": "12",
+  "Profile-Title": "base64:UGFzYXJHdWFyZCBGaXh0dXJl",
+  "x-hwid-limit": "5",
+  "note": "HWID headers claimed by product — confirm against pinned PasarGuard release in lab"
+}

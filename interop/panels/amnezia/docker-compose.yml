@@ -1,0 +1,27 @@
+# Official Amnezia is client-driven VPS deploy (not a slim panel image).
+# Optional community AWG web UI for reproducible .conf export:
+#   https://github.com/spcfox/amnezia-wg-easy (archived upstream — pin digest)
+# Image: ghcr.io/spcfox/amnezia-wg-easy — verify pull before lab.
+services:
+  amnezia-wg-easy:
+    image: ghcr.io/spcfox/amnezia-wg-easy:latest
+    container_name: vpn-direct-amnezia-wg-easy
+    profiles: ["lab"]
+    environment:
+      - WG_HOST=${WG_HOST}
+      - PASSWORD=${PASSWORD:-}
+    volumes:
+      - amnezia_wg:/etc/wireguard
+      - /lib/modules:/lib/modules:ro
+    ports:
+      - "51820:51820/udp"
+      - "51821:51821/tcp"
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+volumes:
+  amnezia_wg:

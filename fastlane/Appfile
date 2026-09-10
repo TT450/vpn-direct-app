@@ -1,0 +1,5 @@
+app_identifier(ENV.fetch("APP_IDENTIFIER", "com.vpndirect.vpndirectapp"))
+
+# Optional: ENV["APP_STORE_APP_ID"] for upload lanes
+# Signing team: ENV["FASTLANE_TEAM_ID"] (required for release lanes that need it)
+team_id(ENV["FASTLANE_TEAM_ID"]) if ENV["FASTLANE_TEAM_ID"].to_s != ""

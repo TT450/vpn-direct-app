@@ -1,0 +1,12 @@
+# Prefer official Marzban-scripts install. Compose stub for reference only.
+services:
+  marzban:
+    image: gozargah/marzban:latest
+    profiles: ["lab"]
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - marzban_data:/var/lib/marzban
+volumes:
+  marzban_data:

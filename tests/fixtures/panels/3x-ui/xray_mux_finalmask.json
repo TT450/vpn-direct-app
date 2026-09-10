@@ -1,0 +1,36 @@
+[
+  {
+    "tag": "vless-mux-tcp",
+    "protocol": "vless",
+    "settings": {
+      "address": "mux.example.com",
+      "port": 443,
+      "id": "11111111-1111-1111-1111-111111111111",
+      "encryption": "none",
+      "flow": ""
+    },
+    "streamSettings": {
+      "network": "tcp",
+      "security": "tls",
+      "tlsSettings": {
+        "serverName": "mux.example.com",
+        "fingerprint": "chrome"
+      },
+      "finalmask": {
+        "tcp": [
+          {
+            "type": "tlshello",
+            "settings": {
+              "packets": "tlshello",
+              "length": "100-200"
+            }
+          }
+        ]
+      }
+    },
+    "mux": {
+      "enabled": true,
+      "concurrency": 8
+    }
+  }
+]

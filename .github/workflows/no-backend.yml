@@ -1,0 +1,22 @@
+name: no-backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  forbid-private-backend-paths:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if backend-private paths are tracked
+        run: |
+          set -euo pipefail
+          hits="$(git ls-files | grep -E '(^|/)(VPNDirectPatch|_private_vpndirect|private_backend)/|(^|/)(DirectBackendAPI|DirectBackendHooks|DirectBackendConfig)\.swift$|(^|/)mobile_api(\.server)?\.py$' || true)"
+          if [ -n "$hits" ]; then
+            echo "Tracked backend-private paths are forbidden on GitHub:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "No forbidden backend paths tracked."

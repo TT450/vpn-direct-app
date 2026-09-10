@@ -1,0 +1,6 @@
+# MASQUE CONNECT-IP / WARP is external (Cloudflare). No useful local Docker server.
+services:
+  masque-notes:
+    image: alpine:3.20
+    profiles: ["lab"]
+    command: ["sh", "-c", "echo 'Inject WARP via .env; see docs/battle/EXTERNAL_CREDENTIALS.md'; sleep infinity"]

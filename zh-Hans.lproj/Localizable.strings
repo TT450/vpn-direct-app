@@ -1,0 +1,34 @@
+"main.disconnected" = "已关闭";
+"main.connected" = "已启用";
+"main.days_left" = "剩余";
+"settings.title" = "设置";
+"about.title" = "关于应用";
+"language.select_language" = "选择语言";
+"settings.language" = "语言";
+"settings.change_config" = "更改配置";
+"settings.telegram" = "我们的Telegram频道";
+"settings.about" = "关于应用";
+
+"add_config.title_01" = "欢迎";
+"add_config.text_01" = "要开始使用，请先设置VPN";
+"add_config.text_02" = "前往我们的Telegram机器人生成您的配置链接，或粘贴复制的Vless链接";
+"add_config.title_02" = "替换配置";
+"add_config.text_03" = "您可以在下方输入或从剪贴板粘贴";
+"add_config.text_04" = "前往Telegram机器人 @vpndirectbot";
+"add_config.paste" = "粘贴";
+"add_config.config_add" = "添加配置";
+"add_config.config_replace" = "更改配置";
+
+"main.download" = "已接收";
+"main.upload" = "已发送";
+
+"main.day1" = "天";
+"main.day2" = "天";
+"main.day5" = "天";
+
+"main.install_extension.text" = "要使 VPN 正常工作，您需要安装扩展程序";
+"main.install_extension.button" = "安装网络扩展";
+
+"general.about" = "后退";
+
+

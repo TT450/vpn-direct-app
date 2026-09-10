@@ -1,0 +1,10 @@
+{
+  "Subscription-Userinfo": "upload=0; download=1048576; total=10737418240; expire=1893456000",
+  "Profile-Title": "base64:VlBOIERpcmVjdCBGaXh0dXJl",
+  "Profile-Update-Interval": "12",
+  "Support-Url": "https://example.com/support",
+  "Profile-Web-Page-Url": "https://example.com/profile",
+  "Announce": "base64:QW5ub3VuY2VtZW50",
+  "Routing-Enable": "true",
+  "Routing": "base64:eyJydWxlcyI6W3siZG9tYWluIjpbImdlb2lwOmtub3duIl0sIm91dGJvdW5kVGFnIjoicHJveHkifV19"
+}

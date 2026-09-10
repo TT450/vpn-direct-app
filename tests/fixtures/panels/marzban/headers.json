@@ -1,0 +1,6 @@
+{
+  "Subscription-Userinfo": "upload=0; download=2048; total=10737418240; expire=1893456000",
+  "Profile-Update-Interval": "12",
+  "Profile-Title": "base64:TWFyemJhbiBGaXh0dXJl",
+  "content-disposition": "attachment; filename=\"marzban-sub\""
+}

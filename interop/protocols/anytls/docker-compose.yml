@@ -1,0 +1,9 @@
+services:
+  anytls:
+    image: alpine:3.20
+    profiles: ["lab"]
+    command: ["sh", "-c", "echo 'Run pinned anytls-go with configs/server.json'; sleep infinity"]
+    volumes:
+      - ./configs:/configs:ro
+    ports:
+      - "10443:443"

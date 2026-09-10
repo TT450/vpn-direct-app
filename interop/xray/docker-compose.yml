@@ -1,0 +1,8 @@
+services:
+  xray:
+    image: teddysun/xray:latest
+    volumes:
+      - ./server/config.example.json:/etc/xray/config.json:ro
+    ports:
+      - "10443:443"
+    profiles: ["lab"]

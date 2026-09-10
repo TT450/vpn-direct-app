@@ -1,0 +1,54 @@
+[
+  {
+    "remarks": "Cascade RU→DE",
+    "outbounds": [
+      {
+        "protocol": "vless",
+        "tag": "hop-ru",
+        "settings": {
+          "vnext": [
+            {
+              "address": "ru.example.com",
+              "port": 443,
+              "users": [{ "id": "33333333-3333-3333-3333-333333333333", "encryption": "none" }]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "security": "reality",
+          "realitySettings": {
+            "serverName": "www.microsoft.com",
+            "publicKey": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            "shortId": "1234",
+            "fingerprint": "chrome"
+          }
+        }
+      },
+      {
+        "protocol": "vless",
+        "tag": "proxy",
+        "settings": {
+          "vnext": [
+            {
+              "address": "de.example.com",
+              "port": 443,
+              "users": [{ "id": "44444444-4444-4444-4444-444444444444", "encryption": "none" }]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "security": "reality",
+          "realitySettings": {
+            "serverName": "www.cloudflare.com",
+            "publicKey": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+            "shortId": "5678",
+            "fingerprint": "chrome"
+          },
+          "sockopt": { "dialerProxy": "hop-ru" }
+        }
+      }
+    ]
+  }
+]

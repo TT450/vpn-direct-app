@@ -1,0 +1,38 @@
+[
+  {
+    "remarks": "3x-ui-single",
+    "outbounds": [
+      {
+        "protocol": "vless",
+        "tag": "proxy",
+        "settings": {
+          "vnext": [
+            {
+              "address": "203.0.113.40",
+              "port": 443,
+              "users": [
+                {
+                  "id": "11111111-1111-1111-1111-111111111111",
+                  "encryption": "none",
+                  "flow": ""
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "security": "reality",
+          "realitySettings": {
+            "show": false,
+            "fingerprint": "chrome",
+            "serverName": "www.cloudflare.com",
+            "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "shortId": "abcd1234",
+            "spiderX": ""
+          }
+        }
+      }
+    ]
+  }
+]

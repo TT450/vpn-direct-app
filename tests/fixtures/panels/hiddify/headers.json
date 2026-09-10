@@ -1,0 +1,7 @@
+{
+  "subscription-userinfo": "upload=0; download=16384; total=53687091200; expire=1893456000",
+  "Subscription-Userinfo": "upload=0; download=16384; total=53687091200; expire=1893456000",
+  "profile-update-interval": "12",
+  "profile-title": "base64:SGlkZGlmeSBGaXh0dXJl",
+  "profile-web-page-url": "https://example.com/hiddify/profile"
+}

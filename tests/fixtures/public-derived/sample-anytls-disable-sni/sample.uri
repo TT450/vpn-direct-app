@@ -1,0 +1,1 @@
+anytls://pool-password@203.0.113.50:443?security=tls&type=tcp&insecure=1&disable_sni=true&udp=1#anytls-pool

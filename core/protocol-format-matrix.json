@@ -1,0 +1,767 @@
+{
+  "schema": 1,
+  "updated": "2026-09-07",
+  "note": "Honest matrix: supported means production Swift path exists; not live handshake.",
+  "cells": [
+    {
+      "protocol": "vless",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "vless",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "vless",
+      "format": "xray_json",
+      "status": "supported"
+    },
+    {
+      "protocol": "vless",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "vless",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "vless",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "vless",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "vless",
+      "format": "panel_specific",
+      "status": "supported"
+    },
+    {
+      "protocol": "vmess",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "vmess",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "vmess",
+      "format": "xray_json",
+      "status": "supported"
+    },
+    {
+      "protocol": "vmess",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "vmess",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "vmess",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "vmess",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "vmess",
+      "format": "panel_specific",
+      "status": "supported"
+    },
+    {
+      "protocol": "trojan",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "trojan",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "trojan",
+      "format": "xray_json",
+      "status": "supported"
+    },
+    {
+      "protocol": "trojan",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "trojan",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "trojan",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "trojan",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "trojan",
+      "format": "panel_specific",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks",
+      "format": "xray_json",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "shadowsocks",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "shadowsocks",
+      "format": "panel_specific",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks2022",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks2022",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks2022",
+      "format": "xray_json",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks2022",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks2022",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowsocks2022",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "shadowsocks2022",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "shadowsocks2022",
+      "format": "panel_specific",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria",
+      "format": "xray_json",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "hysteria",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "hysteria",
+      "format": "panel_specific",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria2",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria2",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria2",
+      "format": "xray_json",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria2",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria2",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "hysteria2",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "hysteria2",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "hysteria2",
+      "format": "panel_specific",
+      "status": "supported"
+    },
+    {
+      "protocol": "tuic",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "tuic",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "tuic",
+      "format": "xray_json",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "tuic",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "tuic",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "tuic",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "tuic",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "tuic",
+      "format": "panel_specific",
+      "status": "parser_only"
+    },
+    {
+      "protocol": "anytls",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "anytls",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "anytls",
+      "format": "xray_json",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "anytls",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "anytls",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "anytls",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "anytls",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "anytls",
+      "format": "panel_specific",
+      "status": "parser_only"
+    },
+    {
+      "protocol": "shadowtls",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowtls",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowtls",
+      "format": "xray_json",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "shadowtls",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowtls",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "shadowtls",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "shadowtls",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "shadowtls",
+      "format": "panel_specific",
+      "status": "parser_only"
+    },
+    {
+      "protocol": "naive",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "naive",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "naive",
+      "format": "xray_json",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "naive",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "naive",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "naive",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "naive",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "naive",
+      "format": "panel_specific",
+      "status": "parser_only"
+    },
+    {
+      "protocol": "wireguard",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "wireguard",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "wireguard",
+      "format": "xray_json",
+      "status": "parser_only"
+    },
+    {
+      "protocol": "wireguard",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "wireguard",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "wireguard",
+      "format": "wg_conf",
+      "status": "supported"
+    },
+    {
+      "protocol": "wireguard",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "wireguard",
+      "format": "panel_specific",
+      "status": "supported"
+    },
+    {
+      "protocol": "amneziawg",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "amneziawg",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "amneziawg",
+      "format": "xray_json",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "amneziawg",
+      "format": "clash",
+      "status": "parser_only"
+    },
+    {
+      "protocol": "amneziawg",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "amneziawg",
+      "format": "wg_conf",
+      "status": "supported"
+    },
+    {
+      "protocol": "amneziawg",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "amneziawg",
+      "format": "panel_specific",
+      "status": "supported"
+    },
+    {
+      "protocol": "masque",
+      "format": "direct_uri",
+      "status": "parser_only"
+    },
+    {
+      "protocol": "masque",
+      "format": "base64",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "masque",
+      "format": "xray_json",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "masque",
+      "format": "clash",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "masque",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "masque",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "masque",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "masque",
+      "format": "panel_specific",
+      "status": "parser_only"
+    },
+    {
+      "protocol": "warp_masque",
+      "format": "direct_uri",
+      "status": "parser_only"
+    },
+    {
+      "protocol": "warp_masque",
+      "format": "base64",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "warp_masque",
+      "format": "xray_json",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "warp_masque",
+      "format": "clash",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "warp_masque",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "warp_masque",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "warp_masque",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "warp_masque",
+      "format": "panel_specific",
+      "status": "parser_only"
+    },
+    {
+      "protocol": "mieru",
+      "format": "direct_uri",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "mieru",
+      "format": "base64",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "mieru",
+      "format": "xray_json",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "mieru",
+      "format": "clash",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "mieru",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "mieru",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "mieru",
+      "format": "mieru_json",
+      "status": "supported"
+    },
+    {
+      "protocol": "mieru",
+      "format": "panel_specific",
+      "status": "n/a"
+    },
+    {
+      "protocol": "socks",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "socks",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "socks",
+      "format": "xray_json",
+      "status": "supported"
+    },
+    {
+      "protocol": "socks",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "socks",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "socks",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "socks",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "socks",
+      "format": "panel_specific",
+      "status": "supported"
+    },
+    {
+      "protocol": "http",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "http",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "http",
+      "format": "xray_json",
+      "status": "supported"
+    },
+    {
+      "protocol": "http",
+      "format": "clash",
+      "status": "supported"
+    },
+    {
+      "protocol": "http",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "http",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "http",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "http",
+      "format": "panel_specific",
+      "status": "supported"
+    },
+    {
+      "protocol": "ssh",
+      "format": "direct_uri",
+      "status": "supported"
+    },
+    {
+      "protocol": "ssh",
+      "format": "base64",
+      "status": "supported"
+    },
+    {
+      "protocol": "ssh",
+      "format": "xray_json",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "ssh",
+      "format": "clash",
+      "status": "unsupported"
+    },
+    {
+      "protocol": "ssh",
+      "format": "singbox",
+      "status": "supported"
+    },
+    {
+      "protocol": "ssh",
+      "format": "wg_conf",
+      "status": "n/a"
+    },
+    {
+      "protocol": "ssh",
+      "format": "mieru_json",
+      "status": "n/a"
+    },
+    {
+      "protocol": "ssh",
+      "format": "panel_specific",
+      "status": "n/a"
+    }
+  ]
+}

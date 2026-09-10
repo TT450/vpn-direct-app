@@ -1,0 +1,26 @@
+{
+  "remarks": "3x-ui-flat-vless",
+  "outbounds": [
+    {
+      "protocol": "vless",
+      "tag": "flat-vless",
+      "settings": {
+        "address": "203.0.113.41",
+        "port": 8443,
+        "id": "22222222-2222-2222-2222-222222222222",
+        "flow": "xtls-rprx-vision",
+        "encryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "fingerprint": "chrome",
+          "serverName": "www.cloudflare.com",
+          "publicKey": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+          "shortId": "deadbeef"
+        }
+      }
+    }
+  ]
+}

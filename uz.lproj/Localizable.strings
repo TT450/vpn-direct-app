@@ -1,0 +1,34 @@
+"main.disconnected" = "O‘chirilgan";
+"main.connected" = "Faol";
+"main.days_left" = "Qoldi";
+"settings.title" = "Sozlamalar";
+"about.title" = "Ilova haqida";
+"language.select_language" = "Til tanlash";
+"settings.language" = "Til";
+"settings.change_config" = "Konfiguratsiyani o‘zgartirish";
+"settings.telegram" = "Telegramdagi kanalimiz";
+"settings.about" = "Ilova haqida";
+
+"add_config.title_01" = "Xush kelibsiz";
+"add_config.text_01" = "Ishni boshlash uchun VPN sozlash kerak";
+"add_config.text_02" = "Bizning Telegram-botimizga o‘ting va o‘zingizning konfiguratsiya havolangizni yarating yoki nusxa olingan Vless havolasini joylashtiring";
+"add_config.title_02" = "Konfiguratsiyani o‘zgartirish";
+"add_config.text_03" = "Uni quyida kiritishingiz yoki almashish buferidan joylashtirishingiz mumkin";
+"add_config.text_04" = "Telegram-bot @vpndirectbot ga o‘ting";
+"add_config.paste" = "Joylashtirish";
+"add_config.config_add" = "Konfiguratsiyani qo‘shish";
+"add_config.config_replace" = "Konfiguratsiyani almashtirish";
+
+"main.download" = "Qabul qilindi";
+"main.upload" = "Yuborildi";
+
+"main.day1" = "kun";
+"main.day2" = "kun";
+"main.day5" = "kun";
+
+"main.install_extension.text" = "VPN ishlashi uchun siz kengaytmani o'rnatishingiz kerak";
+"main.install_extension.button" = "Tarmoq kengaytmasini o'rnating";
+
+"general.about" = "Orqaga";
+
+

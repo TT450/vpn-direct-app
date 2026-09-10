@@ -1,0 +1,4 @@
+{
+  "portBindings": [{ "port": 8964, "protocol": "UDP" }],
+  "users": [{ "name": "lab", "password": "lab-mieru-password" }]
+}

@@ -1,0 +1,10 @@
+# TUIC v5 reference — pin binary/image in VERSION; many labs run host-installed tuic-server.
+services:
+  tuic:
+    image: alpine:3.20
+    profiles: ["lab"]
+    command: ["sh", "-c", "echo 'Install tuic-server per VERSION pin; mount configs/server.json'; sleep infinity"]
+    volumes:
+      - ./configs:/configs:ro
+    ports:
+      - "10443:443/udp"
