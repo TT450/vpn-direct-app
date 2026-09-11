@@ -91,8 +91,14 @@ public struct VPNHomeView: View {
                                 DirectAuthRegisterView(model: model)
                             case .authRecovery:
                                 DirectAuthRecoveryView(model: model)
+                            case .authTelegram:
+                                DirectAuthTelegramHubView(model: model)
                             case .authBot:
                                 DirectAuthBotView(model: model)
+                            case .authPhone:
+                                DirectAuthPhoneView(model: model)
+                            case .authPhoneCode:
+                                DirectAuthPhoneCodeView(model: model)
                             case .authSuccess:
                                 DirectAuthSuccessView(model: model)
                             case .paymentProcessing:
@@ -127,13 +133,21 @@ public struct VPNHomeView: View {
                             case .account:
                                 DirectAccountView(model: model)
                             case .externalPay(let url):
-                                DirectExternalPayWebView(url: url) {
-                                    if let id = model.lastPaymentId {
-                                        Task { await model.finalizeCheckoutSuccess(paymentId: id) }
-                                    } else {
-                                        model.cancelExternalCheckout()
+                                DirectExternalPayWebView(
+                                    url: url,
+                                    onClose: {
+                                        if let id = model.lastPaymentId {
+                                            Task { await model.finalizeCheckoutSuccess(paymentId: id) }
+                                        } else {
+                                            model.cancelExternalCheckout()
+                                        }
+                                    },
+                                    onSuccess: {
+                                        if let id = model.lastPaymentId {
+                                            Task { await model.finalizeCheckoutSuccess(paymentId: id) }
+                                        }
                                     }
-                                }
+                                )
                             }
                         } else {
                             switch model.selectedTab {
@@ -206,16 +220,29 @@ public struct VPNHomeView: View {
                 model.syncFromExtension()
             }
             consumeWidgetToggleIfNeeded()
+            consumeBotAuthDeepLinkIfNeeded()
+            consumePayDeepLinkIfNeeded()
         }
         .onChangeCompat(of: scenePhase) { phase in
             if phase == .active {
                 environments.extensionProfile?.refreshStatus()
                 model.syncFromExtension()
                 consumeWidgetToggleIfNeeded()
+                consumeBotAuthDeepLinkIfNeeded()
+                consumePayDeepLinkIfNeeded()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .vpnDirectWidgetToggle)) { _ in
             consumeWidgetToggleIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .vpnDirectOpenBotAuth)) { _ in
+            consumeBotAuthDeepLinkIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .vpnDirectPaySuccess)) { _ in
+            consumePayDeepLinkIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .vpnDirectPayFail)) { _ in
+            consumePayDeepLinkIfNeeded()
         }
         .onReceive(environments.$extensionProfile) { _ in
             model.syncFromExtension()
@@ -506,6 +533,26 @@ public struct VPNHomeView: View {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 350_000_000)
             model.toggleConnection()
+        }
+    }
+
+    private func consumeBotAuthDeepLinkIfNeeded() {
+        guard VPNDirectDeepLink.consumePendingBotAuth() else { return }
+        model.openBotAuthFromDeepLink()
+    }
+
+    private func consumePayDeepLinkIfNeeded() {
+        if VPNDirectDeepLink.consumePendingPaySuccess() {
+            if let id = model.lastPaymentId {
+                Task { await model.finalizeCheckoutSuccess(paymentId: id) }
+            } else {
+                model.openDetail(.paymentSuccess)
+            }
+            return
+        }
+        if VPNDirectDeepLink.consumePendingPayFail() {
+            model.paymentErrorMessage = "Оплата не завершена. Можно выбрать другой способ."
+            model.openDetail(.paymentError)
         }
     }
 }

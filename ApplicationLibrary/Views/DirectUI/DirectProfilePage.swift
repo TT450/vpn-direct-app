@@ -30,13 +30,13 @@ struct DirectProfilePage: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text("DIRECT ACCOUNT").microLabel(color: .white.opacity(0.45))
                         Text(model.isDirectAuthenticated
-                             ? (model.directAccountEmail ?? "Аккаунт Direct")
+                             ? model.accountDisplayTitle
                              : "Войти в Direct")
                             .font(.system(size: 19, weight: .semibold))
                             .lineLimit(1)
                         Text(model.isDirectAuthenticated
-                             ? "Сессия синхронизирована"
-                             : "Оплата и привязка бота")
+                             ? "\(model.authMethodLabel) · только этот аккаунт"
+                             : "Оплата и вход")
                             .font(.system(size: 10))
                             .foregroundStyle(.white.opacity(0.5))
                             .lineLimit(1)

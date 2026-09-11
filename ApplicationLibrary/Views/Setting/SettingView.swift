@@ -162,12 +162,12 @@ public struct SettingView: View {
                 Section("About") {
                     Tabs.sponsors.navigationLink
                     Link(destination: URL(string: "https://github.com/SagerNet/sing-box-for-apple")!) {
-                        Label("Upstream (sing-box for Apple)", systemImage: "link")
+                        Label("Open Source (Apple client)", systemImage: "link")
                     }
                     .buttonStyle(.plain)
                     .foregroundColor(.accentColor)
                     Link(destination: URL(string: "https://github.com/SagerNet/sing-box")!) {
-                        Label("sing-box Engine", systemImage: "shippingbox.fill")
+                        Label("Open Source Core", systemImage: "shippingbox.fill")
                     }
                     .buttonStyle(.plain)
                     .foregroundColor(.accentColor)

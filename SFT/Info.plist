@@ -18,7 +18,7 @@
 			<key>CFBundleURLIconFile</key>
 			<string>AppIcon.icns</string>
 			<key>CFBundleURLName</key>
-			<string>sing-box</string>
+			<string>VPN Direct</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>sing-box</string>
@@ -40,7 +40,7 @@
 					<string>iPadOS</string>
 				</array>
 				<key>NSApplicationServiceUsageDescription</key>
-				<string>Import sing-box profile from other devices</string>
+				<string>Import VPN Direct profile from other devices</string>
 			</dict>
 		</array>
 	</dict>
@@ -59,6 +59,6 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>As a universal proxy platform, sing-box configures routing according to your configuration.</string>
+	<string>VPN Direct uses the local network to configure routing according to your settings.</string>
 </dict>
 </plist>

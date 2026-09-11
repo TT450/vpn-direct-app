@@ -63,3 +63,7 @@ tests/VPNDirectParserPackage/.build/
 **/DirectBackend.secrets*
 **/DirectBackend*.local.swift
 **/DirectBackendPrivate*.swift
+
+# Google OAuth local plist (never GitHub)
+**/GoogleOAuth.local.plist
+**/client_*.apps.googleusercontent.com.plist

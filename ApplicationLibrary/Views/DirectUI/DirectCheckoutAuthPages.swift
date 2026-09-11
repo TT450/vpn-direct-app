@@ -1,4 +1,5 @@
 import AuthenticationServices
+import CryptoKit
 import SwiftUI
 import WebKit
 
@@ -41,39 +42,52 @@ struct DirectAuthLoginView: View {
     @ObservedObject var model: VPNConnectionModel
 
     var body: some View {
-        DirectAuthPageShell(
-            kicker: "VPN DIRECT / ОПЛАТА",
-            title: "Войти",
-            subtitle: "Войдите, чтобы продолжить. Выбранный заказ сохранён."
+        AuthPageShell(
+            kicker: "ACCOUNT / SIGN IN",
+            title: "Вход",
+            subtitle: PendingCheckout.current == nil
+                ? "Email, Apple, Google, телефон и код из бота — независимые аккаунты."
+                : "Войдите, чтобы продолжить. Выбранный заказ сохранён."
         ) {
-            if let checkout = PendingCheckout.current { DirectAuthCheckoutCard(checkout: checkout) }
-            DirectAuthErrorText(model.checkoutAuthError)
-            CheckoutSectionHeader(title: "БЕЗ ПАРОЛЯ", meta: "OTP").padding(.top, 22)
-            CheckoutAuthRow(mark: "@", title: "Войти по Email", subtitle: "Одноразовый код на почту") {
-                model.checkoutAuthError = nil
-                model.openDetail(.authEmail)
-            }
-            CheckoutAuthRow(mark: "", title: "Войти с Apple", subtitle: "Быстрый вход через Apple") {
-                Task { await model.signInWithAppleForAuth() }
-            }
-            CheckoutAuthRow(mark: "TG", title: "Код из Telegram-бота", subtitle: "Привязка существующей подписки") {
-                model.checkoutAuthError = nil
-                model.openDetail(.authBot)
-            }
-            CheckoutAction(title: "Создать аккаунт", secondary: true) {
-                model.openDetail(.authRegister)
-            }
-            .padding(.top, 16)
-            Button("Не получается войти") { model.openDetail(.authRecovery) }
-                .font(.system(size: 10))
+            VStack(spacing: 10) {
+                if let checkout = PendingCheckout.current {
+                    AuthCheckoutCard(checkout: checkout)
+                }
+                AuthErrorText(model.checkoutAuthError)
+                AuthPrimaryButton(title: "ВОЙТИ ПО EMAIL", icon: "envelope") {
+                    model.requestAuthDestination(.authEmail)
+                }
+                AuthSecondaryButton(title: "Продолжить с Apple", assetIcon: "auth-apple-black") {
+                    Task { await model.signInWithAppleForAuth() }
+                }
+                AuthSecondaryButton(title: "Продолжить с Google", assetIcon: "auth-google") {
+                    Task { await model.signInWithGoogleForAuth() }
+                }
+                AuthSecondaryButton(title: "По номеру телефона", icon: "phone") {
+                    model.openDetail(.authPhone)
+                }
+                AuthSecondaryButton(title: "Код из бота", assetIcon: "auth-telegram") {
+                    model.openDetail(.authBot)
+                }
+                AuthDivider()
+                AuthSecondaryButton(title: "Создать аккаунт", icon: "plus") {
+                    model.openDetail(.authRegister)
+                }
+                Button("Не получается войти") {
+                    model.openDetail(.authRecovery)
+                }
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(DS.muted)
                 .frame(maxWidth: .infinity, minHeight: 36)
+            }
         }
         .disabled(model.checkoutAuthBusy)
-        .overlay {
-            if model.checkoutAuthBusy {
-                ProgressView().scaleEffect(1.1)
-            }
+        .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
+        .alert("Другой аккаунт", isPresented: $model.authAccountSwitchWarning) {
+            Button("Продолжить", role: .destructive) { model.confirmAccountSwitchAndContinue() }
+            Button("Отмена", role: .cancel) { model.cancelAccountSwitch() }
+        } message: {
+            Text("Вы уже вошли. Новый способ входа откроет другой независимый аккаунт — текущая подписка останется на прежнем.")
         }
     }
 }
@@ -81,34 +95,46 @@ struct DirectAuthLoginView: View {
 struct DirectAuthEmailView: View {
     @ObservedObject var model: VPNConnectionModel
     @State private var email = ""
+    @State private var password = ""
+    @State private var revealed = false
 
     var body: some View {
-        DirectAuthPageShell(
-            kicker: "АККАУНТ / EMAIL",
-            title: "Ваша почта",
-            subtitle: "Отправим одноразовый код. Пароль не нужен."
+        AuthPageShell(
+            kicker: "ACCOUNT / EMAIL",
+            title: "Вход по email",
+            subtitle: "Введите данные аккаунта VPN Direct."
         ) {
-            DirectAuthErrorText(model.checkoutAuthError)
-            TextField("name@example.com", text: $email)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.emailAddress)
-                .autocorrectionDisabled()
-                .font(.system(size: 14, weight: .medium))
-                .padding(.horizontal, 14)
-                .frame(height: 52)
-                .overlay(Rectangle().stroke(DS.line))
-                .padding(.top, 24)
-            CheckoutAction(title: "Получить код") {
-                Task { await model.sendEmailCodeForAuth(email: email) }
+            VStack(alignment: .leading, spacing: 13) {
+                AuthErrorText(model.checkoutAuthError)
+                AuthField(title: "EMAIL", placeholder: "you@example.com", text: $email, keyboard: .emailAddress)
+                AuthPasswordField(title: "ПАРОЛЬ", placeholder: "Введите пароль", text: $password, revealed: $revealed)
+                Button("Забыли пароль?") {
+                    model.openDetail(.authRecovery)
+                }
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(DS.ink)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .buttonStyle(.plain)
+                AuthPrimaryButton(title: "ВОЙТИ", icon: "arrow.right") {
+                    Task { await model.loginWithPasswordForAuth(email: email, password: password) }
+                }
+                AuthDivider()
+                Button("Войти по одноразовому коду") {
+                    Task { await model.sendEmailCodeForAuth(email: email) }
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(DS.ink)
+                .frame(maxWidth: .infinity)
+                Button("Создать аккаунт") {
+                    model.openDetail(.authRegister)
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(DS.ink)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.top, 14)
         }
         .disabled(model.checkoutAuthBusy)
-        .overlay {
-            if model.checkoutAuthBusy {
-                ProgressView().scaleEffect(1.1)
-            }
-        }
+        .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
         .onAppear {
             if email.isEmpty, !model.checkoutAuthEmail.isEmpty {
                 email = model.checkoutAuthEmail
@@ -127,128 +153,328 @@ struct DirectAuthCodeView: View {
     }
 
     var body: some View {
-        DirectAuthPageShell(kicker: "АККАУНТ / OTP", title: "Введите код", subtitle: subtitle) {
-            DirectAuthErrorText(model.checkoutAuthError)
-            TextField("000000", text: $model.checkoutAuthCode)
-                .keyboardType(.numberPad)
-                .font(.system(size: 25, weight: .semibold, design: .monospaced))
-                .multilineTextAlignment(.center)
-                .frame(height: 64)
-                .overlay(Rectangle().stroke(DS.line))
-                .padding(.top, 28)
-            CheckoutAction(title: "Подтвердить") {
-                Task { await model.verifyEmailCodeForAuth() }
+        AuthPageShell(kicker: "ACCOUNT / OTP", title: "Введите код", subtitle: subtitle) {
+            VStack(alignment: .leading, spacing: 14) {
+                AuthErrorText(model.checkoutAuthError)
+                TextField("000000", text: $model.checkoutAuthCode)
+                    .keyboardType(.numberPad)
+                    .font(.system(size: 25, weight: .semibold, design: .monospaced))
+                    .multilineTextAlignment(.center)
+                    .frame(height: 64)
+                    .background(Color.white.opacity(0.45))
+                    .overlay(Rectangle().stroke(DS.line))
+                AuthPrimaryButton(title: "ПОДТВЕРДИТЬ", icon: "checkmark") {
+                    Task { await model.verifyEmailCodeForAuth() }
+                }
+                Button("Отправить код снова") {
+                    Task { await model.resendEmailCodeForAuth() }
+                }
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(DS.muted)
+                .frame(maxWidth: .infinity, minHeight: 42)
             }
-            .padding(.top, 14)
-            Button("Отправить код снова") {
-                Task { await model.resendEmailCodeForAuth() }
-            }
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(DS.muted)
-            .frame(maxWidth: .infinity, minHeight: 42)
         }
         .disabled(model.checkoutAuthBusy)
-        .overlay {
-            if model.checkoutAuthBusy {
-                ProgressView().scaleEffect(1.1)
-            }
-        }
+        .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
     }
 }
 
 struct DirectAuthRegisterView: View {
     @ObservedObject var model: VPNConnectionModel
+    @State private var name = ""
+    @State private var email = ""
+    @State private var password = ""
+    @State private var confirmation = ""
+    @State private var revealed = false
+    @State private var confirmationRevealed = false
 
     var body: some View {
-        DirectAuthPageShell(
-            kicker: "АККАУНТ / РЕГИСТРАЦИЯ",
-            title: "Создать аккаунт",
-            subtitle: "Регистрация проходит по Email-коду — пароль не нужен."
+        AuthPageShell(
+            kicker: "ACCOUNT / NEW",
+            title: "Регистрация",
+            subtitle: "Создайте аккаунт VPN Direct."
         ) {
-            Text(
-                "Аккаунт нужен только для управления Direct-подпиской и восстановления доступа. "
-                    + "Просмотр тарифов и импорт внешних подписок остаются доступны без регистрации."
-            )
-            .font(.system(size: 11))
-            .foregroundStyle(DS.muted)
-            .lineSpacing(4)
-            .padding(.top, 24)
-            CheckoutAction(title: "Продолжить с Email") { model.openDetail(.authEmail) }
-                .padding(.top, 20)
-            CheckoutAction(title: "Войти с Apple", secondary: true) {
-                Task { await model.signInWithAppleForAuth() }
+            VStack(alignment: .leading, spacing: 11) {
+                AuthErrorText(model.checkoutAuthError)
+                AuthField(title: "ИМЯ", placeholder: "Как к вам обращаться", text: $name)
+                AuthField(title: "EMAIL", placeholder: "you@example.com", text: $email, keyboard: .emailAddress)
+                AuthPasswordField(title: "ПАРОЛЬ", placeholder: "Минимум 8 символов", text: $password, revealed: $revealed)
+                AuthPasswordField(
+                    title: "ПОВТОРИТЕ ПАРОЛЬ",
+                    placeholder: "Введите пароль ещё раз",
+                    text: $confirmation,
+                    revealed: $confirmationRevealed
+                )
+                Text("Создавая аккаунт, вы соглашаетесь с условиями использования и политикой конфиденциальности.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(DS.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                AuthPrimaryButton(title: "СОЗДАТЬ АККАУНТ", icon: "arrow.right") {
+                    Task {
+                        await model.registerWithPasswordForAuth(
+                            name: name,
+                            email: email,
+                            password: password,
+                            confirmation: confirmation
+                        )
+                    }
+                }
+                AuthDivider()
+                AuthSecondaryButton(title: "Продолжить с Apple", assetIcon: "auth-apple-black") {
+                    Task { await model.signInWithAppleForAuth() }
+                }
+                AuthSecondaryButton(title: "Продолжить с Google", assetIcon: "auth-google") {
+                    Task { await model.signInWithGoogleForAuth() }
+                }
+                AuthSecondaryButton(title: "По номеру телефона", icon: "phone") {
+                    model.openDetail(.authPhone)
+                }
+                Button("Уже есть аккаунт? Войти") {
+                    model.openDetail(.authLogin)
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(DS.ink)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
             }
-            .padding(.top, 8)
         }
         .disabled(model.checkoutAuthBusy)
-        .overlay {
-            if model.checkoutAuthBusy {
-                ProgressView().scaleEffect(1.1)
-            }
-        }
+        .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
     }
 }
 
 struct DirectAuthRecoveryView: View {
     @ObservedObject var model: VPNConnectionModel
+    @State private var email = ""
+    @State private var sent = false
 
     var body: some View {
-        DirectAuthPageShell(
-            kicker: "АККАУНТ / ВОССТАНОВЛЕНИЕ",
-            title: "Не получается войти",
-            subtitle: "Восстановление — это повторный вход без пароля."
+        AuthPageShell(
+            kicker: "ACCOUNT / PASSWORD",
+            title: "Восстановление пароля",
+            subtitle: "Отправим ссылку для сброса пароля на вашу почту."
         ) {
-            CheckoutAuthRow(mark: "@", title: "Получить новый код", subtitle: "Повторить вход по Email") {
-                model.openDetail(.authEmail)
-            }
-            CheckoutAuthRow(mark: "", title: "Войти с Apple", subtitle: "Если аккаунт связан с Apple") {
-                Task { await model.signInWithAppleForAuth() }
-            }
-            CheckoutAuthRow(mark: "TG", title: "Код из бота", subtitle: "Если подписка уже в Telegram") {
-                model.openDetail(.authBot)
+            VStack(alignment: .leading, spacing: 14) {
+                AuthErrorText(model.checkoutAuthError)
+                if sent {
+                    Text("Если аккаунт существует, письмо уже отправлено. Проверьте «Спам».")
+                        .font(.system(size: 12))
+                        .foregroundStyle(DS.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    AuthField(title: "EMAIL", placeholder: "you@example.com", text: $email, keyboard: .emailAddress)
+                    AuthPrimaryButton(title: "ОТПРАВИТЬ ССЫЛКУ", icon: "arrow.right") {
+                        Task {
+                            let ok = await model.requestPasswordResetForAuth(email: email)
+                            if ok { sent = true }
+                        }
+                    }
+                }
+                Text("Можно также войти через Apple, Google или по номеру.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(DS.muted)
+                AuthSecondaryButton(title: "Войти с Apple", assetIcon: "auth-apple-black") {
+                    Task { await model.signInWithAppleForAuth() }
+                }
+                AuthSecondaryButton(title: "Войти с Google", assetIcon: "auth-google") {
+                    Task { await model.signInWithGoogleForAuth() }
+                }
+                AuthSecondaryButton(title: "По номеру телефона", icon: "phone") {
+                    model.openDetail(.authPhone)
+                }
             }
         }
         .disabled(model.checkoutAuthBusy)
-        .overlay {
-            if model.checkoutAuthBusy {
-                ProgressView().scaleEffect(1.1)
+        .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
+        .onAppear {
+            if email.isEmpty, !model.checkoutAuthEmail.isEmpty {
+                email = model.checkoutAuthEmail
             }
         }
     }
 }
 
-struct DirectAuthBotView: View {
+struct DirectAuthTelegramHubView: View {
     @ObservedObject var model: VPNConnectionModel
 
     var body: some View {
-        DirectAuthPageShell(
-            kicker: "VPN DIRECT / BOT",
-            title: "Привязать подписку",
-            subtitle: "Перенесите существующую подписку из VPN Direct бота."
+        AuthPageShell(
+            kicker: "ACCOUNT / BOT",
+            title: "Аккаунт бота",
+            subtitle: "Вход в аккаунт @vpndirectbot: код из бота или подтверждение в Telegram."
         ) {
-            DirectAuthErrorText(model.checkoutAuthError)
-            TextField("XXXX-XXXX", text: $model.checkoutAuthBotCode)
-                .textInputAutocapitalization(.characters)
-                .font(.system(size: 17, weight: .semibold, design: .monospaced))
-                .padding(.horizontal, 14)
-                .frame(height: 54)
-                .overlay(Rectangle().stroke(DS.line))
-                .padding(.top, 24)
-            CheckoutAction(title: "Привязать") {
-                Task { await model.linkBotCodeForAuth() }
+            VStack(alignment: .leading, spacing: 12) {
+                AuthErrorText(model.checkoutAuthError)
+                AuthPrimaryButton(title: "КОД ИЛИ ПОДТВЕРЖДЕНИЕ", icon: "number") {
+                    model.openDetail(.authBot)
+                }
+                AuthSecondaryButton(title: "По номеру телефона", icon: "phone") {
+                    model.openDetail(.authPhone)
+                }
+                Text("Телефон создаёт отдельный app-аккаунт. Подписка бота — только через код или подтверждение.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(DS.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 4)
             }
-            .padding(.top, 14)
-            Text("В боте @vpndirectbot откройте «Привязать приложение» и введите код сюда.")
-                .font(.system(size: 10))
-                .foregroundStyle(DS.muted)
-                .padding(.top, 12)
         }
         .disabled(model.checkoutAuthBusy)
-        .overlay {
-            if model.checkoutAuthBusy {
-                ProgressView().scaleEffect(1.1)
+        .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
+    }
+}
+
+struct DirectAuthBotView: View {
+    @ObservedObject var model: VPNConnectionModel
+    @State private var mode: Mode = .code
+
+    private enum Mode: String, CaseIterable {
+        case code = "Код"
+        case confirm = "Подтверждение"
+    }
+
+    var body: some View {
+        AuthPageShell(
+            kicker: "ACCOUNT / BOT",
+            title: "Аккаунт бота",
+            subtitle: mode == .code
+                ? "В @vpndirectbot нажмите «Синхронизировать с приложением» и введите 6 цифр."
+                : "Укажите @username или Telegram ID — в боте придёт запрос «Согласиться / Запретить»."
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                AuthErrorText(model.checkoutAuthError)
+                Picker("", selection: $mode) {
+                    ForEach(Mode.allCases, id: \.self) { item in
+                        Text(item.rawValue).tag(item)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if mode == .code {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("КОД ИЗ БОТА").microLabel(color: DS.ink)
+                        Text("Кнопка в боте создаёт одноразовый 6-значный код. Старый формат XXXX-XXXX тоже ещё принимается.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(DS.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(14)
+                    .background(DS.panel.opacity(0.08))
+                    .overlay(Rectangle().stroke(DS.line))
+                    AuthField(
+                        title: "КОД",
+                        placeholder: "123456",
+                        text: $model.checkoutAuthBotCode,
+                        keyboard: .numberPad
+                    )
+                    AuthPrimaryButton(title: "ВОЙТИ", icon: "arrow.right") {
+                        Task { await model.linkBotCodeForAuth() }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ПОДТВЕРЖДЕНИЕ В TELEGRAM").microLabel(color: DS.ink)
+                        Text("Мы отправим запрос в чат с ботом. Пока ждёте — ничего не означает: подтверждение, отказ и неизвестный аккаунт выглядят одинаково.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(DS.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(14)
+                    .background(DS.panel.opacity(0.08))
+                    .overlay(Rectangle().stroke(DS.line))
+                    AuthField(
+                        title: "@USERNAME ИЛИ TG ID",
+                        placeholder: "@username или 123456789",
+                        text: $model.checkoutAuthBotIdentifier
+                    )
+                    AuthPrimaryButton(title: "ЗАПРОСИТЬ ВХОД", icon: "paperplane") {
+                        Task {
+                            await model.requestBotLoginConfirmForAuth(
+                                identifier: model.checkoutAuthBotIdentifier
+                            )
+                        }
+                    }
+                    if model.checkoutAuthBusy {
+                        Text("Ожидаем подтверждение в Telegram…")
+                            .font(.system(size: 11))
+                            .foregroundStyle(DS.muted)
+                    }
+                }
             }
         }
+        .disabled(model.checkoutAuthBusy)
+        .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
+    }
+}
+
+struct DirectAuthPhoneView: View {
+    @ObservedObject var model: VPNConnectionModel
+    @State private var phone = ""
+
+    var body: some View {
+        AuthPageShell(
+            kicker: "ACCOUNT / PHONE",
+            title: "Вход по номеру",
+            subtitle: "Код придёт в Telegram. Новый номер — новый app-аккаунт с триалом; уже зарегистрированный — просто вход."
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                AuthErrorText(model.checkoutAuthError)
+                AuthField(
+                    title: "ТЕЛЕФОН",
+                    placeholder: "+79001234567 или 89001234567",
+                    text: $phone,
+                    keyboard: .phonePad
+                )
+                AuthPrimaryButton(title: "ОТПРАВИТЬ КОД", icon: "paperplane") {
+                    Task { await model.sendPhoneCodeForAuth(phone: phone) }
+                }
+                Text("Нужен Telegram на этом номере для получения кода. Это не аккаунт бота — для бота используйте «Код из бота».")
+                    .font(.system(size: 10))
+                    .foregroundStyle(DS.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .disabled(model.checkoutAuthBusy)
+        .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
+        .onAppear {
+            if phone.isEmpty, !model.checkoutAuthPhone.isEmpty {
+                phone = model.checkoutAuthPhone
+            }
+        }
+    }
+}
+
+struct DirectAuthPhoneCodeView: View {
+    @ObservedObject var model: VPNConnectionModel
+
+    private var subtitle: String {
+        model.checkoutAuthPhone.isEmpty
+            ? "Введите код из Telegram."
+            : "Код отправлен в Telegram на \(model.checkoutAuthPhone)."
+    }
+
+    var body: some View {
+        AuthPageShell(kicker: "ACCOUNT / PHONE OTP", title: "Код из Telegram", subtitle: subtitle) {
+            VStack(alignment: .leading, spacing: 14) {
+                AuthErrorText(model.checkoutAuthError)
+                TextField("000000", text: $model.checkoutAuthCode)
+                    .keyboardType(.numberPad)
+                    .font(.system(size: 25, weight: .semibold, design: .monospaced))
+                    .multilineTextAlignment(.center)
+                    .frame(height: 64)
+                    .background(Color.white.opacity(0.45))
+                    .overlay(Rectangle().stroke(DS.line))
+                AuthPrimaryButton(title: "ПОДТВЕРДИТЬ", icon: "checkmark") {
+                    Task { await model.verifyPhoneCodeForAuth() }
+                }
+                Button("Отправить код снова") {
+                    Task { await model.sendPhoneCodeForAuth(phone: model.checkoutAuthPhone) }
+                }
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(DS.muted)
+                .frame(maxWidth: .infinity, minHeight: 42)
+            }
+        }
+        .disabled(model.checkoutAuthBusy)
+        .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
     }
 }
 
@@ -257,84 +483,28 @@ struct DirectAuthSuccessView: View {
 
     private var continueTitle: String {
         if model.authFlowReturnsToAccount {
-            return "Вернуться в аккаунт"
+            return "ВЕРНУТЬСЯ В АККАУНТ"
         }
-        return PendingCheckout.current == nil ? "Готово" : "Продолжить оплату"
+        return PendingCheckout.current == nil ? "ГОТОВО" : "ПРОДОЛЖИТЬ ОПЛАТУ"
     }
 
     var body: some View {
-        DirectAuthPageShell(
+        AuthPageShell(
             kicker: "VPN DIRECT / ГОТОВО",
             title: "Аккаунт готов",
             subtitle: model.authFlowReturnsToAccount
                 ? "Сессия сохранена. Можно вернуться в аккаунт."
                 : "Возвращаем вас к оформлению заказа."
         ) {
-            if let checkout = PendingCheckout.current, !model.authFlowReturnsToAccount {
-                DirectAuthCheckoutCard(checkout: checkout).padding(.top, 24)
+            VStack(alignment: .leading, spacing: 16) {
+                if let checkout = PendingCheckout.current, !model.authFlowReturnsToAccount {
+                    AuthCheckoutCard(checkout: checkout)
+                }
+                AuthPrimaryButton(title: continueTitle, icon: "arrow.right") {
+                    model.completeAuthAfterSuccess()
+                }
             }
-            CheckoutAction(title: continueTitle) {
-                model.completeAuthAfterSuccess()
-            }
-            .padding(.top, 16)
         }
-    }
-}
-
-// MARK: - Shared auth chrome
-
-private struct DirectAuthPageShell<Content: View>: View {
-    let kicker: String
-    let title: String
-    let subtitle: String
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                PageHeading(kicker: kicker, title: title, subtitle: subtitle)
-                    .padding(.top, DS.pageTop)
-                content()
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 34)
-        }
-        .background(DS.paper.ignoresSafeArea())
-        .preferredColorScheme(.light)
-        .buttonStyle(HapticButtonStyle())
-    }
-}
-
-private struct DirectAuthErrorText: View {
-    let message: String?
-    init(_ message: String?) { self.message = message }
-    var body: some View {
-        if let message {
-            Text(message)
-                .font(.system(size: 11))
-                .foregroundStyle(.red)
-                .padding(.top, 12)
-        }
-    }
-}
-
-private struct DirectAuthCheckoutCard: View {
-    let checkout: PendingCheckout
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text("ЗАКАЗ СОХРАНЁН").microLabel(color: DS.acid)
-            Text(checkout.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(.white)
-            HStack {
-                Text("\(checkout.periodDays) дней")
-                Spacer()
-                Text("\(checkout.price) ₽").fontWeight(.semibold)
-            }
-            .font(.system(size: 10))
-            .foregroundStyle(.white.opacity(0.55))
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(DS.panel)
     }
 }
 
@@ -412,6 +582,8 @@ struct DirectPaymentSuccessView: View {
 struct DirectExternalPayWebView: View {
     let url: URL
     let onClose: () -> Void
+    /// Called when the hub navigates to a success page (payment confirmed in browser).
+    var onSuccess: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -425,7 +597,7 @@ struct DirectExternalPayWebView: View {
             .frame(height: 48)
             .overlay(alignment: .bottom) { Hairline() }
 
-            DirectWKWebView(url: url)
+            DirectWKWebView(url: url, onSuccess: onSuccess)
         }
         .background(DS.paper.ignoresSafeArea())
     }
@@ -433,12 +605,61 @@ struct DirectExternalPayWebView: View {
 
 private struct DirectWKWebView: UIViewRepresentable {
     let url: URL
+    var onSuccess: (() -> Void)? = nil
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onSuccess: onSuccess)
+    }
+
     func makeUIView(context: Context) -> WKWebView {
         let view = WKWebView()
+        view.navigationDelegate = context.coordinator
         view.load(URLRequest(url: url))
         return view
     }
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        context.coordinator.onSuccess = onSuccess
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        var onSuccess: (() -> Void)?
+        private var didFireSuccess = false
+
+        init(onSuccess: (() -> Void)?) {
+            self.onSuccess = onSuccess
+        }
+
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            if let navURL = navigationAction.request.url {
+                maybeSucceed(navURL)
+            }
+            decisionHandler(.allow)
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            if let navURL = webView.url {
+                maybeSucceed(navURL)
+            }
+        }
+
+        private func maybeSucceed(_ navURL: URL) {
+            guard !didFireSuccess else { return }
+            let host = (navURL.host ?? "").lowercased()
+            let path = navURL.path.lowercased()
+            let suffixes = DirectBackendRuntime.checkoutSuccessHostSuffixes
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+                .filter { !$0.isEmpty }
+            guard !suffixes.isEmpty else { return }
+            let isAllowedHost = suffixes.contains { suffix in
+                host == suffix || host.hasSuffix(".\(suffix)") || host.hasSuffix(suffix)
+            }
+            let isSuccess = path == "/success" || path.hasPrefix("/success/")
+            guard isAllowedHost, isSuccess else { return }
+            didFireSuccess = true
+            DispatchQueue.main.async { self.onSuccess?() }
+        }
+    }
 }
 
 private struct DirectPaymentStateView<Extra: View>: View {
@@ -611,8 +832,344 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
     }
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        continuation?.resume(throwing: error)
+        if let authError = error as? ASAuthorizationError {
+            switch authError.code {
+            case .unknown:
+                continuation?.resume(throwing: NSError(
+                    domain: "DirectAuth",
+                    code: 1000,
+                    userInfo: [NSLocalizedDescriptionKey:
+                        "Sign in with Apple не настроен для приложения. В Apple Developer включите capability «Sign In with Apple» для App ID com.vpndirect.vpndirectapp и переустановите профиль."]
+                ))
+            case .canceled:
+                continuation?.resume(throwing: NSError(
+                    domain: "DirectAuth",
+                    code: 1001,
+                    userInfo: [NSLocalizedDescriptionKey: "Вход через Apple отменён"]
+                ))
+            default:
+                continuation?.resume(throwing: error)
+            }
+        } else {
+            continuation?.resume(throwing: error)
+        }
         continuation = nil
+    }
+}
+
+// MARK: - Google Sign In (OAuth code + PKCE via ASWebAuthenticationSession)
+
+@MainActor
+final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationContextProviding {
+    struct Result {
+        let idToken: String
+        let userId: String?
+        let email: String?
+    }
+
+    private var session: ASWebAuthenticationSession?
+
+    func signIn() async throws -> Result {
+        let clientId = DirectBackendRuntime.googleClientID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clientId.isEmpty else {
+            throw NSError(
+                domain: "DirectAuth",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Google Sign In не настроен (client id)"]
+            )
+        }
+        let configuredRedirect = DirectBackendRuntime.googleRedirectURI.trimmingCharacters(in: .whitespacesAndNewlines)
+        let redirect: String
+        if !configuredRedirect.isEmpty {
+            redirect = configuredRedirect
+        } else if let reversed = Self.reversedClientID(from: clientId) {
+            // Google iOS clients expect reversed-client-id:/oauth2redirect or :/
+            redirect = "\(reversed):/oauth2redirect/google"
+        } else {
+            redirect = "vpndirect:/oauth2redirect/google"
+        }
+
+        let verifier = Self.makeCodeVerifier()
+        let challenge = Self.makeCodeChallenge(verifier: verifier)
+        var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
+        components.queryItems = [
+            URLQueryItem(name: "client_id", value: clientId),
+            URLQueryItem(name: "redirect_uri", value: redirect),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "scope", value: "openid email profile"),
+            URLQueryItem(name: "code_challenge", value: challenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256"),
+            URLQueryItem(name: "prompt", value: "select_account"),
+        ]
+        guard let authURL = components.url else {
+            throw NSError(domain: "DirectAuth", code: 3, userInfo: [NSLocalizedDescriptionKey: "Некорректный Google OAuth URL"])
+        }
+        let callbackScheme = URL(string: redirect)?.scheme ?? "vpndirect"
+
+        let callbackURL: URL = try await withCheckedThrowingContinuation { cont in
+            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: callbackScheme) { callbackURL, error in
+                if let error {
+                    let ns = error as NSError
+                    if ns.domain == ASWebAuthenticationSessionError.errorDomain,
+                       ns.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                        cont.resume(throwing: NSError(
+                            domain: "DirectAuth",
+                            code: 1001,
+                            userInfo: [NSLocalizedDescriptionKey: "Вход через Google отменён"]
+                        ))
+                    } else {
+                        cont.resume(throwing: error)
+                    }
+                    return
+                }
+                guard let callbackURL else {
+                    cont.resume(throwing: NSError(
+                        domain: "DirectAuth",
+                        code: 4,
+                        userInfo: [NSLocalizedDescriptionKey: "Google не вернул код авторизации"]
+                    ))
+                    return
+                }
+                cont.resume(returning: callbackURL)
+            }
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = true
+            self.session = session
+            if !session.start() {
+                cont.resume(throwing: NSError(
+                    domain: "DirectAuth",
+                    code: 5,
+                    userInfo: [NSLocalizedDescriptionKey: "Не удалось открыть Google Sign In"]
+                ))
+            }
+        }
+
+        let values = Self.queryValues(from: callbackURL)
+        if let err = values["error"] {
+            throw NSError(
+                domain: "DirectAuth",
+                code: 6,
+                userInfo: [NSLocalizedDescriptionKey: values["error_description"] ?? err]
+            )
+        }
+        guard let code = values["code"], !code.isEmpty else {
+            throw NSError(
+                domain: "DirectAuth",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "Google не вернул authorization code"]
+            )
+        }
+
+        let tokens = try await Self.exchangeCode(
+            code: code,
+            redirectURI: redirect,
+            clientId: clientId,
+            codeVerifier: verifier
+        )
+        let claims = Self.decodeJWTClaims(tokens.idToken)
+        return Result(
+            idToken: tokens.idToken,
+            userId: tokens.sub ?? claims["sub"],
+            email: tokens.email ?? claims["email"]
+        )
+    }
+
+    private static func exchangeCode(
+        code: String,
+        redirectURI: String,
+        clientId: String,
+        codeVerifier: String
+    ) async throws -> (idToken: String, email: String?, sub: String?) {
+        var request = URLRequest(url: URL(string: "https://oauth2.googleapis.com/token")!)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        var body = URLComponents()
+        body.queryItems = [
+            URLQueryItem(name: "code", value: code),
+            URLQueryItem(name: "client_id", value: clientId),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
+            URLQueryItem(name: "grant_type", value: "authorization_code"),
+            URLQueryItem(name: "code_verifier", value: codeVerifier),
+        ]
+        request.httpBody = body.percentEncodedQuery?.data(using: .utf8)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        guard status == 200, let idToken = json["id_token"] as? String, !idToken.isEmpty else {
+            let description = (json["error_description"] as? String)
+                ?? (json["error"] as? String)
+                ?? String(data: data, encoding: .utf8)
+                ?? "token exchange failed"
+            throw NSError(
+                domain: "DirectAuth",
+                code: 7,
+                userInfo: [NSLocalizedDescriptionKey: "Google token exchange: \(description)"]
+            )
+        }
+        return (idToken, json["email"] as? String, json["sub"] as? String)
+    }
+
+    private static func queryValues(from url: URL) -> [String: String] {
+        let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        var values: [String: String] = [:]
+        let raw = comps?.query ?? comps?.fragment ?? ""
+        for pair in raw.split(separator: "&") {
+            let parts = pair.split(separator: "=", maxSplits: 1).map(String.init)
+            if parts.count == 2 {
+                values[parts[0]] = parts[1].removingPercentEncoding ?? parts[1]
+            }
+        }
+        for item in comps?.queryItems ?? [] {
+            values[item.name] = item.value ?? values[item.name]
+        }
+        return values
+    }
+
+    private static func makeCodeVerifier() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        return Data(bytes).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    private static func makeCodeChallenge(verifier: String) -> String {
+        let digest = SHA256.hash(data: Data(verifier.utf8))
+        return Data(digest).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    private static func reversedClientID(from clientId: String) -> String? {
+        let suffix = ".apps.googleusercontent.com"
+        guard clientId.hasSuffix(suffix) else { return nil }
+        let prefix = String(clientId.dropLast(suffix.count))
+        guard !prefix.isEmpty else { return nil }
+        return "com.googleusercontent.apps.\(prefix)"
+    }
+
+    private static func decodeJWTClaims(_ jwt: String) -> [String: String] {
+        let parts = jwt.split(separator: ".")
+        guard parts.count >= 2 else { return [:] }
+        var b64 = String(parts[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        while b64.count % 4 != 0 { b64.append("=") }
+        guard let data = Data(base64Encoded: b64),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return [:] }
+        var out: [String: String] = [:]
+        if let sub = json["sub"] as? String { out["sub"] = sub }
+        if let email = json["email"] as? String { out["email"] = email }
+        return out
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow } ?? ASPresentationAnchor()
+    }
+}
+
+// MARK: - Telegram Login (widget page → vpndirect://tg-auth)
+
+@MainActor
+final class TelegramLoginCoordinator: NSObject, ASWebAuthenticationPresentationContextProviding {
+    struct Result {
+        let id: Int
+        let firstName: String?
+        let lastName: String?
+        let username: String?
+        let photoURL: String?
+        let authDate: Int
+        let hash: String
+    }
+
+    private var session: ASWebAuthenticationSession?
+
+    func signIn() async throws -> Result {
+        let urlString = DirectBackendRuntime.telegramLoginURLString
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !urlString.isEmpty, let authURL = URL(string: urlString) else {
+            throw NSError(
+                domain: "DirectAuth",
+                code: 10,
+                userInfo: [NSLocalizedDescriptionKey: "Telegram Login не настроен"]
+            )
+        }
+        return try await withCheckedThrowingContinuation { cont in
+            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "vpndirect") { callbackURL, error in
+                if let error {
+                    let ns = error as NSError
+                    if ns.domain == ASWebAuthenticationSessionError.errorDomain,
+                       ns.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                        cont.resume(throwing: NSError(
+                            domain: "DirectAuth",
+                            code: 1001,
+                            userInfo: [NSLocalizedDescriptionKey: "Вход через Telegram отменён"]
+                        ))
+                    } else {
+                        cont.resume(throwing: error)
+                    }
+                    return
+                }
+                guard let callbackURL,
+                      let comps = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)
+                else {
+                    cont.resume(throwing: NSError(
+                        domain: "DirectAuth",
+                        code: 11,
+                        userInfo: [NSLocalizedDescriptionKey: "Telegram не вернул данные"]
+                    ))
+                    return
+                }
+                var values: [String: String] = [:]
+                for item in comps.queryItems ?? [] {
+                    values[item.name] = item.value ?? ""
+                }
+                guard let id = Int(values["id"] ?? ""),
+                      let authDate = Int(values["auth_date"] ?? ""),
+                      let hash = values["hash"], !hash.isEmpty
+                else {
+                    cont.resume(throwing: NSError(
+                        domain: "DirectAuth",
+                        code: 12,
+                        userInfo: [NSLocalizedDescriptionKey: "Неполный ответ Telegram Login"]
+                    ))
+                    return
+                }
+                cont.resume(returning: Result(
+                    id: id,
+                    firstName: values["first_name"].flatMap { $0.isEmpty ? nil : $0 },
+                    lastName: values["last_name"].flatMap { $0.isEmpty ? nil : $0 },
+                    username: values["username"].flatMap { $0.isEmpty ? nil : $0 },
+                    photoURL: values["photo_url"].flatMap { $0.isEmpty ? nil : $0 },
+                    authDate: authDate,
+                    hash: hash
+                ))
+            }
+            session.presentationContextProvider = self
+            // Keep cookies so the user can authorize inside Telegram in the sheet.
+            session.prefersEphemeralWebBrowserSession = false
+            self.session = session
+            if !session.start() {
+                cont.resume(throwing: NSError(
+                    domain: "DirectAuth",
+                    code: 13,
+                    userInfo: [NSLocalizedDescriptionKey: "Не удалось открыть Telegram Login"]
+                ))
+            }
+        }
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow } ?? ASPresentationAnchor()
     }
 }
 

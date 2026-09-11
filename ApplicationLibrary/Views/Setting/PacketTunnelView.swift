@@ -30,7 +30,7 @@ struct PacketTunnelView: View {
                 FormView {
                     #if !os(macOS)
                         FormToggle("Ignore Memory Limit", """
-                        Do not enforce memory limits on sing-box. Will cause OOM on non-jailbroken devices.
+                        Do not enforce memory limits on the VPN Direct core. Will cause OOM on non-jailbroken devices.
                         """, $ignoreMemoryLimit) { newValue in
                             await SharedPreferences.ignoreMemoryLimit.set(newValue)
                             await restartService()

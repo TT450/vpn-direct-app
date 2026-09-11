@@ -14,7 +14,7 @@ public struct SponsorsView: View {
             } header: {
                 Text("About")
             } footer: {
-                Text("Based on the open-source sing-box for Apple client (GPLv3).")
+                Text("Open-source VPN Direct client (GPLv3).")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }

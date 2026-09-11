@@ -2,7 +2,7 @@ import SwiftUI
 
 #if os(iOS)
 
-/// Direct account screen — login / logout / link bot / refresh from backend.
+/// Direct account screen — login / logout / switch independent accounts.
 struct DirectAccountView: View {
     @ObservedObject var model: VPNConnectionModel
     @State private var busy = false
@@ -15,17 +15,22 @@ struct DirectAccountView: View {
                     kicker: "VPN DIRECT / АККАУНТ",
                     title: model.isDirectAuthenticated ? "Аккаунт" : "Вход",
                     subtitle: model.isDirectAuthenticated
-                        ? "Управление Direct-сессией"
-                        : "Нужен только для оплаты и синхронизации с ботом"
+                        ? "Сессия только этого аккаунта — другие способы входа независимы"
+                        : "Нужен для оплаты. Способы входа не объединяются"
                 )
                 .padding(.top, DS.pageTop)
 
                 if model.isDirectAuthenticated {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("СЕССИЯ").microLabel(color: DS.acid)
-                        Text(model.directAccountEmail ?? "Авторизован")
+                        Text("СЕССИЯ · \(model.authMethodLabel.uppercased())").microLabel(color: DS.acid)
+                        Text(model.accountDisplayTitle)
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.white)
+                        if let kind = model.directAccountKind {
+                            Text(kind == "telegram" ? "Аккаунт Telegram" : "Аккаунт приложения")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.white.opacity(0.55))
+                        }
                         if let url = model.directSubscriptionURL {
                             Text(url)
                                 .font(.system(size: 10, design: .monospaced))
@@ -46,21 +51,25 @@ struct DirectAccountView: View {
                             message = "Обновлено"
                         }
                     } label: {
-                        row("Обновить аккаунт", "Синхронизация подписки")
+                        row("Обновить аккаунт", "Синхронизация подписки этого аккаунта")
                     }
 
                     Button {
-                        model.authFlowReturnsToAccount = true
-                        model.checkoutAuthError = nil
                         model.openDetail(.authBot)
                     } label: {
-                        row("Привязать бота", "Код из Telegram")
+                        row("Код из бота", "Вход в аккаунт @vpndirectbot")
+                    }
+
+                    Button {
+                        model.openDetail(.authPhone)
+                    } label: {
+                        row("По номеру телефона", "Отдельный app-аккаунт")
                     }
 
                     Button {
                         model.openAuthFromAccount()
                     } label: {
-                        row("Другой способ входа", "Email, Apple, восстановление")
+                        row("Другой способ входа", "Email, Apple, Google — тоже отдельные аккаунты")
                     }
 
                     Button {
@@ -74,8 +83,8 @@ struct DirectAccountView: View {
                     }
                 } else {
                     Text(
-                        "Войдите по Email, Apple или коду из бота. Просмотр тарифов и импорт внешних подписок "
-                            + "доступны без регистрации."
+                        "Email, Apple, Google, телефон и код из бота — независимые аккаунты. "
+                            + "Просмотр тарифов и импорт внешних подписок доступны без регистрации."
                     )
                     .font(.system(size: 11))
                     .foregroundStyle(DS.muted)
@@ -109,6 +118,12 @@ struct DirectAccountView: View {
         }
         .background(DS.paper.ignoresSafeArea())
         .buttonStyle(HapticButtonStyle())
+        .alert("Другой аккаунт", isPresented: $model.authAccountSwitchWarning) {
+            Button("Продолжить", role: .destructive) { model.confirmAccountSwitchAndContinue() }
+            Button("Отмена", role: .cancel) { model.cancelAccountSwitch() }
+        } message: {
+            Text("Новый вход откроет другой независимый аккаунт. Текущая подписка останется на прежнем.")
+        }
     }
 
     private func row(_ title: String, _ subtitle: String) -> some View {
@@ -118,36 +133,31 @@ struct DirectAccountView: View {
                 Text(subtitle).font(.system(size: 10)).foregroundStyle(DS.muted)
             }
             Spacer()
-            Image(systemName: "arrow.right").font(.system(size: 11))
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(DS.muted)
         }
-        .frame(minHeight: 64)
+        .padding(.vertical, 16)
         .overlay(alignment: .bottom) { Hairline() }
+        .foregroundStyle(DS.ink)
     }
 
     private func accountPrimaryAction(_ title: String) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Image(systemName: "arrow.right")
-        }
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(DS.acid)
-        .padding(.horizontal, 15)
-        .frame(height: 50)
-        .background(DS.ink)
+        Text(title)
+            .font(.system(size: 13, weight: .bold))
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(DS.ink)
+            .foregroundStyle(.white)
     }
 
     private func accountSecondaryAction(_ title: String) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Image(systemName: "arrow.right")
-        }
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(DS.ink)
-        .padding(.horizontal, 15)
-        .frame(height: 50)
-        .overlay(Rectangle().stroke(DS.ink))
+        Text(title)
+            .font(.system(size: 13, weight: .semibold))
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
+            .overlay(Rectangle().stroke(DS.line))
+            .foregroundStyle(DS.ink)
     }
 }
 

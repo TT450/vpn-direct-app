@@ -24,7 +24,7 @@
                         Section {
                             EmptyView()
                         } footer: {
-                            Text("To import configurations from your iPhone or iPad, make sure sing-box is the **same version** on both devices and **VPN is disabled**.")
+                            Text("To import configurations from your iPhone or iPad, make sure VPN Direct is the **same version** on both devices and **VPN is disabled**.")
                         }
 
                         DevicePicker(

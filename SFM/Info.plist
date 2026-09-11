@@ -12,7 +12,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>AppIcon.icns</string>
 			<key>CFBundleTypeName</key>
-			<string>sing-box Profile</string>
+			<string>VPN Direct Profile</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>LSHandlerRank</key>
@@ -31,7 +31,7 @@
 			<key>CFBundleURLIconFile</key>
 			<string>AppIcon</string>
 			<key>CFBundleURLName</key>
-			<string>sing-box</string>
+			<string>VPN Direct</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>sing-box</string>
@@ -47,7 +47,7 @@
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>
 			<key>NSUbiquitousContainerName</key>
-			<string>sing-box</string>
+			<string>VPN Direct</string>
 			<key>NSUbiquitousContainerSupportedFolderLevels</key>
 			<string>Any</string>
 		</dict>
@@ -62,7 +62,7 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>sing-box Profile</string>
+			<string>VPN Direct Profile</string>
 			<key>UTTypeIconFiles</key>
 			<array/>
 			<key>UTTypeIdentifier</key>
@@ -86,7 +86,7 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>sing-box Profile</string>
+			<string>VPN Direct Profile</string>
 			<key>UTTypeIconFiles</key>
 			<array>
 				<string>AppIcon.icns</string>
@@ -113,15 +113,15 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>sing-box uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
+	<string>VPN Direct uses Location permission for Wi‑Fi SSID/BSSID routing rules, without reading your precise location.</string>
 	<key>NSLocationUsageDescription</key>
-	<string>sing-box uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
+	<string>VPN Direct uses Location permission for Wi‑Fi SSID/BSSID routing rules, without reading your precise location.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>sing-box uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
+	<string>VPN Direct uses Location permission for Wi‑Fi SSID/BSSID routing rules, without reading your precise location.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>sing-box uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
+	<string>VPN Direct uses Location permission for Wi‑Fi SSID/BSSID routing rules, without reading your precise location.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>As a universal proxy platform, sing-box configures routing according to your configuration.</string>
+	<string>VPN Direct uses the local network to configure routing according to your settings.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is required to scan QR codes for importing profiles.</string>
 </dict>

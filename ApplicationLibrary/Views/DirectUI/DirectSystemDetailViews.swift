@@ -175,12 +175,12 @@ struct DirectCoreSettingsView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
 
-                PageHeading(kicker: "СИСТЕМА / CORE", title: "Ядро", subtitle: "Версия sing-box и размер данных")
+                PageHeading(kicker: "СИСТЕМА / CORE", title: "Ядро", subtitle: "Версия ядра и размер данных")
                     .padding(.top, DS.pageTop)
 
                 HStack(alignment: .bottom) {
                     VStack(alignment: .leading, spacing: 7) {
-                        Text("SING–BOX ENGINE").microLabel(color: .white.opacity(0.42))
+                        Text("VPN DIRECT CORE").microLabel(color: .white.opacity(0.42))
                         Text(version).font(.system(size: 28, weight: .semibold, design: .monospaced))
                         Text("Актуальная версия ядра").font(.system(size: 10)).foregroundStyle(.white.opacity(0.48))
                     }

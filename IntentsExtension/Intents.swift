@@ -3,13 +3,13 @@ import Foundation
 import Library
 
 struct StartServiceIntent: AppIntent {
-    static var title: LocalizedStringResource = "Start sing-box"
+    static var title: LocalizedStringResource = "Start VPN Direct"
 
     static var description =
-        IntentDescription("Start or reload sing-box service with specified profile")
+        IntentDescription("Start or reload VPN Direct service with specified profile")
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Start sing-box service with profile \(\.$profile).")
+        Summary("Start VPN Direct service with profile \(\.$profile).")
     }
 
     @Parameter(title: "Profile", optionsProvider: ProfileProvider())
@@ -46,13 +46,13 @@ struct StartServiceIntent: AppIntent {
 }
 
 struct RestartServiceIntent: AppIntent {
-    static var title: LocalizedStringResource = "Restart sing-box"
+    static var title: LocalizedStringResource = "Restart VPN Direct"
 
     static var description =
-        IntentDescription("Restart sing-box service")
+        IntentDescription("Restart VPN Direct service")
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Restart sing-box service")
+        Summary("Restart VPN Direct service")
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -71,13 +71,13 @@ struct RestartServiceIntent: AppIntent {
 }
 
 struct StopServiceIntent: AppIntent {
-    static var title: LocalizedStringResource = "Stop sing-box"
+    static var title: LocalizedStringResource = "Stop VPN Direct"
 
     static var description =
-        IntentDescription("Stop sing-box service")
+        IntentDescription("Stop VPN Direct service")
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Stop sing-box service")
+        Summary("Stop VPN Direct service")
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -90,13 +90,13 @@ struct StopServiceIntent: AppIntent {
 }
 
 struct ToggleServiceIntent: AppIntent {
-    static var title: LocalizedStringResource = "Toggle sing-box"
+    static var title: LocalizedStringResource = "Toggle VPN Direct"
 
     static var description =
-        IntentDescription("Toggle sing-box service")
+        IntentDescription("Toggle VPN Direct service")
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Toggle sing-box service")
+        Summary("Toggle VPN Direct service")
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<Bool> {
@@ -115,13 +115,13 @@ struct ToggleServiceIntent: AppIntent {
 }
 
 struct GetServiceStatus: AppIntent {
-    static var title: LocalizedStringResource = "Get is sing-box service started"
+    static var title: LocalizedStringResource = "Get is VPN Direct service started"
 
     static var description =
-        IntentDescription("Get is sing-box service started")
+        IntentDescription("Get is VPN Direct service started")
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Get is sing-box service started")
+        Summary("Get is VPN Direct service started")
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<Bool> {
@@ -133,13 +133,13 @@ struct GetServiceStatus: AppIntent {
 }
 
 struct GetCurrentProfile: AppIntent {
-    static var title: LocalizedStringResource = "Get current sing-box profile"
+    static var title: LocalizedStringResource = "Get current VPN Direct profile"
 
     static var description =
-        IntentDescription("Get current sing-box profile")
+        IntentDescription("Get current VPN Direct profile")
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Get current sing-box profile")
+        Summary("Get current VPN Direct profile")
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -151,13 +151,13 @@ struct GetCurrentProfile: AppIntent {
 }
 
 struct UpdateProfileIntent: AppIntent {
-    static var title: LocalizedStringResource = "Update sing-box profile"
+    static var title: LocalizedStringResource = "Update VPN Direct profile"
 
     static var description =
-        IntentDescription("Update specified sing-box profile")
+        IntentDescription("Update specified VPN Direct profile")
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Update sing-box profile \(\.$profile).")
+        Summary("Update VPN Direct profile \(\.$profile).")
     }
 
     @Parameter(title: "Profile", optionsProvider: RemoteProfileProvider())

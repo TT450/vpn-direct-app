@@ -973,7 +973,7 @@ private class StatusBarHeaderView: NSView {
     init(environments: ExtensionEnvironments) {
         self.environments = environments
 
-        titleLabel = NSTextField(labelWithString: "sing-box")
+        titleLabel = NSTextField(labelWithString: "VPN Direct")
         statusSwitch = NSSwitch()
         loadingIndicator = NSProgressIndicator()
 

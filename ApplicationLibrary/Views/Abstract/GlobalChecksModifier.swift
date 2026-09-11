@@ -229,7 +229,7 @@ public struct GlobalChecksModifier: ViewModifier {
             wifiLocationManager.onAuthorizationGranted = {
                 alert = AlertState(
                     title: String(localized: "WiFi State Access"),
-                    message: String(localized: "In the standalone version of SFM, reading WiFi state requires this app to be running. After you quit the SFM app, the sing-box service cannot continue to provide `wifi_ssid` and `wifi_bssid` routing rules.")
+                    message: String(localized: "In the standalone version of SFM, reading WiFi state requires this app to be running. After you quit the SFM app, the VPN Direct service cannot continue to provide `wifi_ssid` and `wifi_bssid` routing rules.")
                 )
             }
             wifiLocationManager.requestAuthorizationAndShowWarning()
@@ -239,7 +239,7 @@ public struct GlobalChecksModifier: ViewModifier {
             guard Variant.useSystemExtension, HelperServiceManager.rootHelperStatus != .enabled else { return }
             alert = AlertState(
                 title: String(localized: "Helper Service Required"),
-                message: String(localized: "The sing-box service requires Helper Service to provide process lookup functionality, which supports `process_name` and `process_path` routing rules."),
+                message: String(localized: "The VPN Direct service requires Helper Service to provide process lookup functionality, which supports `process_name` and `process_path` routing rules."),
                 primaryButton: .default(String(localized: "App Settings")) {
                     NotificationCenter.default.post(name: .navigateToSettingsPage, object: SettingsPage.app)
                 },

@@ -69,6 +69,23 @@ struct MainView: View {
             NotificationCenter.default.post(name: .vpnDirectWidgetToggle, object: nil)
             return
         }
+        // Bot «Open app» / sync flow → screen to enter 6-digit code.
+        if VPNDirectDeepLink.isBotAuthURL(url) {
+            VPNDirectDeepLink.markPendingBotAuth()
+            NotificationCenter.default.post(name: .vpnDirectOpenBotAuth, object: nil)
+            return
+        }
+        // Merchant return → payment success / fail screens.
+        if let paid = VPNDirectDeepLink.payResult(from: url) {
+            if paid {
+                VPNDirectDeepLink.markPendingPaySuccess()
+                NotificationCenter.default.post(name: .vpnDirectPaySuccess, object: nil)
+            } else {
+                VPNDirectDeepLink.markPendingPayFail()
+                NotificationCenter.default.post(name: .vpnDirectPayFail, object: nil)
+            }
+            return
+        }
         let absolute = AutoSubscriptionImporter.normalizeImportURL(url.absoluteString)
         if VLESSConfigBuilder.isVLESSLink(absolute) || SubscriptionConfigBuilder.isHTTPURL(absolute) {
             Task {
@@ -105,6 +122,9 @@ struct MainView: View {
             } catch {
                 alert = AlertState(action: "import profile from URL", error: error)
             }
+        } else if url.scheme?.lowercased() == "vpndirect" {
+            // Unknown vpndirect:// path — open app quietly (no error alert).
+            return
         } else {
             alert = AlertState(errorMessage: String(localized: "Handled unknown URL \(url.absoluteString)"))
         }

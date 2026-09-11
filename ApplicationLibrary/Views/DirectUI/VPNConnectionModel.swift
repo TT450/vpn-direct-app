@@ -61,14 +61,23 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var checkoutAuthEmail = ""
     @Published public var checkoutAuthCode = ""
     @Published public var checkoutAuthBotCode = ""
+    @Published public var checkoutAuthBotIdentifier = ""
+    @Published public var checkoutAuthPhone = ""
+    @Published public var checkoutAuthPhoneRequestId = ""
     @Published public var checkoutAuthError: String?
     @Published public var checkoutAuthBusy = false
+    @Published public var authAccountSwitchWarning = false
+    @Published public var pendingAuthDestination: DetailPage?
     /// When true, auth success returns to account instead of continuing checkout.
     @Published public var authFlowReturnsToAccount = false
     @Published public var paymentErrorMessage = "Не удалось завершить оплату"
     @Published public var paymentActivationPending = false
     @Published public var lastPaymentId: String?
     @Published public var directAccountEmail: String?
+    @Published public var directAccountKind: String?
+    @Published public var directAuthMethod: String?
+    @Published public var directAccountUsername: String?
+    @Published public var directAccountPhone: String?
     @Published public var directSubscriptionURL: String?
     @Published public var lastSuccessTitle = ""
     @Published public var lastSuccessPrice = 0
@@ -568,7 +577,10 @@ public final class VPNConnectionModel: ObservableObject {
         case .authCode: return "Код"
         case .authRegister: return "Регистрация"
         case .authRecovery: return "Восстановление"
-        case .authBot: return "Telegram"
+        case .authTelegram: return "Telegram"
+        case .authBot: return "Код бота"
+        case .authPhone: return "Телефон"
+        case .authPhoneCode: return "Код"
         case .authSuccess: return "Готово"
         case .account: return "Аккаунт"
         case .paymentProcessing, .paymentCancelled, .paymentError, .paymentSuccess, .externalPay:
@@ -580,6 +592,15 @@ public final class VPNConnectionModel: ObservableObject {
         authFlowReturnsToAccount = true
         checkoutAuthError = nil
         openDetail(.authLogin)
+    }
+
+    /// Deep link from Telegram bot (`vpndirect://auth/bot`) — jump straight to code entry.
+    public func openBotAuthFromDeepLink() {
+        authFlowReturnsToAccount = true
+        checkoutAuthError = nil
+        checkoutAuthBotCode = ""
+        selectedTab = .profile
+        openDetail(.authBot)
     }
 
     public func completeAuthAfterSuccess() {
@@ -948,9 +969,64 @@ public final class VPNConnectionModel: ObservableObject {
             return
         }
         directAccountEmail = nil
+        directAccountKind = nil
+        directAuthMethod = nil
+        directAccountUsername = nil
+        directAccountPhone = nil
         directSubscriptionURL = nil
         UserDefaults.standard.set(false, forKey: "vpndirect.authenticated")
         objectWillChange.send()
+    }
+
+    /// Independent accounts: warn before replacing the current session with another login method.
+    public func requestAuthDestination(_ page: DetailPage) {
+        checkoutAuthError = nil
+        if isDirectAuthenticated {
+            pendingAuthDestination = page
+            authAccountSwitchWarning = true
+            return
+        }
+        openDetail(page)
+    }
+
+    public func confirmAccountSwitchAndContinue() {
+        authAccountSwitchWarning = false
+        guard let page = pendingAuthDestination else { return }
+        pendingAuthDestination = nil
+        openDetail(page)
+    }
+
+    public func cancelAccountSwitch() {
+        authAccountSwitchWarning = false
+        pendingAuthDestination = nil
+    }
+
+    public var authMethodLabel: String {
+        switch (directAuthMethod ?? "").lowercased() {
+        case "telegram", "telegram_bot": return "Telegram"
+        case "phone": return "Телефон"
+        case "apple": return "Apple"
+        case "google": return "Google"
+        case "email": return "Email"
+        default:
+            if directAccountKind == "telegram" { return "Telegram" }
+            if let phone = directAccountPhone, !phone.isEmpty { return "Телефон" }
+            if let email = directAccountEmail, !email.isEmpty { return "Email" }
+            return "Direct"
+        }
+    }
+
+    public var accountDisplayTitle: String {
+        if let phone = directAccountPhone, !phone.isEmpty { return phone }
+        if let email = directAccountEmail,
+           !email.isEmpty,
+           !email.hasSuffix("@phone.privatedirect"),
+           !email.hasSuffix("@apple.privatedirect"),
+           !email.hasSuffix("@google.privatedirect") {
+            return email
+        }
+        if let name = directAccountUsername, !name.isEmpty { return name }
+        return authMethodLabel
     }
 
     public func refreshDirectAccount() async {
@@ -996,6 +1072,42 @@ public final class VPNConnectionModel: ObservableObject {
         checkoutAuthError = "Сервис входа недоступен"
     }
 
+    func requestBotLoginConfirmForAuth(identifier: String) async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.requestBotLoginConfirm {
+            await run(self, identifier)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+    }
+
+    func signInWithTelegramForAuth() async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.signInWithTelegram {
+            await run(self)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+    }
+
+    func sendPhoneCodeForAuth(phone: String) async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.sendPhoneCode {
+            await run(self, phone)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+    }
+
+    func verifyPhoneCodeForAuth() async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.verifyPhoneCode {
+            await run(self)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+    }
+
     func signInWithAppleForAuth() async {
         DirectBackendRuntime.warmUp()
         if let run = DirectBackendRuntime.signInWithApple {
@@ -1003,6 +1115,47 @@ public final class VPNConnectionModel: ObservableObject {
             return
         }
         checkoutAuthError = "Сервис входа недоступен"
+    }
+
+    func signInWithGoogleForAuth() async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.signInWithGoogle {
+            await run(self)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+    }
+
+    func loginWithPasswordForAuth(email: String, password: String) async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.loginWithPassword {
+            await run(self, email, password)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+    }
+
+    func registerWithPasswordForAuth(
+        name: String,
+        email: String,
+        password: String,
+        confirmation: String
+    ) async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.registerWithPassword {
+            await run(self, name, email, password, confirmation)
+            return
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+    }
+
+    func requestPasswordResetForAuth(email: String) async -> Bool {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.requestPasswordReset {
+            return await run(self, email)
+        }
+        checkoutAuthError = "Сервис входа недоступен"
+        return false
     }
 
     public func attachDirectSubscription(url: String) async {
@@ -1027,7 +1180,7 @@ public final class VPNConnectionModel: ObservableObject {
         requestCheckoutPayment()
     }
 
-    private func applyLocalPremiumFromCheckout(pending: PendingCheckout?) {
+    func applyLocalPremiumFromCheckout(pending: PendingCheckout?) {
         if checkoutReturnPage == .addOns {
             if pendingAddOnTrafficGB > 0 {
                 if premiumTrafficGB < Self.unlimitedTrafficGB {
@@ -1071,7 +1224,7 @@ public final class VPNConnectionModel: ObservableObject {
         return "Свой тариф · \(period)"
     }
 
-    private func setActiveAccess(_ source: AccessSource) {
+    func setActiveAccess(_ source: AccessSource) {
         activeAccess = source
         Self.saveAccessSource(source)
     }
@@ -1086,7 +1239,7 @@ public final class VPNConnectionModel: ObservableObject {
         }
     }
 
-    private func persistPremiumState() {
+    func persistPremiumState() {
         UserDefaults.standard.set(hasPremiumEntitlement, forKey: Self.premiumEntitlementKey)
         UserDefaults.standard.set(premiumRemainingDays, forKey: Self.premiumDaysKey)
         UserDefaults.standard.set(premiumTrafficGB, forKey: Self.premiumTrafficKey)

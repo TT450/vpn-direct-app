@@ -51,7 +51,10 @@ public enum DetailPage: Equatable {
     case authCode
     case authRegister
     case authRecovery
+    case authTelegram
     case authBot
+    case authPhone
+    case authPhoneCode
     case authSuccess
     case paymentProcessing
     case paymentCancelled

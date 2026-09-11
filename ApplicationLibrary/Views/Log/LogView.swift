@@ -247,7 +247,7 @@ private struct LogContentInnerView: View {
             "(packet-tunnel) log server started",
             "INFO[0000] router: updated default interface en0, index 11",
             "inbound/tun[0]: started at utun3",
-            "sing-box started (1.666s)",
+            "VPN Direct started (1.666s)",
         ]
         #if os(tvOS)
             return ScrollView {

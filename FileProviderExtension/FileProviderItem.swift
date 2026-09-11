@@ -44,7 +44,7 @@ class FileProviderItem: NSObject, NSFileProviderItem {
 
     var filename: String {
         if isRoot {
-            return "sing-box"
+            return "VPN Direct"
         }
         return url.lastPathComponent
     }
