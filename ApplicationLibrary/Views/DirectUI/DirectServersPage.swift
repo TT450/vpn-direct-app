@@ -23,13 +23,28 @@ struct DirectServersPage: View {
     }
 
     private var selectedServer: DirectServerItem? {
-        if let id = model.selectedServerID,
-           let match = servers.first(where: { $0.id == id })
-            ?? model.directServerItems.first(where: { $0.id == id })
-        {
+        if let id = model.selectedServerID, let match = item(for: id) {
             return match
         }
+        // Auto / live urltest pick — never fall back to list order (Germany-first).
+        if let active = model.activeServer, let match = item(for: active.id) {
+            return match
+        }
+        if canSwitch, model.usesAutoSelection {
+            return nil
+        }
         return servers.first ?? model.directServerItems.first
+    }
+
+    private func item(for id: String) -> DirectServerItem? {
+        let needle = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return nil }
+        let pool = servers.isEmpty ? model.directServerItems : servers
+        if let exact = pool.first(where: { $0.id == needle }) {
+            return exact
+        }
+        let hits = pool.filter { needle.hasPrefix($0.id) || $0.id.hasPrefix(needle) }
+        return hits.max(by: { $0.id.count < $1.id.count })
     }
 
     private var canSwitch: Bool { model.canSwitchDirectLocations }
@@ -55,25 +70,41 @@ struct DirectServersPage: View {
                 if model.directServerItems.isEmpty {
                     emptyLocations
                         .padding(.top, 14)
-                } else if let current = selectedServer {
+                } else {
                     if canSwitch {
                         autoRow
                             .padding(.top, 14)
                     }
 
-                    currentServerCard(current)
-                        .padding(.top, canSwitch ? 10 : 14)
+                    if let current = selectedServer {
+                        currentServerCard(current)
+                            .padding(.top, canSwitch ? 10 : 14)
 
-                    sectionHeader
-                        .padding(.top, 22)
+                        sectionHeader
+                            .padding(.top, 22)
 
-                    VStack(spacing: 0) {
-                        ForEach(servers.filter { $0.id != current.id }) { server in
-                            serverRow(server)
-                            Hairline()
+                        VStack(spacing: 0) {
+                            ForEach(servers.filter { $0.id != current.id }) { server in
+                                serverRow(server)
+                                Hairline()
+                            }
                         }
+                        .overlay(Rectangle().stroke(DS.line))
+                    } else {
+                        determiningCard
+                            .padding(.top, canSwitch ? 10 : 14)
+
+                        sectionHeader
+                            .padding(.top, 22)
+
+                        VStack(spacing: 0) {
+                            ForEach(servers) { server in
+                                serverRow(server)
+                                Hairline()
+                            }
+                        }
+                        .overlay(Rectangle().stroke(DS.line))
                     }
-                    .overlay(Rectangle().stroke(DS.line))
 
                     Text(footerNote)
                         .font(.system(size: 9))
@@ -94,66 +125,102 @@ struct DirectServersPage: View {
         if canSwitch {
             return "Смена локации работает так же, как в окне выбора сервера. Пинг зависит от сети."
         }
-        return "Список из каталога Direct (без запроса в панель). После покупки тарифа локации станут переключаемыми."
+        return "Список из каталога Direct. После покупки тарифа локации станут переключаемыми."
     }
 
     private var subscriptionStrip: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(planStripTitle).microLabel(color: DS.ink)
-                Text(planStripDetail)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(DS.muted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("03 / VPN DIRECT").microLabel(color: DS.muted)
+                    Text("Доступ")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(DS.ink)
+                    Text(planStripDetail)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(DS.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
 
-            Spacer()
+                Spacer(minLength: 8)
 
-            Button {
-                refreshLocations()
-            } label: {
-                Image(systemName: (model.isPingingServers || catalog.isRefreshing) ? "hourglass" : "arrow.clockwise")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(DS.ink)
-                    .frame(width: 32, height: 32)
-                    .overlay(Rectangle().stroke(DS.line))
+                Button {
+                    refreshLocations()
+                } label: {
+                    Image(systemName: (model.isPingingServers || catalog.isRefreshing) ? "hourglass" : "arrow.clockwise")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(DS.ink)
+                        .frame(width: 34, height: 34)
+                        .overlay(Rectangle().stroke(DS.ink, lineWidth: 1))
+                }
+                .buttonStyle(HapticButtonStyle())
+                .accessibilityLabel("Обновить локации")
             }
-            .buttonStyle(HapticButtonStyle())
-            .accessibilityLabel("Обновить локации")
+            .padding(.bottom, 10)
 
-            Button("ТАРИФЫ") {
-                model.openPremiumPlans(mode: .presets)
-            }
-            .font(.system(size: 8, weight: .bold, design: .monospaced))
-            .foregroundStyle(DS.ink)
-            .padding(.horizontal, 9)
-            .frame(height: 32)
-            .overlay(Rectangle().stroke(DS.line))
-            .buttonStyle(HapticButtonStyle())
-            .padding(.leading, 6)
+            HStack(spacing: 8) {
+                Button {
+                    model.openPremiumPlans(mode: .presets)
+                } label: {
+                    accessOption(
+                        kicker: "ТАРИФЫ",
+                        title: "Готовые планы",
+                        detail: "START · PLUS · PRO",
+                        primary: false
+                    )
+                }
+                .buttonStyle(HapticButtonStyle())
 
-            Button("КОНСТРУКТОР") {
-                model.openPremiumPlans(mode: .constructor)
+                Button {
+                    model.openPremiumPlans(mode: .constructor)
+                } label: {
+                    accessOption(
+                        kicker: "КОНСТРУКТОР",
+                        title: "Собрать свой",
+                        detail: "ДНИ · УСТРОЙСТВА · ТРАФИК",
+                        primary: true
+                    )
+                }
+                .buttonStyle(HapticButtonStyle())
             }
-            .font(.system(size: 8, weight: .bold, design: .monospaced))
-            .foregroundStyle(DS.paper)
-            .padding(.horizontal, 9)
-            .frame(height: 32)
-            .background(DS.ink)
-            .buttonStyle(HapticButtonStyle())
-            .padding(.leading, 6)
         }
-        .padding(11)
-        .background(DS.panel)
-        .foregroundStyle(.white)
+        .padding(.bottom, 2)
     }
 
-    private var planStripTitle: String {
-        if model.hasPremiumEntitlement {
-            return (model.selectedPlan.name ?? "DIRECT").uppercased()
+    private func accessOption(
+        kicker: String,
+        title: String,
+        detail: String,
+        primary: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .center, spacing: 6) {
+                Text(kicker)
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundStyle(primary ? DS.acid : DS.ink)
+                Spacer(minLength: 4)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(primary ? DS.acid : DS.muted)
+            }
+
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(primary ? DS.paper : DS.ink)
+                .lineLimit(1)
+
+            Text(detail)
+                .font(.system(size: 8, weight: .medium, design: .monospaced))
+                .foregroundStyle(primary ? DS.paper.opacity(0.58) : DS.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
-        return "DIRECT"
+        .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 10)
+        .background(primary ? DS.ink : DS.paper)
+        .overlay(Rectangle().stroke(primary ? DS.ink : DS.line, lineWidth: primary ? 1.5 : 1))
     }
 
     private var planStripDetail: String {
@@ -204,9 +271,11 @@ struct DirectServersPage: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Автовыбор")
                         .font(.system(size: 14, weight: .semibold))
-                    Text(model.usesAutoSelection ? "Активен · лучший пинг" : "Включить авто")
+                    Text(autoSubtitle)
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(DS.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
                 Spacer()
                 if model.usesAutoSelection {
@@ -220,6 +289,31 @@ struct DirectServersPage: View {
             .overlay(Rectangle().stroke(model.usesAutoSelection ? DS.ink : DS.line, lineWidth: model.usesAutoSelection ? 1.5 : 1))
         }
         .buttonStyle(HapticButtonStyle())
+    }
+
+    private var autoSubtitle: String {
+        if model.usesAutoSelection {
+            if let server = model.activeServer {
+                return "Активен · \(server.locationLabel)"
+            }
+            return model.isProtected ? "Активен · определяем маршрут…" : "Активен · лучший пинг"
+        }
+        return "Включить авто"
+    }
+
+    private var determiningCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("ТЕКУЩАЯ ЛОКАЦИЯ").microLabel(color: DS.muted)
+            Text("Определяем маршрут…")
+                .font(.system(size: 19, weight: .semibold))
+            Text("Автовыбор ещё выбирает лучший сервер")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(DS.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(DS.paper)
+        .overlay(Rectangle().stroke(DS.ink, lineWidth: 1.5))
     }
 
     private func currentServerCard(_ server: DirectServerItem) -> some View {
@@ -360,7 +454,11 @@ struct DirectServersPage: View {
     }
 
     private func isOnline(_ server: DirectServerItem) -> Bool {
-        model.isConnected && model.selectedServerID == server.id
+        guard model.isConnected else { return false }
+        if let selected = model.selectedServerID {
+            return selected == server.id
+        }
+        return model.activeServer?.id == server.id
     }
 
     private func qualityLabel(for server: DirectServerItem) -> String {

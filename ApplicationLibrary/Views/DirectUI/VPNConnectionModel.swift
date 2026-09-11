@@ -105,7 +105,9 @@ public final class VPNConnectionModel: ObservableObject {
     private var connectTimeoutTask: Task<Void, Never>?
     private var connectPollTask: Task<Void, Never>?
     private var lastPeriodicURLTestAt: Date?
-    private var assignedServerID: String?
+    /// Live outbound currently used by urltest/selector (not the same as manual `selectedServerID`).
+    /// Must be `@Published` — otherwise Auto UI keeps falling back to `servers.first` (Germany).
+    @Published private var assignedServerID: String?
     @Published public private(set) var favoriteServerIDs: Set<String> = []
     @Published public private(set) var recentServerIDs: [String] = []
     private var sessionTrafficBaseline: Int64 = 0
@@ -466,23 +468,38 @@ public final class VPNConnectionModel: ObservableObject {
     public var activeServer: VPNServer? {
         guard let sub = activeSubscription else { return nil }
         if let selectedServerID,
-           let selected = sub.servers.first(where: { $0.id == selectedServerID })
+           let selected = Self.resolveServer(id: selectedServerID, in: sub.servers)
         {
             return selected
         }
         if let assignedServerID,
            assignedServerID != "auto",
-           let assigned = sub.servers.first(where: { $0.id == assignedServerID })
-               ?? sub.servers.first(where: { assignedServerID.hasPrefix($0.id) || $0.id.hasPrefix(assignedServerID) })
+           let assigned = Self.resolveServer(id: assignedServerID, in: sub.servers)
         {
             return assigned
         }
-        // Auto mode: never fall back to list order (Germany-first) — prefer measured best ping.
+        // Auto mode: never fall back to list order (Germany-first).
+        // When connected, wait for live assigned outbound; when idle, soft-preview best ping.
         if usesAutoSelection {
+            guard !isConnected else { return nil }
             let ranked = sub.servers.filter { $0.ping > 0 }.sorted { $0.ping < $1.ping }
-            if let best = ranked.first { return best }
+            return ranked.first
         }
         return sub.servers.first
+    }
+
+    /// Match libbox outbound tags to catalog servers. Prefer longest id to avoid
+    /// short prefixes (e.g. `de`) stealing a more specific tag (`de-berlin-1`).
+    private static func resolveServer(id: String, in servers: [VPNServer]) -> VPNServer? {
+        let needle = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return nil }
+        if let exact = servers.first(where: { $0.id == needle }) {
+            return exact
+        }
+        let hits = servers.filter {
+            needle.hasPrefix($0.id) || $0.id.hasPrefix(needle)
+        }
+        return hits.max(by: { $0.id.count < $1.id.count })
     }
 
     public var statusTitle: String {
@@ -2405,11 +2422,12 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func updateFromGroups() {
-        // Large subscriptions (Durev ~30 leaves) + open picker: group pushes must not
-        // rebuild the entire server list on every Libbox tick.
-        if activeSheet == .serverPicker { return }
         Task {
+            // Always refresh the live Auto outbound — otherwise "Сейчас" stays on
+            // servers.first (usually Germany) while the picker is open.
             await refreshAssignedFromGroups()
+            // Large subscriptions + open picker: skip full list rebuild on every tick.
+            if activeSheet == .serverPicker { return }
             await mergeLivePings()
         }
     }
@@ -2662,18 +2680,26 @@ public final class VPNConnectionModel: ObservableObject {
         }
     }
 
+    @MainActor
     private func refreshAssignedFromGroups() async {
         guard let groups = environments?.commandClient.groups else { return }
+        let next: String?
         if let pick = resolveAutoOutboundPick(from: groups) {
-            assignedServerID = pick
-            return
+            next = pick
+        } else {
+            let selectable = groups.filter { $0.selectable }
+            guard let group = selectable.first(where: { $0.type == "selector" }) ?? selectable.first else { return }
+            if group.selected == "auto", let pick = resolveAutoOutboundPick(from: groups) {
+                next = pick
+            } else if !group.selected.isEmpty, group.selected != "auto" {
+                next = group.selected
+            } else {
+                next = nil
+            }
         }
-        let selectable = groups.filter { $0.selectable }
-        guard let group = selectable.first(where: { $0.type == "selector" }) ?? selectable.first else { return }
-        if group.selected == "auto", let pick = resolveAutoOutboundPick(from: groups) {
-            assignedServerID = pick
-        } else if !group.selected.isEmpty, group.selected != "auto" {
-            assignedServerID = group.selected
+        guard let next, !next.isEmpty, next != "auto" else { return }
+        if assignedServerID != next {
+            assignedServerID = next
         }
     }
 

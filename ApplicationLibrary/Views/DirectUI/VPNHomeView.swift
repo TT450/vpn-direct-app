@@ -561,15 +561,17 @@ private struct ServerPickerChrome: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 16.4, *) {
             content
-                .presentationDetents([.large])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(0)
+                .preferredColorScheme(.light)
         } else if #available(iOS 16.0, *) {
             content
-                .presentationDetents([.large])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+                .preferredColorScheme(.light)
         } else {
-            content
+            content.preferredColorScheme(.light)
         }
     }
 }

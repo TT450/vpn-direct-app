@@ -99,28 +99,35 @@ private struct SheetScaffold<Content: View>: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text(kicker).microLabel()
-                        Text(title).font(.system(size: 30, weight: .semibold)).tracking(-1.3)
+                        Text(title)
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(DS.ink)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
                     }
-                    Spacer()
+                    Spacer(minLength: 8)
                     Button(action: close) {
                         Image(systemName: "xmark")
-                            .frame(width: 40, height: 40)
+                            .font(.system(size: 12, weight: .bold))
+                            .frame(width: 36, height: 36)
                             .background(DS.ink)
                             .foregroundStyle(DS.acid)
                     }
                     .buttonStyle(HapticButtonStyle())
                 }
-                .padding(.bottom, 16)
+                .padding(.bottom, 14)
                 .overlay(alignment: .bottom) { Hairline() }
                 content
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 22)
+            .padding(.top, 28)
+            .padding(.bottom, 28)
         }
         .background(DS.paper.ignoresSafeArea())
+        .preferredColorScheme(.light)
     }
 }
 
@@ -707,29 +714,73 @@ struct DirectConnectionProfilesView: View {
     ]
 
     var body: some View {
-        SheetScaffold(kicker: "ПРОФИЛИ / \(String(format: "%02d", profiles.count))", title: "Режим подключения", close: { dismiss() }) {
-            Text("Один профиль управляет сервером, протоколом и поведением при сбое.").font(.system(size: 10)).foregroundStyle(DS.muted).padding(.vertical, 12)
-            ForEach(Array(profiles.enumerated()), id: \.element.1) { index, profile in
-                Button {
-                    model.setConnectionMode(profile.1)
-                    HapticManager.shared.play(.selection)
-                    dismiss()
-                } label: {
-                    HStack(spacing: 12) {
-                        Text(profile.0).font(.system(size: 15, weight: .bold, design: .monospaced)).foregroundStyle(DS.acid).frame(width: 38, height: 38).background(DS.ink)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(String(format: "%02d", index + 1)) / ПРОФИЛЬ").microLabel()
-                            Text(profile.1).font(.system(size: 14, weight: .semibold))
-                            Text(profile.2).font(.system(size: 9)).foregroundStyle(DS.muted)
+        SheetScaffold(
+            kicker: "РЕЖИМ / \(String(format: "%02d", profiles.count))",
+            title: "Режим подключения",
+            close: { dismiss() }
+        ) {
+            Text("Выберите, как клиент подбирает сервер и ведёт себя при сбое.")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(DS.muted)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
+
+            VStack(spacing: 0) {
+                ForEach(Array(profiles.enumerated()), id: \.element.1) { index, profile in
+                    let selected = isSelected(profile.1)
+                    Button {
+                        model.setConnectionMode(profile.1)
+                        HapticManager.shared.play(.selection)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(String(format: "%02d", index + 1))
+                                .microLabel(color: DS.muted)
+                                .frame(width: 18, alignment: .leading)
+
+                            Text(profile.0)
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .foregroundStyle(DS.acid)
+                                .frame(width: 28, height: 28)
+                                .background(DS.ink)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(profile.1)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(DS.ink)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                Text(profile.2)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(DS.muted)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
+                            }
+
+                            Spacer(minLength: 6)
+
+                            Image(systemName: selected ? "checkmark" : "chevron.right")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(selected ? DS.green : DS.muted)
                         }
-                        Spacer()
-                        Image(systemName: model.connectionMode == profile.1 ? "checkmark" : "arrow.right").foregroundStyle(DS.green)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 56)
+                        .background(selected ? DS.acid.opacity(0.12) : .clear)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.horizontal, 10).frame(minHeight: 72).background(model.connectionMode == profile.1 ? DS.acid.opacity(0.1) : .clear).contentShape(Rectangle())
+                    .buttonStyle(HapticButtonStyle())
+                    .overlay(alignment: .bottom) { Hairline() }
                 }
-                .buttonStyle(HapticButtonStyle()).overlay(alignment: .bottom) { Hairline() }
             }
+            .overlay(Rectangle().stroke(DS.line))
         }
+    }
+
+    private func isSelected(_ mode: String) -> Bool {
+        if mode == "5G" {
+            return model.connectionMode == "5G" || model.connectionMode == "Антиблокировка"
+        }
+        return model.connectionMode == mode
     }
 }
 
