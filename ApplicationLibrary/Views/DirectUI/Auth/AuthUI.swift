@@ -21,7 +21,24 @@ struct AuthPageShell<Content: View>: View {
             VStack(alignment: .leading, spacing: 0) {
                 PageHeading(kicker: kicker, title: title, subtitle: subtitle)
                     .padding(.top, DS.pageTop)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, 20)
+
+                HStack(spacing: 12) {
+                    Text("DIRECT")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(DS.acid)
+                        .frame(width: 52, height: 42)
+                        .background(DS.ink)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("БЕЗОПАСНЫЙ ВХОД").microLabel(color: DS.ink)
+                        Text("Продолжайте с выбранным способом")
+                            .font(.system(size: 10))
+                            .foregroundStyle(DS.muted)
+                    }
+                    Spacer()
+                }
+                .padding(.bottom, 20)
+
                 content
                 Spacer(minLength: 28)
             }
@@ -110,7 +127,7 @@ struct AuthPrimaryButton: View {
             .font(.system(size: 10, weight: .bold, design: .monospaced))
             .foregroundStyle(DS.acid)
             .padding(.horizontal, 14)
-            .frame(height: 50)
+            .frame(height: 52)
             .background(DS.ink)
         }
         .buttonStyle(HapticButtonStyle())

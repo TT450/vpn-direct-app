@@ -78,6 +78,61 @@ public enum PaymentMethod: String, CaseIterable, Codable {
     case external = "Другие способы"
 }
 
+/// Device row for Account → Devices (filled by local backend hooks).
+public struct DirectAccountDevice: Identifiable, Equatable {
+    public var id: String
+    public var label: String
+    public var detail: String
+    public var isCurrent: Bool
+
+    public init(id: String, label: String, detail: String, isCurrent: Bool) {
+        self.id = id
+        self.label = label
+        self.detail = detail
+        self.isCurrent = isCurrent
+    }
+}
+
+/// Payment history row for Account → Payments.
+public struct DirectAccountPayment: Identifiable, Equatable {
+    public var id: String
+    public var title: String
+    public var subtitle: String
+    public var amountLabel: String
+    public var statusLabel: String
+    public var isRefundLike: Bool
+
+    public init(
+        id: String,
+        title: String,
+        subtitle: String,
+        amountLabel: String,
+        statusLabel: String,
+        isRefundLike: Bool
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.amountLabel = amountLabel
+        self.statusLabel = statusLabel
+        self.isRefundLike = isRefundLike
+    }
+}
+
+public struct DirectPromoRedeemResult: Equatable {
+    public var ok: Bool
+    public var message: String
+    public var bonusDays: Int?
+    public var discountPercent: Double?
+
+    public init(ok: Bool, message: String, bonusDays: Int? = nil, discountPercent: Double? = nil) {
+        self.ok = ok
+        self.message = message
+        self.bonusDays = bonusDays
+        self.discountPercent = discountPercent
+    }
+}
+
 public struct DirectAppCatalog: Equatable {
     public var currency: String
     public var tariffs: [DirectAppTariff]
@@ -201,6 +256,7 @@ public enum DirectBuiltinProfile {
 
 public enum AppSheet: String, Identifiable {
     case serverPicker
+    case subscriptionPicker
     case connectionReport
     case profiles
     case recovery

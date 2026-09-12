@@ -740,14 +740,101 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func openChangeSubscription() {
-        select(tab: .management)
+        openSubscriptionPicker()
+    }
+
+    /// Sheet with installed subscriptions (Direct + imports). Used when home has no active profile.
+    public func openSubscriptionPicker() {
+        Task { @MainActor in
+            activeSheet = .subscriptionPicker
+        }
     }
 
     public func openChangeServer() {
         // Defer so the tap can finish; mounting the picker on the same runloop
         // felt like a dead button when the main thread was already busy.
         Task { @MainActor in
-            activeSheet = .serverPicker
+            if activeSubscription == nil {
+                activeSheet = .subscriptionPicker
+            } else {
+                activeSheet = .serverPicker
+            }
+        }
+    }
+
+    /// Account has a real VPN Direct tariff (show Management Direct card / picker row).
+    public var hasNativeDirectSubscription: Bool {
+        hasPremiumEntitlement
+    }
+
+    /// Selected profile in the client is the live Direct subscription (not empty builtin stub).
+    public var isNativeDirectSubscriptionActive: Bool {
+        guard let sub = activeSubscription else { return false }
+        return DirectBuiltinProfile.isDirectOwned(sub.profile.remoteURL)
+            && !DirectBuiltinProfile.isBuiltin(sub.profile.remoteURL)
+    }
+
+    /// Live Direct remote (`/sub/…`), never `vpndirect://builtin/*` stubs.
+    public var preferredNativeDirectSubscription: VPNSubscriptionItem? {
+        let owned = subscriptions.filter {
+            DirectBuiltinProfile.isDirectOwned($0.profile.remoteURL)
+                && !DirectBuiltinProfile.isBuiltin($0.profile.remoteURL)
+        }
+        return owned.first(where: { !$0.servers.isEmpty }) ?? owned.first
+    }
+
+    /// Profiles the user can pick in the subscription sheet.
+    public var selectableSubscriptions: [VPNSubscriptionItem] {
+        let hasLiveDirect = preferredNativeDirectSubscription != nil
+        return subscriptions.filter { item in
+            if DirectBuiltinProfile.isBuiltin(item.profile.remoteURL) {
+                // Prefer the real Direct remote; show premium stub only as last resort.
+                guard DirectBuiltinProfile.kind(for: item.profile.remoteURL) == .premium else {
+                    return false
+                }
+                return hasPremiumEntitlement && !hasLiveDirect
+            }
+            if DirectBuiltinProfile.isDirectOwned(item.profile.remoteURL) {
+                return hasPremiumEntitlement
+            }
+            return true
+        }
+    }
+
+    /// Activate a profile from the subscription picker and close the sheet.
+    public func pickSubscriptionFromSheet(_ subscriptionID: Int64) {
+        if let item = subscriptions.first(where: { $0.id == subscriptionID }),
+           DirectBuiltinProfile.isDirectOwned(item.profile.remoteURL)
+        {
+            setActiveAccess(.premium)
+        }
+        activate(subscriptionID: subscriptionID)
+        activeSheet = nil
+        selectedTab = .home
+    }
+
+    /// Put native Direct back into the client (Management «Использовать»).
+    /// Same path as checkout/login: live Direct remote via `attachDirectSubscription`, not the empty builtin stub.
+    public func useNativeDirectSubscription() {
+        guard hasNativeDirectSubscription else { return }
+        HapticManager.shared.play(.selection)
+        if let live = preferredNativeDirectSubscription {
+            setActiveAccess(.premium)
+            activate(subscriptionID: live.id)
+            selectedTab = .home
+            return
+        }
+        Task { @MainActor in
+            if directSubscriptionURL == nil || directSubscriptionURL?.isEmpty == true {
+                await refreshDirectAccount()
+            }
+            if let url = directSubscriptionURL, !url.isEmpty {
+                await attachDirectSubscription(url: url)
+            } else if let live = preferredNativeDirectSubscription {
+                setActiveAccess(.premium)
+                activate(subscriptionID: live.id)
+            }
+            selectedTab = .home
         }
     }
 

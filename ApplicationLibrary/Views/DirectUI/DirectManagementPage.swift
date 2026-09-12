@@ -88,59 +88,85 @@ struct DirectManagementPage: View {
         return "\(traffic) · \(devices) устройства"
     }
 
+    @ViewBuilder
     private var subscriptionCard: some View {
-        let active = model.hasPremiumEntitlement && model.isPremiumAccessReady
-
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("01 / ПОДПИСКА")
-                        .microLabel(color: DS.acid.opacity(0.75))
-                    Text(planNameLabel)
-                        .font(.system(size: 24, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white)
-                }
-
-                Spacer(minLength: 12)
-
-                Text(active ? "● АКТИВНА" : "○ НЕТ ТАРИФА")
-                    .microLabel(color: active ? DS.acid : DS.muted)
-                    .padding(.top, 3)
-            }
-
-            Text(planSummaryLine)
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(DS.paper.opacity(0.58))
-                .lineLimit(2)
-                .padding(.top, 8)
-
-            Rectangle()
-                .fill(DS.paper.opacity(0.16))
-                .frame(height: 1)
-                .padding(.vertical, 14)
-
-            HStack(alignment: .lastTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("ДО ОКОНЧАНИЯ")
-                        .microLabel(color: DS.paper.opacity(0.55))
-                    Text(model.hasPremiumEntitlement ? "\(model.premiumRemainingDays) дней" : "—")
-                        .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("ОКОНЧАНИЕ")
-                        .microLabel(color: DS.paper.opacity(0.55))
-                    Text(expirationText)
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white)
-                }
-            }
+        if model.hasNativeDirectSubscription {
+            nativeDirectSubscriptionCard
         }
-        .padding(15)
-        .background(DS.ink)
+    }
+
+    private var nativeDirectSubscriptionCard: some View {
+        let active = model.hasPremiumEntitlement && model.isPremiumAccessReady
+        let inUse = model.isNativeDirectSubscriptionActive
+
+        // Card + CTA flush (no gap) so they read as one block.
+        return VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("01 / ПОДПИСКА")
+                            .microLabel(color: DS.acid.opacity(0.75))
+                        Text(planNameLabel)
+                            .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.white)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    Text(active ? "● АКТИВНА" : "○ НЕТ ТАРИФА")
+                        .microLabel(color: active ? DS.acid : DS.muted)
+                        .padding(.top, 3)
+                }
+
+                Text(planSummaryLine)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(DS.paper.opacity(0.58))
+                    .lineLimit(2)
+                    .padding(.top, 8)
+
+                Rectangle()
+                    .fill(DS.paper.opacity(0.16))
+                    .frame(height: 1)
+                    .padding(.vertical, 14)
+
+                HStack(alignment: .lastTextBaseline) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("ДО ОКОНЧАНИЯ")
+                            .microLabel(color: DS.paper.opacity(0.55))
+                        Text(model.hasPremiumEntitlement ? "\(model.premiumRemainingDays) дней" : "—")
+                            .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.white)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("ОКОНЧАНИЕ")
+                            .microLabel(color: DS.paper.opacity(0.55))
+                        Text(expirationText)
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DS.ink)
+
+            Button {
+                guard !inUse else { return }
+                model.useNativeDirectSubscription()
+            } label: {
+                Text(inUse ? "Используется" : "Использовать")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(DS.acid)
+            }
+            .buttonStyle(HapticButtonStyle())
+            // Do not `.disabled` — iOS greys the label; keep full acid + black always.
+        }
         .overlay(Rectangle().stroke(DS.ink, lineWidth: 1.5))
     }
 

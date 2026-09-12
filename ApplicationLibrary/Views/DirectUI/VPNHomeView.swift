@@ -110,9 +110,14 @@ public struct VPNHomeView: View {
                                     changeMethod: { model.openDetail(.payment) }
                                 )
                             case .paymentError:
-                                DirectPaymentErrorView(message: model.paymentErrorMessage) {
-                                    model.retryCheckout()
-                                }
+                                DirectPaymentErrorView(
+                                    message: model.paymentErrorMessage,
+                                    retry: { model.retryCheckout() },
+                                    onSupport: {
+                                        model.selectedTab = .profile
+                                        model.closeDetail()
+                                    }
+                                )
                             case .paymentSuccess:
                                 DirectPaymentSuccessView(
                                     title: "Подписка активна",
@@ -288,6 +293,8 @@ public struct VPNHomeView: View {
                 switch sheet {
                 case .serverPicker:
                     DirectServerPickerView(model: model)
+                case .subscriptionPicker:
+                    DirectSubscriptionPickerView(model: model)
                 case .connectionReport:
                     DirectConnectionReportView(model: model)
                 case .profiles:

@@ -504,8 +504,25 @@ struct DirectAuthSuccessView: View {
 struct DirectPaymentProcessingView: View {
     let title: String
     let subtitle: String
+
+    init(title: String = "Оплата", subtitle: String = "Подтверждаем операцию…") {
+        self.title = title
+        self.subtitle = subtitle
+    }
+
     var body: some View {
-        DirectPaymentStateView(mark: "...", title: title, subtitle: subtitle)
+        DirectPaymentStateView(mark: "…", title: title, subtitle: subtitle) {
+            VStack(alignment: .leading, spacing: 13) {
+                ProgressView()
+                    .progressViewStyle(.linear)
+                    .tint(DS.ink)
+                    .frame(height: 4)
+                Text("Не закрывайте экран, если банк уже открыл подтверждение. После ответа статус обновится автоматически.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(DS.muted)
+                    .lineSpacing(3)
+            }
+        }
     }
 }
 
@@ -514,32 +531,29 @@ struct DirectPaymentWaitingView: View {
 
     var body: some View {
         DirectPaymentStateView(
-            mark: "…",
+            mark: "WAIT",
             title: "Ожидаем подтверждение банка",
             subtitle: model.paymentWaitingSubtitle.isEmpty
                 ? "Статус обновится, когда банк подтвердит оплату. Можно свернуть приложение."
                 : model.paymentWaitingSubtitle
         ) {
-            VStack(spacing: 10) {
-                if !model.paymentWaitingTimedOut {
-                    ProgressView()
-                        .padding(.top, 8)
-                } else {
+            VStack(spacing: 9) {
+                if model.paymentWaitingTimedOut {
                     Text("Ожидаем подтверждения со стороны банка. Зайдите позже или свяжитесь с вашим банком.")
-                        .font(.system(size: 12))
+                        .font(.system(size: 10))
                         .foregroundStyle(DS.muted)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 8)
-                    Button("Купить снова") {
-                        model.openDetail(.payment)
-                    }
-                    .buttonStyle(HapticButtonStyle())
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(DS.acid)
-                    .padding(.horizontal, 14)
-                    .frame(height: 44)
-                    .frame(maxWidth: .infinity)
-                    .background(DS.ink)
+                        .lineSpacing(3)
+                } else {
+                    ProgressView()
+                        .progressViewStyle(.linear)
+                        .tint(DS.ink)
+                        .frame(height: 4)
+                }
+                CheckoutAction(title: "Обновить статус") {
+                    model.startPaymentStatusPolling()
+                }
+                CheckoutAction(title: "Отменить ожидание", secondary: true) {
+                    model.abandonPaymentFlow(returnToPaymentMethod: true)
                 }
             }
         }
@@ -551,30 +565,45 @@ struct DirectPaymentWaitingView: View {
 struct DirectPaymentCancelledView: View {
     let retry: () -> Void
     let changeMethod: () -> Void
+
     var body: some View {
         DirectPaymentStateView(
-            mark: "—",
+            mark: "×",
             title: "Оплата отменена",
-            subtitle: "Заказ никуда не исчез. Повторите оплату или выберите другой способ.",
-            actionTitle: "Повторить",
-            action: retry,
-            secondaryTitle: "Сменить способ",
-            secondaryAction: changeMethod
-        )
+            subtitle: "Операция была отменена. Деньги не должны быть списаны повторно."
+        ) {
+            VStack(spacing: 9) {
+                CheckoutAction(title: "Попробовать снова", action: retry)
+                CheckoutAction(title: "Сменить способ", secondary: true, action: changeMethod)
+                Text("Если банк показывает списание, не повторяйте платёж — сначала дождитесь возврата статуса.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(DS.muted)
+                    .lineSpacing(3)
+                    .padding(.top, 5)
+            }
+        }
     }
 }
 
 struct DirectPaymentErrorView: View {
     let message: String
     let retry: () -> Void
+    var onSupport: (() -> Void)? = nil
+
     var body: some View {
         DirectPaymentStateView(
             mark: "!",
-            title: "Не удалось оплатить",
+            title: "Не удалось завершить оплату",
             subtitle: message,
-            actionTitle: "Повторить",
-            action: retry
-        )
+            tone: DS.danger
+        ) {
+            VStack(spacing: 9) {
+                CheckoutAction(title: "Повторить", action: retry)
+                if let onSupport {
+                    CheckoutAction(title: "Открыть поддержку", secondary: true, action: onSupport)
+                }
+            }
+        }
     }
 }
 
@@ -589,30 +618,46 @@ struct DirectPaymentSuccessView: View {
 
     var body: some View {
         DirectPaymentStateView(
-            mark: "✓",
+            mark: "OK",
             title: title,
             subtitle: activationPending
-                ? "Платёж получен. Активируем вашу Direct-подписку…"
-                : "Подписка активна. Можно подключаться.",
-            actionTitle: activationPending ? "Обновить статус" : "К локациям",
-            action: {
-                if activationPending {
-                    refreshActivation?()
-                } else {
-                    openLocations()
-                }
-            },
-            secondaryTitle: "На главную",
-            secondaryAction: openHome
+                ? "Платёж принят. Обновите статус, чтобы получить доступ."
+                : "Подписка активирована. VPN Direct готов к подключению."
         ) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("ПЛАН").microLabel(color: DS.muted)
-                Text("\(period) · \(price) ₽").font(.system(size: 13, weight: .semibold))
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 0) {
+                    checkoutFact("СТАТУС", activationPending ? "ОЖИДАЕТ" : "АКТИВЕН")
+                    checkoutFact("ПЛАН", period)
+                    if price > 0 { checkoutFact("СУММА", "\(price)") }
+                }
+                if activationPending {
+                    CheckoutAction(title: "Обновить статус") {
+                        refreshActivation?()
+                    }
+                    .padding(.top, 14)
+                }
+                CheckoutAction(
+                    title: activationPending ? "На главную" : "К локациям",
+                    secondary: activationPending,
+                    action: activationPending ? openHome : openLocations
+                )
+                .padding(.top, 9)
+                if !activationPending {
+                    CheckoutAction(title: "На главную", secondary: true, action: openHome)
+                        .padding(.top, 9)
+                }
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(Rectangle().stroke(DS.line))
         }
+    }
+
+    private func checkoutFact(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).microLabel(color: DS.muted)
+            Text(value).font(.system(size: 13, weight: .semibold, design: .monospaced))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 13)
+        .overlay(alignment: .leading) { Hairline().frame(width: 1) }
     }
 }
 
@@ -703,50 +748,54 @@ private struct DirectPaymentStateView<Extra: View>: View {
     let mark: String
     let title: String
     let subtitle: String
-    let actionTitle: String?
-    let action: () -> Void
-    let secondaryTitle: String?
-    let secondaryAction: () -> Void
-    let extra: () -> Extra
+    let tone: Color
+    let extra: Extra
 
     init(
         mark: String,
         title: String,
         subtitle: String,
-        actionTitle: String? = nil,
-        action: @escaping () -> Void = {},
-        secondaryTitle: String? = nil,
-        secondaryAction: @escaping () -> Void = {},
-        @ViewBuilder extra: @escaping () -> Extra = { EmptyView() }
+        tone: Color = DS.ink,
+        @ViewBuilder extra: () -> Extra
     ) {
         self.mark = mark
         self.title = title
         self.subtitle = subtitle
-        self.actionTitle = actionTitle
-        self.action = action
-        self.secondaryTitle = secondaryTitle
-        self.secondaryAction = secondaryAction
-        self.extra = extra
+        self.tone = tone
+        self.extra = extra()
     }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                PageHeading(kicker: "VPN DIRECT / ОПЛАТА", title: title, subtitle: subtitle)
+                PageHeading(kicker: "DIRECT / CHECKOUT", title: title, subtitle: subtitle)
                     .padding(.top, DS.pageTop)
-                Text(mark)
-                    .font(.system(size: 30, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(DS.acid)
-                    .frame(width: 74, height: 74)
-                    .background(DS.ink)
-                    .padding(.top, 28)
-                extra().padding(.top, 22)
-                if let actionTitle {
-                    CheckoutAction(title: actionTitle, action: action).padding(.top, 18)
+                    .padding(.bottom, 24)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .top) {
+                        Text(mark)
+                            .font(.system(size: 22, weight: .bold, design: .monospaced))
+                            .foregroundStyle(DS.acid)
+                            .frame(width: 64, height: 64)
+                            .background(tone == DS.danger ? DS.danger : DS.ink)
+                        Spacer()
+                    }
+                    Text(title.uppercased())
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.top, 19)
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.58))
+                        .lineSpacing(3)
+                        .padding(.top, 7)
                 }
-                if let secondaryTitle {
-                    CheckoutAction(title: secondaryTitle, secondary: true, action: secondaryAction).padding(.top, 7)
-                }
+                .padding(18)
+                .background(tone == DS.danger ? DS.danger : DS.ink)
+
+                extra
+                    .padding(.top, 18)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 34)
@@ -799,20 +848,22 @@ private struct CheckoutAction: View {
     let title: String
     var secondary = false
     let action: () -> Void
+
     var body: some View {
         Button(action: action) {
             HStack {
                 Text(title)
                 Spacer()
-                Image(systemName: "arrow.right")
+                Image(systemName: secondary ? "arrow.left" : "arrow.right")
             }
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 10, weight: .bold, design: .monospaced))
             .foregroundStyle(secondary ? DS.ink : DS.acid)
             .padding(.horizontal, 15)
-            .frame(height: 50)
+            .frame(height: 52)
             .background(secondary ? Color.clear : DS.ink)
-            .overlay(Rectangle().stroke(secondary ? DS.ink : Color.clear))
+            .overlay(Rectangle().stroke(DS.ink))
         }
+        .buttonStyle(HapticButtonStyle())
     }
 }
 

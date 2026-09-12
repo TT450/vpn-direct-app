@@ -97,34 +97,41 @@ private struct SheetScaffold<Content: View>: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(kicker).microLabel()
-                        Text(title)
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(DS.ink)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.85)
-                    }
-                    Spacer(minLength: 8)
-                    Button(action: close) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .frame(width: 36, height: 36)
-                            .background(DS.ink)
-                            .foregroundStyle(DS.acid)
-                    }
-                    .buttonStyle(HapticButtonStyle())
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(kicker).microLabel()
+                    Text(title)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(DS.ink)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                 }
-                .padding(.bottom, 14)
-                .overlay(alignment: .bottom) { Hairline() }
-                content
+                Spacer(minLength: 8)
+                Button(action: close) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .frame(width: 36, height: 36)
+                        .background(DS.ink)
+                        .foregroundStyle(DS.acid)
+                }
+                .buttonStyle(HapticButtonStyle())
             }
             .padding(.horizontal, 20)
             .padding(.top, 28)
-            .padding(.bottom, 28)
+            .padding(.bottom, 14)
+            .overlay(alignment: .bottom) { Hairline() }
+            .background(DS.paper)
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    content
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .padding(.bottom, 28)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .background(DS.paper.ignoresSafeArea())
         .preferredColorScheme(.light)

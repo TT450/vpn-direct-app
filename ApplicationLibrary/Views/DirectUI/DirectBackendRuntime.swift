@@ -42,6 +42,18 @@ public enum DirectBackendRuntime {
     public static var registerWithPassword: ((VPNConnectionModel, String, String, String, String) async -> Void)?
     public static var requestPasswordReset: ((VPNConnectionModel, String) async -> Bool)?
 
+    /// Account utilities (devices / payments / promo / support / linking). Defaults are no-op for public clones.
+    public static var fetchAccountDevices: () async throws -> [DirectAccountDevice] = { [] }
+    public static var revokeAccountDevice: (String) async throws -> Void = { _ in }
+    public static var fetchAccountPayments: () async throws -> [DirectAccountPayment] = { [] }
+    public static var redeemPromo: (String) async throws -> DirectPromoRedeemResult = { _ in
+        DirectPromoRedeemResult(ok: false, message: "Сервис промокодов недоступен")
+    }
+    public static var submitSupport: (String, String) async throws -> Void = { _, _ in }
+    public static var prepareAccountLink: (String) async throws -> String = { method in
+        "Подтвердите владение способом входа «\(method)» — подписки не объединяются автоматически."
+    }
+
     /// Optional Google OAuth client id (filled by local hooks). Empty = Google button shows setup error.
     public static var googleClientID: String = ""
     public static var googleRedirectURI: String = "vpndirect:/oauth2redirect/google"
