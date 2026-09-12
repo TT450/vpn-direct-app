@@ -19,6 +19,13 @@ public enum DirectBackendRuntime {
 
     public static var startCheckout: ((VPNConnectionModel) async -> Void)?
     public static var finalizeCheckout: ((VPNConnectionModel, String) async -> Void)?
+    public static var applyPaidCheckout: ((VPNConnectionModel, DirectCheckoutStatus, String) async -> Void)?
+    public static var fetchAppCatalog: () async throws -> DirectAppCatalog = {
+        DirectAppCatalog(currency: "RUB", tariffs: [], constructor: nil, addons: nil, monthMultipliers: [:])
+    }
+    public static var checkoutStatus: ((String) async throws -> DirectCheckoutStatus)?
+    public static var quoteCheckout: ((DirectCheckoutQuoteRequest) async throws -> DirectCheckoutQuote)?
+    public static var registerPushToken: ((String, String) async throws -> Void)?
     public static var logout: ((VPNConnectionModel) async -> Void)?
     public static var refreshAccount: ((VPNConnectionModel) async -> Void)?
     public static var bootstrapSession: ((VPNConnectionModel) async -> Void)?
@@ -27,7 +34,6 @@ public enum DirectBackendRuntime {
     public static var verifyEmailCode: ((VPNConnectionModel) async -> Void)?
     public static var linkBotCode: ((VPNConnectionModel) async -> Void)?
     public static var requestBotLoginConfirm: ((VPNConnectionModel, String) async -> Void)?
-    public static var signInWithTelegram: ((VPNConnectionModel) async -> Void)?
     public static var sendPhoneCode: ((VPNConnectionModel, String) async -> Void)?
     public static var verifyPhoneCode: ((VPNConnectionModel) async -> Void)?
     public static var signInWithApple: ((VPNConnectionModel) async -> Void)?
@@ -39,8 +45,6 @@ public enum DirectBackendRuntime {
     /// Optional Google OAuth client id (filled by local hooks). Empty = Google button shows setup error.
     public static var googleClientID: String = ""
     public static var googleRedirectURI: String = "vpndirect:/oauth2redirect/google"
-    /// Hosted Telegram Login Widget page (local hooks may override).
-    public static var telegramLoginURLString: String = ""
     /// Hosts/suffixes where external checkout WebView `/success` counts as paid (local hooks).
     public static var checkoutSuccessHostSuffixes: [String] = []
 

@@ -19,19 +19,13 @@ struct DirectManagementPage: View {
         return model.selectedPlan.trafficGB ?? 0
     }
 
-    private var whiteListLimit: Int {
-        model.hasPremiumEntitlement ? model.premiumWhitelistGB : model.selectedPlan.whitelistGB
-    }
-
-    /// Demo usage until backend reports real counters.
+    /// Real usage from backend: limit − remaining (0 until /me reports remaining).
     private var trafficUsed: Int {
         guard trafficLimit > 0 else { return 0 }
-        return Int(Double(trafficLimit) * 0.35)
-    }
-
-    private var whiteListUsed: Int {
-        guard whiteListLimit > 0 else { return 0 }
-        return Int(Double(whiteListLimit) * 0.28)
+        if model.hasPremiumEntitlement {
+            return min(model.premiumTrafficUsedGB, trafficLimit)
+        }
+        return 0
     }
 
     private var expirationText: String {
@@ -51,7 +45,7 @@ struct DirectManagementPage: View {
                 PageHeading(
                     kicker: "DIRECT / MANAGEMENT",
                     title: "Управление",
-                    subtitle: "Ваша подписка VPN Direct"
+                    subtitle: "Подписка, лимиты и настройки VPN Direct"
                 )
                 .padding(.top, DS.pageTop)
                 .padding(.bottom, 16)
@@ -59,16 +53,16 @@ struct DirectManagementPage: View {
                 subscriptionCard
 
                 primaryActions
-                    .padding(.top, 20)
+                    .padding(.top, 12)
 
                 usageSection
-                    .padding(.top, 22)
+                    .padding(.top, 24)
 
                 settingsSection
-                    .padding(.top, 22)
+                    .padding(.top, 24)
 
                 externalSection
-                    .padding(.top, 22)
+                    .padding(.top, 24)
                     .padding(.bottom, 28)
             }
             .padding(.horizontal, 20)
@@ -80,7 +74,7 @@ struct DirectManagementPage: View {
         if let name = model.selectedPlan.name, model.hasPremiumEntitlement {
             return name.uppercased()
         }
-        return model.hasPremiumEntitlement ? "DIRECT" : "—"
+        return model.hasPremiumEntitlement ? "DIRECT" : "БЕЗ ТАРИФА"
     }
 
     private var planSummaryLine: String {
@@ -91,48 +85,62 @@ struct DirectManagementPage: View {
             return model.selectedPlan.trafficLabel
         }()
         let devices = model.hasPremiumEntitlement ? model.premiumDeviceLimit : model.selectedPlan.devices
-        let wl = model.hasPremiumEntitlement ? model.premiumWhitelistGB : model.selectedPlan.whitelistGB
-        let wlPart = wl > 0 ? " · \(wl) GB White-list" : ""
-        return "\(traffic) · \(devices) устройства\(wlPart)"
+        return "\(traffic) · \(devices) устройства"
     }
 
     private var subscriptionCard: some View {
         let active = model.hasPremiumEntitlement && model.isPremiumAccessReady
+
         return VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(planNameLabel)
-                    .font(.system(size: 22, weight: .semibold, design: .monospaced))
-                Spacer()
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("01 / ПОДПИСКА")
+                        .microLabel(color: DS.acid.opacity(0.75))
+                    Text(planNameLabel)
+                        .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white)
+                }
+
+                Spacer(minLength: 12)
+
                 Text(active ? "● АКТИВНА" : "○ НЕТ ТАРИФА")
-                    .microLabel(color: active ? DS.green : DS.muted)
+                    .microLabel(color: active ? DS.acid : DS.muted)
+                    .padding(.top, 3)
             }
 
             Text(planSummaryLine)
                 .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(DS.muted)
-                .padding(.top, 6)
+                .foregroundStyle(DS.paper.opacity(0.58))
+                .lineLimit(2)
+                .padding(.top, 8)
 
-            Hairline().padding(.vertical, 13)
+            Rectangle()
+                .fill(DS.paper.opacity(0.16))
+                .frame(height: 1)
+                .padding(.vertical, 14)
 
             HStack(alignment: .lastTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("ДО ОКОНЧАНИЯ").microLabel(color: DS.muted)
+                    Text("ДО ОКОНЧАНИЯ")
+                        .microLabel(color: DS.paper.opacity(0.55))
                     Text(model.hasPremiumEntitlement ? "\(model.premiumRemainingDays) дней" : "—")
-                        .font(.system(size: 19, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white)
                 }
 
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text("ОКОНЧАНИЕ").microLabel(color: DS.muted)
+                    Text("ОКОНЧАНИЕ")
+                        .microLabel(color: DS.paper.opacity(0.55))
                     Text(expirationText)
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white)
                 }
             }
         }
         .padding(15)
-        .background(DS.panel)
-        .foregroundStyle(.white)
+        .background(DS.ink)
         .overlay(Rectangle().stroke(DS.ink, lineWidth: 1.5))
     }
 
@@ -140,53 +148,53 @@ struct DirectManagementPage: View {
         Button {
             renew()
         } label: {
-            HStack {
+            HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("ПОДПИСКА").microLabel(color: DS.acid.opacity(0.7))
-                    Text(model.hasPremiumEntitlement ? "Продлить" : "Купить тариф")
+                    Text(model.hasPremiumEntitlement ? "ПОДПИСКА" : "VPN DIRECT")
+                        .microLabel(color: DS.acid.opacity(0.72))
+                    Text(model.hasPremiumEntitlement ? "Продлить подписку" : "Выбрать тариф")
                         .font(.system(size: 16, weight: .semibold))
                 }
                 Spacer()
                 Image(systemName: "arrow.right")
+                    .font(.system(size: 12, weight: .bold))
             }
             .foregroundStyle(DS.acid)
             .padding(.horizontal, 15)
             .frame(height: 62)
             .background(DS.ink)
+            .overlay(Rectangle().stroke(DS.ink))
         }
         .buttonStyle(HapticButtonStyle())
     }
 
     private var usageSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader("ИСПОЛЬЗОВАНИЕ")
+            sectionHeader("02 / ИСПОЛЬЗОВАНИЕ")
 
             if trafficLimit > 0 {
                 usageRow(title: "VPN TRAFFIC", used: trafficUsed, limit: trafficLimit, unit: "GB")
             } else {
-                usageUnlimitedRow(title: "VPN TRAFFIC", caption: model.hasPremiumEntitlement ? "Unlimited" : "—")
-            }
-            Hairline()
-            if whiteListLimit > 0 {
-                usageRow(title: "WHITE-LIST", used: whiteListUsed, limit: whiteListLimit, unit: "GB")
-            } else {
-                usageUnlimitedRow(title: "WHITE-LIST", caption: "—")
+                usageUnlimitedRow(title: "VPN TRAFFIC", caption: model.hasPremiumEntitlement ? "UNLIMITED" : "—")
             }
         }
     }
 
     private func usageRow(title: String, used: Int, limit: Int, unit: String) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(title).microLabel(color: DS.muted)
                 Spacer()
                 Text("\(used) / \(limit) \(unit)")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(DS.ink)
             }
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Rectangle().fill(DS.line).frame(height: 5)
+                    Rectangle()
+                        .fill(DS.line)
+                        .frame(height: 5)
                     Rectangle()
                         .fill(DS.ink)
                         .frame(
@@ -197,7 +205,7 @@ struct DirectManagementPage: View {
             }
             .frame(height: 5)
         }
-        .padding(.vertical, 11)
+        .padding(.vertical, 12)
     }
 
     private func usageUnlimitedRow(title: String, caption: String) -> some View {
@@ -206,53 +214,61 @@ struct DirectManagementPage: View {
             Spacer()
             Text(caption)
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(DS.ink)
         }
-        .padding(.vertical, 11)
+        .padding(.vertical, 13)
     }
 
     private var settingsSection: some View {
         VStack(spacing: 0) {
-            sectionHeader("НАСТРОЙКА")
+            sectionHeader("03 / НАСТРОЙКА")
 
-            managementRow("Изменить тариф") {
+            managementRow("Изменить тариф", detail: "ГОТОВЫЕ ПЛАНЫ") {
                 model.openPremiumPlans(mode: .presets)
             }
             Hairline()
-            managementRow("Изменить устройства") {
+            managementRow("Изменить устройства", detail: "КОНСТРУКТОР") {
                 model.openPremiumPlans(mode: .constructor)
             }
             Hairline()
-            managementRow("Изменить трафик") {
+            managementRow("Изменить трафик", detail: "КОНСТРУКТОР") {
                 model.openPremiumPlans(mode: .constructor)
             }
         }
     }
 
-    private func managementRow(_ title: String, action: @escaping () -> Void) -> some View {
+    private func managementRow(_ title: String, detail: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 12, weight: .medium))
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(DS.ink)
+                    Text(detail)
+                        .microLabel(color: DS.muted)
+                }
+
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9))
-                    .foregroundStyle(DS.muted)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(DS.ink)
             }
-            .foregroundStyle(DS.ink)
-            .frame(height: 47)
+            .frame(minHeight: 52)
         }
         .buttonStyle(HapticButtonStyle())
     }
 
     private var externalSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader("ДРУГИЕ ПОДПИСКИ")
+            sectionHeader("04 / ДРУГИЕ ПОДПИСКИ")
 
             if imported.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Нет добавленных подписок")
                         .font(.system(size: 12, weight: .medium))
-                    Text("Можно добавить стороннюю подписку и использовать её вместе с VPN Direct.")
+                        .foregroundStyle(DS.ink)
+                    Text("Добавьте стороннюю подписку, если хотите использовать её вместе с VPN Direct.")
                         .font(.system(size: 9))
                         .foregroundStyle(DS.muted)
                 }
@@ -266,16 +282,16 @@ struct DirectManagementPage: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(item.name)
                                     .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(DS.ink)
                                 Text(model.isSubscriptionActive(item.id) ? "Добавлена · активна" : "Добавлена извне")
                                     .font(.system(size: 9, design: .monospaced))
                                     .foregroundStyle(DS.muted)
                             }
                             Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 8))
-                                .foregroundStyle(DS.muted)
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(DS.ink)
                         }
-                        .foregroundStyle(DS.ink)
                         .padding(.vertical, 12)
                     }
                     .buttonStyle(HapticButtonStyle())
@@ -284,16 +300,20 @@ struct DirectManagementPage: View {
             }
 
             Button(action: openAddMenu) {
-                HStack {
+                HStack(spacing: 9) {
                     Image(systemName: "plus")
                     Text("ДОБАВИТЬ ПОДПИСКУ")
                     Spacer()
+                    Image(systemName: "arrow.right")
                 }
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundStyle(DS.ink)
-                .frame(height: 45)
+                .foregroundStyle(DS.acid)
+                .padding(.horizontal, 14)
+                .frame(height: 46)
+                .background(DS.ink)
             }
             .buttonStyle(HapticButtonStyle())
+            .padding(.top, 4)
         }
     }
 

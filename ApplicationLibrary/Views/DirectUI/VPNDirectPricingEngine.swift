@@ -9,6 +9,7 @@ public enum VPNDirectPricingEngine {
         30: 1.00,
         90: 0.88,
         180: 0.78,
+        270: 0.72,
         365: 0.65,
     ]
 

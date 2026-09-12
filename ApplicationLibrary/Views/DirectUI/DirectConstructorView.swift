@@ -9,12 +9,11 @@ struct DirectConstructorView: View {
     @State private var days = 30
     @State private var devices = 3
     @State private var traffic = 300
-    @State private var whiteList = 50
+    @State private var livePrice: Int?
 
     private let dayOptions = [7, 30, 90, 180, 365]
     private let deviceOptions = [1, 3, 5, 10, 20]
     private let trafficOptions = [100, 300, 700, 2000, 0] // 0 = unlimited
-    private let whiteListOptions = [20, 50, 100, 250, 500]
 
     var body: some View {
         GeometryReader { proxy in
@@ -50,10 +49,6 @@ struct DirectConstructorView: View {
                     }
                 }
 
-                builderSection("White-list", "\(whiteList) GB") {
-                    choices(whiteListOptions, selected: whiteList) { whiteList = $0 } label: { "\($0) GB" }
-                }
-
                 Spacer(minLength: 10)
 
                 HStack(alignment: .lastTextBaseline) {
@@ -69,7 +64,7 @@ struct DirectConstructorView: View {
                         .font(.system(size: 25, weight: .semibold, design: .monospaced))
                 }
 
-                Text("\(daysValue) · \(devices) устройства · \(trafficValue) · white-list \(whiteList) GB")
+                Text("\(daysValue) · \(devices) устройства · \(trafficValue)")
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(DS.muted)
                     .padding(.top, 5)
@@ -101,6 +96,7 @@ struct DirectConstructorView: View {
         .clipped()
         .onAppear {
             model.planBrowseMode = .constructor
+            Task { await model.refreshAppCatalog() }
             days = dayOptions.contains(model.selectedPlan.days) ? model.selectedPlan.days : 30
             devices = deviceOptions.contains(model.selectedPlan.devices) ? model.selectedPlan.devices : 3
             if let gb = model.selectedPlan.trafficGB, trafficOptions.contains(gb) {
@@ -110,15 +106,17 @@ struct DirectConstructorView: View {
             } else {
                 traffic = 300
             }
-            whiteList = whiteListOptions.contains(model.selectedPlan.whitelistGB)
-                ? model.selectedPlan.whitelistGB
-                : 50
+            if let c = model.appCatalog?.constructor {
+                devices = max(c.minDevices, devices)
+                days = max(c.minDays, days)
+                if traffic != 0 { traffic = max(c.minTrafficGB, traffic) }
+            }
             syncModel()
+            Task { await refreshQuote() }
         }
-        .onChangeCompat(of: days) { _ in syncModel() }
-        .onChangeCompat(of: devices) { _ in syncModel() }
-        .onChangeCompat(of: traffic) { _ in syncModel() }
-        .onChangeCompat(of: whiteList) { _ in syncModel() }
+        .onChangeCompat(of: days) { _ in syncModel(); Task { await refreshQuote() } }
+        .onChangeCompat(of: devices) { _ in syncModel(); Task { await refreshQuote() } }
+        .onChangeCompat(of: traffic) { _ in syncModel(); Task { await refreshQuote() } }
     }
 
     private func builderSection<Content: View>(
@@ -196,21 +194,65 @@ struct DirectConstructorView: View {
             days: days,
             devices: devices,
             trafficGB: traffic == 0 ? nil : traffic,
-            whitelistGB: whiteList
+            whitelistGB: 0
         )
     }
 
     private var price: Int {
-        VPNDirectPricingEngine.price(for: configuration)
+        livePrice ?? VPNDirectPricingEngine.price(for: configuration)
     }
 
     private func syncModel() {
         model.applySelectedPlan(configuration, playHaptic: false)
     }
 
+    private func refreshQuote() async {
+        DirectBackendRuntime.warmUp()
+        guard let quote = DirectBackendRuntime.quoteCheckout else { return }
+        do {
+            let q = try await quote(
+                DirectCheckoutQuoteRequest(
+                    productKind: "constructor",
+                    tariffID: nil,
+                    days: days,
+                    devices: devices,
+                    trafficGB: traffic == 0 ? nil : traffic
+                )
+            )
+            await MainActor.run {
+                livePrice = q.amount
+                model.checkoutPrice = q.amount
+                model.checkoutTitle = q.title
+            }
+        } catch {
+            await MainActor.run { livePrice = nil }
+        }
+    }
+
     private func purchase() {
         model.applySelectedPlan(configuration)
+        model.checkoutPrice = price
         model.checkoutReturnPage = .planConstructor
+        model.pendingCheckoutTariffID = nil
+        PendingCheckout.save(
+            PendingCheckout(
+                title: model.checkoutTitle.isEmpty ? planName : model.checkoutTitle,
+                price: price,
+                periodDays: days,
+                paymentMethodRaw: model.paymentMethod.rawValue,
+                returnPage: String(describing: DetailPage.planConstructor),
+                planName: planName,
+                trafficGB: traffic == 0 ? nil : traffic,
+                devices: devices,
+                whitelistGB: 0,
+                createdAt: Date(),
+                productKind: "constructor",
+                tariffID: nil,
+                addonDays: nil,
+                addonDevices: nil,
+                addonTrafficGB: nil
+            )
+        )
         model.openDetail(.payment)
     }
 }

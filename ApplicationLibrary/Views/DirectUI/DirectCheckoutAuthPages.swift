@@ -16,12 +16,18 @@ struct PendingCheckout: Codable, Equatable {
     let devices: Int
     let whitelistGB: Int
     let createdAt: Date
+    var productKind: String?
+    var tariffID: Int?
+    var addonDays: Int?
+    var addonDevices: Int?
+    var addonTrafficGB: Int?
 
     var paymentMethod: PaymentMethod {
         PaymentMethod(rawValue: paymentMethodRaw) ?? .apple
     }
 
     private static let key = "vpndirect.pending.checkout.v1"
+    private static let openPaymentsKey = "vpndirect.open.payment.ids"
 
     static var current: Self? {
         guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
@@ -34,6 +40,20 @@ struct PendingCheckout: Codable, Equatable {
     }
 
     static func clear() { UserDefaults.standard.removeObject(forKey: key) }
+
+    static var openPaymentIDs: [String] {
+        UserDefaults.standard.stringArray(forKey: openPaymentsKey) ?? []
+    }
+
+    static func rememberPaymentID(_ id: String) {
+        var ids = openPaymentIDs
+        if !ids.contains(id) { ids.append(id) }
+        UserDefaults.standard.set(ids, forKey: openPaymentsKey)
+    }
+
+    static func forgetPaymentID(_ id: String) {
+        UserDefaults.standard.set(openPaymentIDs.filter { $0 != id }, forKey: openPaymentsKey)
+    }
 }
 
 // MARK: - Auth pages (each is its own DetailPage — no in-page route swapping)
@@ -294,35 +314,6 @@ struct DirectAuthRecoveryView: View {
     }
 }
 
-struct DirectAuthTelegramHubView: View {
-    @ObservedObject var model: VPNConnectionModel
-
-    var body: some View {
-        AuthPageShell(
-            kicker: "ACCOUNT / BOT",
-            title: "Аккаунт бота",
-            subtitle: "Вход в аккаунт @vpndirectbot: код из бота или подтверждение в Telegram."
-        ) {
-            VStack(alignment: .leading, spacing: 12) {
-                AuthErrorText(model.checkoutAuthError)
-                AuthPrimaryButton(title: "КОД ИЛИ ПОДТВЕРЖДЕНИЕ", icon: "number") {
-                    model.openDetail(.authBot)
-                }
-                AuthSecondaryButton(title: "По номеру телефона", icon: "phone") {
-                    model.openDetail(.authPhone)
-                }
-                Text("Телефон создаёт отдельный app-аккаунт. Подписка бота — только через код или подтверждение.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(DS.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 4)
-            }
-        }
-        .disabled(model.checkoutAuthBusy)
-        .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
-    }
-}
-
 struct DirectAuthBotView: View {
     @ObservedObject var model: VPNConnectionModel
     @State private var mode: Mode = .code
@@ -518,6 +509,45 @@ struct DirectPaymentProcessingView: View {
     }
 }
 
+struct DirectPaymentWaitingView: View {
+    @ObservedObject var model: VPNConnectionModel
+
+    var body: some View {
+        DirectPaymentStateView(
+            mark: "…",
+            title: "Ожидаем подтверждение банка",
+            subtitle: model.paymentWaitingSubtitle.isEmpty
+                ? "Статус обновится, когда банк подтвердит оплату. Можно свернуть приложение."
+                : model.paymentWaitingSubtitle
+        ) {
+            VStack(spacing: 10) {
+                if !model.paymentWaitingTimedOut {
+                    ProgressView()
+                        .padding(.top, 8)
+                } else {
+                    Text("Ожидаем подтверждения со стороны банка. Зайдите позже или свяжитесь с вашим банком.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(DS.muted)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 8)
+                    Button("Купить снова") {
+                        model.openDetail(.payment)
+                    }
+                    .buttonStyle(HapticButtonStyle())
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DS.acid)
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .frame(maxWidth: .infinity)
+                    .background(DS.ink)
+                }
+            }
+        }
+        .onAppear { model.startPaymentStatusPolling() }
+        .onDisappear { model.stopPaymentStatusPolling() }
+    }
+}
+
 struct DirectPaymentCancelledView: View {
     let retry: () -> Void
     let changeMethod: () -> Void
@@ -555,6 +585,7 @@ struct DirectPaymentSuccessView: View {
     let activationPending: Bool
     let openLocations: () -> Void
     let openHome: () -> Void
+    var refreshActivation: (() -> Void)? = nil
 
     var body: some View {
         DirectPaymentStateView(
@@ -563,9 +594,15 @@ struct DirectPaymentSuccessView: View {
             subtitle: activationPending
                 ? "Платёж получен. Активируем вашу Direct-подписку…"
                 : "Подписка активна. Можно подключаться.",
-            actionTitle: activationPending ? nil : "К локациям",
-            action: openLocations,
-            secondaryTitle: activationPending ? nil : "На главную",
+            actionTitle: activationPending ? "Обновить статус" : "К локациям",
+            action: {
+                if activationPending {
+                    refreshActivation?()
+                } else {
+                    openLocations()
+                }
+            },
+            secondaryTitle: "На главную",
             secondaryAction: openHome
         ) {
             VStack(alignment: .leading, spacing: 6) {
@@ -754,7 +791,7 @@ private struct CheckoutAuthRow: View {
             }
             .frame(minHeight: 70)
         }
-        .overlay(alignment: .bottom) { Hairline() }
+            .overlay(alignment: .bottom) { Hairline() }
     }
 }
 
@@ -1064,105 +1101,6 @@ final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationCo
         if let sub = json["sub"] as? String { out["sub"] = sub }
         if let email = json["email"] as? String { out["email"] = email }
         return out
-    }
-
-    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first { $0.isKeyWindow } ?? ASPresentationAnchor()
-    }
-}
-
-// MARK: - Telegram Login (widget page → vpndirect://tg-auth)
-
-@MainActor
-final class TelegramLoginCoordinator: NSObject, ASWebAuthenticationPresentationContextProviding {
-    struct Result {
-        let id: Int
-        let firstName: String?
-        let lastName: String?
-        let username: String?
-        let photoURL: String?
-        let authDate: Int
-        let hash: String
-    }
-
-    private var session: ASWebAuthenticationSession?
-
-    func signIn() async throws -> Result {
-        let urlString = DirectBackendRuntime.telegramLoginURLString
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !urlString.isEmpty, let authURL = URL(string: urlString) else {
-            throw NSError(
-                domain: "DirectAuth",
-                code: 10,
-                userInfo: [NSLocalizedDescriptionKey: "Telegram Login не настроен"]
-            )
-        }
-        return try await withCheckedThrowingContinuation { cont in
-            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "vpndirect") { callbackURL, error in
-                if let error {
-                    let ns = error as NSError
-                    if ns.domain == ASWebAuthenticationSessionError.errorDomain,
-                       ns.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
-                        cont.resume(throwing: NSError(
-                            domain: "DirectAuth",
-                            code: 1001,
-                            userInfo: [NSLocalizedDescriptionKey: "Вход через Telegram отменён"]
-                        ))
-                    } else {
-                        cont.resume(throwing: error)
-                    }
-                    return
-                }
-                guard let callbackURL,
-                      let comps = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)
-                else {
-                    cont.resume(throwing: NSError(
-                        domain: "DirectAuth",
-                        code: 11,
-                        userInfo: [NSLocalizedDescriptionKey: "Telegram не вернул данные"]
-                    ))
-                    return
-                }
-                var values: [String: String] = [:]
-                for item in comps.queryItems ?? [] {
-                    values[item.name] = item.value ?? ""
-                }
-                guard let id = Int(values["id"] ?? ""),
-                      let authDate = Int(values["auth_date"] ?? ""),
-                      let hash = values["hash"], !hash.isEmpty
-                else {
-                    cont.resume(throwing: NSError(
-                        domain: "DirectAuth",
-                        code: 12,
-                        userInfo: [NSLocalizedDescriptionKey: "Неполный ответ Telegram Login"]
-                    ))
-                    return
-                }
-                cont.resume(returning: Result(
-                    id: id,
-                    firstName: values["first_name"].flatMap { $0.isEmpty ? nil : $0 },
-                    lastName: values["last_name"].flatMap { $0.isEmpty ? nil : $0 },
-                    username: values["username"].flatMap { $0.isEmpty ? nil : $0 },
-                    photoURL: values["photo_url"].flatMap { $0.isEmpty ? nil : $0 },
-                    authDate: authDate,
-                    hash: hash
-                ))
-            }
-            session.presentationContextProvider = self
-            // Keep cookies so the user can authorize inside Telegram in the sheet.
-            session.prefersEphemeralWebBrowserSession = false
-            self.session = session
-            if !session.start() {
-                cont.resume(throwing: NSError(
-                    domain: "DirectAuth",
-                    code: 13,
-                    userInfo: [NSLocalizedDescriptionKey: "Не удалось открыть Telegram Login"]
-                ))
-            }
-        }
     }
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {

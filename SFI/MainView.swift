@@ -86,6 +86,17 @@ struct MainView: View {
             }
             return
         }
+        // Plans / account deep links (push + marketing).
+        if VPNDirectDeepLink.isPlansURL(url) {
+            VPNDirectDeepLink.markPendingPlans()
+            NotificationCenter.default.post(name: .vpnDirectOpenPlans, object: nil)
+            return
+        }
+        if VPNDirectDeepLink.isAccountURL(url) {
+            VPNDirectDeepLink.markPendingAccount()
+            NotificationCenter.default.post(name: .vpnDirectOpenAccount, object: nil)
+            return
+        }
         let absolute = AutoSubscriptionImporter.normalizeImportURL(url.absoluteString)
         if VLESSConfigBuilder.isVLESSLink(absolute) || SubscriptionConfigBuilder.isHTTPURL(absolute) {
             Task {

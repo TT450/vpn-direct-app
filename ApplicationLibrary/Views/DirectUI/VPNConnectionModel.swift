@@ -40,7 +40,10 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var freeExpiresAt: Date?
     @Published public var hasPremiumEntitlement = false
     @Published public var premiumRemainingDays = 0
+    /// Plan traffic limit in GB (from `traffic_gb`).
     @Published public var premiumTrafficGB = 300
+    /// Remaining traffic in GB (from `traffic_gb_remaining`). `nil` until server reports it.
+    @Published public var premiumTrafficRemainingGB: Int?
     @Published public var premiumWhitelistGB = 0
     @Published public var premiumDevicesUsed = 1
     @Published public var premiumDeviceLimit = 5
@@ -73,6 +76,15 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var paymentErrorMessage = "Не удалось завершить оплату"
     @Published public var paymentActivationPending = false
     @Published public var lastPaymentId: String?
+    @Published public var paymentWaitingSubtitle = ""
+    @Published public var paymentWaitingTimedOut = false
+    @Published public var appCatalog: DirectAppCatalog?
+    /// Catalog tariff id for app_tariff checkout (must survive savePendingCheckout).
+    @Published public var pendingCheckoutTariffID: Int?
+    private var paymentPollTask: Task<Void, Never>?
+    private var paymentWaitStartedAt: Date?
+    /// True only after we successfully opened the external pay WebView for this attempt.
+    var didOpenExternalPayPage = false
     @Published public var directAccountEmail: String?
     @Published public var directAccountKind: String?
     @Published public var directAuthMethod: String?
@@ -128,6 +140,7 @@ public final class VPNConnectionModel: ObservableObject {
     private static let premiumEntitlementKey = "vpndirect.access.premium.enabled"
     private static let premiumDaysKey = "vpndirect.access.premium.days"
     private static let premiumTrafficKey = "vpndirect.access.premium.traffic.gb"
+    private static let premiumTrafficRemainingKey = "vpndirect.access.premium.traffic.remaining.gb"
     private static let premiumWhitelistKey = "vpndirect.access.premium.whitelist.gb"
     private static let premiumDevicesUsedKey = "vpndirect.access.premium.devices.used"
     private static let premiumDeviceLimitKey = "vpndirect.access.premium.devices.limit"
@@ -157,6 +170,9 @@ public final class VPNConnectionModel: ObservableObject {
         premiumRemainingDays = UserDefaults.standard.integer(forKey: Self.premiumDaysKey)
         let traffic = UserDefaults.standard.integer(forKey: Self.premiumTrafficKey)
         premiumTrafficGB = traffic > 0 ? traffic : 300
+        if UserDefaults.standard.object(forKey: Self.premiumTrafficRemainingKey) != nil {
+            premiumTrafficRemainingGB = UserDefaults.standard.integer(forKey: Self.premiumTrafficRemainingKey)
+        }
         premiumWhitelistGB = max(0, UserDefaults.standard.integer(forKey: Self.premiumWhitelistKey))
         let used = UserDefaults.standard.integer(forKey: Self.premiumDevicesUsedKey)
         premiumDevicesUsed = used > 0 ? used : 1
@@ -177,7 +193,19 @@ public final class VPNConnectionModel: ObservableObject {
 
     public var premiumTrafficDisplayLabel: String {
         if premiumTrafficGB >= Self.unlimitedTrafficGB { return "Unlimited" }
+        if let remaining = premiumTrafficRemainingGB, remaining >= 0, premiumTrafficGB > 0,
+           premiumTrafficGB < Self.unlimitedTrafficGB
+        {
+            return "\(remaining)/\(premiumTrafficGB) ГБ"
+        }
         return "\(premiumTrafficGB) ГБ"
+    }
+
+    /// Used GB for management meter. Prefer limit − remaining from backend.
+    public var premiumTrafficUsedGB: Int {
+        guard premiumTrafficGB > 0, premiumTrafficGB < Self.unlimitedTrafficGB else { return 0 }
+        guard let remaining = premiumTrafficRemainingGB else { return 0 }
+        return max(0, premiumTrafficGB - max(0, remaining))
     }
 
     public var isBusy: Bool { phase != .idle }
@@ -556,10 +584,43 @@ public final class VPNConnectionModel: ObservableObject {
 
     /// Pop one detail level (or return to the tab root).
     public func goBack() {
+        // Payment flow: never leave the user stuck on processing/waiting after Back.
+        if let page = detailPage, Self.isPaymentFlowPage(page) {
+            abandonPaymentFlow(returnToPaymentMethod: page == .paymentWaiting || page == .paymentError || page == .paymentProcessing)
+            return
+        }
         if let previous = detailStack.popLast() {
+            if Self.isPaymentFlowPage(previous) {
+                abandonPaymentFlow(returnToPaymentMethod: true)
+                return
+            }
             detailPage = previous
         } else {
             detailPage = nil
+        }
+    }
+
+    private static func isPaymentFlowPage(_ page: DetailPage) -> Bool {
+        switch page {
+        case .paymentProcessing, .paymentWaiting, .paymentCancelled, .paymentError, .paymentSuccess, .externalPay:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Leave waiting/error/processing without auto-resuming the bank-wait screen.
+    public func abandonPaymentFlow(returnToPaymentMethod: Bool) {
+        stopPaymentStatusPolling()
+        paymentActivationPending = false
+        paymentWaitStartedAt = nil
+        paymentWaitingTimedOut = false
+        didOpenExternalPayPage = false
+        detailStack.removeAll { Self.isPaymentFlowPage($0) }
+        if returnToPaymentMethod {
+            detailPage = .payment
+        } else {
+            detailPage = detailStack.popLast()
         }
     }
 
@@ -573,7 +634,7 @@ public final class VPNConnectionModel: ObservableObject {
 
     private static func shortTitle(for page: DetailPage) -> String {
         switch page {
-        case .premiumPlans, .freeAccess: return "Тарифы"
+        case .premiumPlans: return "Тарифы"
         case .planConstructor: return "Конструктор"
         case .payment: return "Оплата"
         case .accessChoice: return "Доступ"
@@ -594,13 +655,12 @@ public final class VPNConnectionModel: ObservableObject {
         case .authCode: return "Код"
         case .authRegister: return "Регистрация"
         case .authRecovery: return "Восстановление"
-        case .authTelegram: return "Telegram"
         case .authBot: return "Код бота"
         case .authPhone: return "Телефон"
         case .authPhoneCode: return "Код"
         case .authSuccess: return "Готово"
         case .account: return "Аккаунт"
-        case .paymentProcessing, .paymentCancelled, .paymentError, .paymentSuccess, .externalPay:
+        case .paymentProcessing, .paymentWaiting, .paymentCancelled, .paymentError, .paymentSuccess, .externalPay:
             return "Оплата"
         }
     }
@@ -730,10 +790,6 @@ public final class VPNConnectionModel: ObservableObject {
 
     public func clearAccessChoiceContext() {
         accessChoiceContext = nil
-    }
-
-    public func handleAccessChoiceFree() {
-        openDetail(.premiumPlans)
     }
 
     public func handleAccessChoicePremium() {
@@ -900,9 +956,29 @@ public final class VPNConnectionModel: ObservableObject {
         pendingAddOnTrafficGB = trafficGB
         pendingAddOnDevice = device
         pendingAddOnDay = day
+        pendingCheckoutTariffID = nil
         checkoutTitle = "Дополнительные ресурсы"
         checkoutPrice = price
         checkoutReturnPage = .addOns
+        PendingCheckout.save(
+            PendingCheckout(
+                title: checkoutTitle,
+                price: price,
+                periodDays: day ? 1 : selectedPlan.days,
+                paymentMethodRaw: paymentMethod.rawValue,
+                returnPage: String(describing: DetailPage.addOns),
+                planName: nil,
+                trafficGB: trafficGB > 0 ? trafficGB : nil,
+                devices: device ? 1 : selectedPlan.devices,
+                whitelistGB: 0,
+                createdAt: Date(),
+                productKind: "addon",
+                tariffID: nil,
+                addonDays: day ? 1 : 0,
+                addonDevices: device ? 1 : 0,
+                addonTrafficGB: trafficGB
+            )
+        )
     }
 
     public var isDirectAuthenticated: Bool {
@@ -911,6 +987,15 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func savePendingCheckout() {
+        let existing = PendingCheckout.current
+        let isAddon = pendingAddOnDay || pendingAddOnDevice || pendingAddOnTrafficGB > 0
+        let kind: String = {
+            if let existingKind = existing?.productKind, !existingKind.isEmpty { return existingKind }
+            if isAddon { return "addon" }
+            if selectedPlan.name == nil { return "constructor" }
+            return "app_tariff"
+        }()
+        let tariffID = pendingCheckoutTariffID ?? existing?.tariffID
         PendingCheckout.save(
             PendingCheckout(
                 title: checkoutTitle,
@@ -921,14 +1006,173 @@ public final class VPNConnectionModel: ObservableObject {
                 planName: selectedPlan.name,
                 trafficGB: selectedPlan.trafficGB,
                 devices: selectedPlan.devices,
-                whitelistGB: selectedPlan.whitelistGB,
-                createdAt: Date()
+                whitelistGB: 0,
+                createdAt: Date(),
+                productKind: kind,
+                tariffID: tariffID,
+                addonDays: isAddon ? (pendingAddOnDay ? 1 : 0) : existing?.addonDays,
+                addonDevices: isAddon ? (pendingAddOnDevice ? 1 : 0) : existing?.addonDevices,
+                addonTrafficGB: isAddon ? pendingAddOnTrafficGB : existing?.addonTrafficGB
             )
         )
     }
 
     public func clearPendingCheckout() {
         PendingCheckout.clear()
+    }
+
+    public func beginPaymentWaiting() {
+        paymentWaitingTimedOut = false
+        paymentWaitingSubtitle = "Ожидаем подтверждение банка…"
+        if paymentWaitStartedAt == nil {
+            paymentWaitStartedAt = Date()
+        }
+        openDetail(.paymentWaiting)
+        startPaymentStatusPolling()
+    }
+
+    public func startPaymentStatusPolling() {
+        stopPaymentStatusPolling()
+        paymentPollTask = Task { @MainActor in
+            while !Task.isCancelled {
+                await pollOpenPaymentsOnce()
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+            }
+        }
+    }
+
+    public func stopPaymentStatusPolling() {
+        paymentPollTask?.cancel()
+        paymentPollTask = nil
+    }
+
+    /// Resume open checkouts without yanking the user into `.paymentWaiting`
+    /// from unrelated screens (home / management / locations / account).
+    /// Pass `forceWaitingUI: true` only when returning from the bank / pay URL.
+    public func resumeOpenPaymentsIfNeeded(forceWaitingUI: Bool = false) {
+        guard !PendingCheckout.openPaymentIDs.isEmpty else { return }
+        if let page = detailPage {
+            switch page {
+            case .payment, .paymentError, .paymentCancelled, .paymentSuccess, .paymentProcessing,
+                 .authLogin, .authEmail, .authCode, .authRegister, .authRecovery, .authBot,
+                 .authPhone, .authPhoneCode, .authSuccess, .premiumPlans, .planConstructor, .addOns, .accessChoice:
+                // Stay on the current auth/checkout screen; poll in background.
+                startPaymentStatusPolling()
+                return
+            case .paymentWaiting:
+                startPaymentStatusPolling()
+                return
+            case .externalPay:
+                return
+            default:
+                break
+            }
+        }
+        if forceWaitingUI {
+            beginPaymentWaiting()
+        } else {
+            startPaymentStatusPolling()
+        }
+    }
+
+    @MainActor
+    private func pollOpenPaymentsOnce() async {
+        DirectBackendRuntime.warmUp()
+        var ids = PendingCheckout.openPaymentIDs
+        if let current = lastPaymentId, !ids.contains(current) {
+            ids.append(current)
+        }
+        guard !ids.isEmpty else { return }
+
+        if let started = paymentWaitStartedAt, Date().timeIntervalSince(started) > 2 * 60 * 60 {
+            paymentWaitingTimedOut = true
+            paymentWaitingSubtitle = "Ожидаем подтверждения со стороны банка. Зайдите позже или свяжитесь с вашим банком."
+        }
+
+        for id in ids {
+            do {
+                DirectBackendRuntime.warmUp()
+                guard let fetch = DirectBackendRuntime.checkoutStatus else { return }
+                let status = try await fetch(id)
+                let st = (status.status ?? "").lowercased()
+                if st == "paid" || st == "paid_unfulfilled" {
+                    if status.fulfilled == true || status.hasSubscription == true {
+                        await applyPaidFromHooks(status: status, paymentId: id)
+                        return
+                    }
+                    // Paid but grant still in flight — show success with refresh CTA, keep polling.
+                    paymentActivationPending = true
+                    paymentWaitingSubtitle = "Оплата прошла, активируем подписку…"
+                    if detailPage == .paymentWaiting || detailPage == .paymentProcessing {
+                        lastSuccessTitle = status.title ?? checkoutTitle
+                        lastSuccessPrice = status.amount ?? checkoutPrice
+                        openDetail(.paymentSuccess)
+                    }
+                } else if ["canceled", "cancelled", "failed", "expired"].contains(st) {
+                    PendingCheckout.forgetPaymentID(id)
+                    if id == lastPaymentId {
+                        stopPaymentStatusPolling()
+                        // Only surface cancel UI when the user is already waiting on payment.
+                        if detailPage == .paymentWaiting || detailPage == .paymentProcessing {
+                            openDetail(.paymentCancelled)
+                        }
+                        return
+                    }
+                } else if st == "timeout" {
+                    paymentWaitingTimedOut = true
+                    paymentWaitingSubtitle = "Ожидаем подтверждения со стороны банка. Зайдите позже или свяжитесь с вашим банком."
+                } else {
+                    paymentWaitingSubtitle = "Статус: ожидание ответа банка…"
+                }
+            } catch {
+                // Keep waiting — network blips during bank app switch are normal.
+            }
+        }
+    }
+
+    @MainActor
+    private func applyPaidFromHooks(status: DirectCheckoutStatus, paymentId: String) async {
+        stopPaymentStatusPolling()
+        DirectBackendRuntime.warmUp()
+        if let apply = DirectBackendRuntime.applyPaidCheckout {
+            await apply(self, status, paymentId)
+            return
+        }
+        if let url = status.subscriptionUrl, !url.isEmpty {
+            directSubscriptionURL = url
+            await attachDirectSubscription(url: url)
+        }
+        applyLocalPremiumFromCheckout(pending: PendingCheckout.current)
+        paymentActivationPending = false
+        PendingCheckout.forgetPaymentID(paymentId)
+        clearPendingCheckout()
+        openDetail(.paymentSuccess)
+    }
+
+    public func refreshAppCatalog() async {
+        DirectBackendRuntime.warmUp()
+        do {
+            appCatalog = try await DirectBackendRuntime.fetchAppCatalog()
+        } catch {
+            // Keep previous catalog
+        }
+    }
+
+    /// Pull-to-refresh for every Direct screen except the home tab.
+    public func performPullToRefresh() async {
+        async let subs: Void = reloadSubscriptions()
+        async let catalog: Void = refreshAppCatalog()
+        async let locs: Void = DirectLocationsCatalog.shared.refreshFromBackendIfNeeded(force: true)
+        if isDirectAuthenticated {
+            await refreshDirectAccount()
+        }
+        _ = await (subs, catalog, locs)
+        syncFromExtension()
+        refreshPublicIP()
+        if selectedTab == .locations {
+            requestURLTest()
+        }
+        HapticManager.shared.play(.selection)
     }
 
     /// Gate: guest path ends at payment method; auth required only when charging.
@@ -1098,15 +1342,6 @@ public final class VPNConnectionModel: ObservableObject {
         checkoutAuthError = "Сервис входа недоступен"
     }
 
-    func signInWithTelegramForAuth() async {
-        DirectBackendRuntime.warmUp()
-        if let run = DirectBackendRuntime.signInWithTelegram {
-            await run(self)
-            return
-        }
-        checkoutAuthError = "Сервис входа недоступен"
-    }
-
     func sendPhoneCodeForAuth(phone: String) async {
         DirectBackendRuntime.warmUp()
         if let run = DirectBackendRuntime.sendPhoneCode {
@@ -1202,6 +1437,9 @@ public final class VPNConnectionModel: ObservableObject {
             if pendingAddOnTrafficGB > 0 {
                 if premiumTrafficGB < Self.unlimitedTrafficGB {
                     premiumTrafficGB += pendingAddOnTrafficGB
+                    if let remaining = premiumTrafficRemainingGB {
+                        premiumTrafficRemainingGB = remaining + pendingAddOnTrafficGB
+                    }
                 }
             }
             if pendingAddOnDevice {
@@ -1219,8 +1457,10 @@ public final class VPNConnectionModel: ObservableObject {
             premiumRemainingDays = pending?.periodDays ?? selectedPlan.days
             if let gb = pending?.trafficGB ?? selectedPlan.trafficGB {
                 premiumTrafficGB = gb
+                premiumTrafficRemainingGB = gb
             } else {
                 premiumTrafficGB = Self.unlimitedTrafficGB
+                premiumTrafficRemainingGB = nil
             }
             premiumWhitelistGB = pending?.whitelistGB ?? selectedPlan.whitelistGB
             premiumDeviceLimit = max(1, pending?.devices ?? selectedPlan.devices)
@@ -1260,6 +1500,11 @@ public final class VPNConnectionModel: ObservableObject {
         UserDefaults.standard.set(hasPremiumEntitlement, forKey: Self.premiumEntitlementKey)
         UserDefaults.standard.set(premiumRemainingDays, forKey: Self.premiumDaysKey)
         UserDefaults.standard.set(premiumTrafficGB, forKey: Self.premiumTrafficKey)
+        if let remaining = premiumTrafficRemainingGB {
+            UserDefaults.standard.set(remaining, forKey: Self.premiumTrafficRemainingKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.premiumTrafficRemainingKey)
+        }
         UserDefaults.standard.set(premiumWhitelistGB, forKey: Self.premiumWhitelistKey)
         UserDefaults.standard.set(premiumDevicesUsed, forKey: Self.premiumDevicesUsedKey)
         UserDefaults.standard.set(premiumDeviceLimit, forKey: Self.premiumDeviceLimitKey)
@@ -2200,7 +2445,9 @@ public final class VPNConnectionModel: ObservableObject {
     }
 
     public func select(serverID: String?) {
-        guard serverID != selectedServerID else {
+        // Manual re-tap of the same leaf just closes the sheet.
+        // Auto (nil) must always re-bind urltest — otherwise a stale leaf pin sticks forever.
+        if serverID != nil, serverID == selectedServerID {
             activeSheet = nil
             return
         }
@@ -2231,8 +2478,10 @@ public final class VPNConnectionModel: ObservableObject {
                     try await LibboxNewStandaloneCommandClient()!.selectOutbound(server.groupTag, outboundTag: serverID)
                     assignedServerID = serverID
                 } else {
-                    let groupTag = activeSubscription?.servers.first?.groupTag ?? "proxy"
-                    // Auto mode: native sing-box urltest balancer.
+                    let groupTag = resolveSelectorGroupTag(
+                        fallback: activeSubscription?.servers.first?.groupTag ?? "proxy"
+                    )
+                    // Auto mode: keep the selector on native urltest `auto` — never pin a leaf.
                     try await LibboxNewStandaloneCommandClient()!.selectOutbound(groupTag, outboundTag: "auto")
                     try? await LibboxNewStandaloneCommandClient()!.urlTest("auto")
                     try? await Task.sleep(nanoseconds: 500_000_000)
@@ -2805,10 +3054,10 @@ public final class VPNConnectionModel: ObservableObject {
         // not on normal 10–40ms jitter between FR/NL/DE.
         let switchMargin = 80
         guard best.value + switchMargin < currentDelay else { return }
-        let groupTag = activeSubscription?.servers.first?.groupTag ?? "proxy"
+        // Keep selector on urltest `auto` — pinning a leaf breaks Auto permanently.
         try? await LibboxNewStandaloneCommandClient()!.urlTest("auto")
-        try? await LibboxNewStandaloneCommandClient()!.selectOutbound(groupTag, outboundTag: best.key)
-        assignedServerID = best.key
+        try? await Task.sleep(nanoseconds: 350_000_000)
+        await refreshAssignedFromGroups()
     }
 
     private func ensureAutoConnectSettings() async {

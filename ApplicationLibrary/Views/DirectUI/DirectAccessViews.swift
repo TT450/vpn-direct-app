@@ -162,6 +162,9 @@ private struct AccessChoiceRow: View {
     }
 }
 
+// TEMPORARILY HIDDEN — duplicate of DirectPlansView; will return in later versions.
+// Kept under `#if false` so we can revive without rewrite.
+#if false
 struct DirectPremiumPlansView: View {
     @ObservedObject var model: VPNConnectionModel
 
@@ -294,18 +297,6 @@ struct DirectPremiumPlansView: View {
 
             optionHeader("ТРАФИК")
             trafficChipRow
-
-            optionHeader("БЕЛЫЕ СПИСКИ")
-            intChipRow(
-                values: VPNDirectPlanCatalog.constructorWhitelistGB,
-                selected: model.selectedPlan.whitelistGB,
-                label: VPNDirectPlanCatalog.whitelistOptionLabel
-            ) { value in
-                var plan = model.selectedPlan
-                plan.name = nil
-                plan.whitelistGB = value
-                model.applySelectedPlan(plan)
-            }
         }
     }
 
@@ -397,6 +388,7 @@ struct DirectPremiumPlansView: View {
     }
 }
 
+
 private struct PresetPlanCard: View {
     let preset: VPNDirectPlanPreset
     let isSelected: Bool
@@ -425,8 +417,8 @@ private struct PresetPlanCard: View {
 
                 HStack(spacing: 0) {
                     presetStat(label: "ТРАФИК", value: VPNDirectPlanCatalog.trafficOptionLabel(preset.trafficGB), dark: isSelected)
-                    presetStat(label: "WHITE-LIST", value: "\(preset.whitelistGB) GB", dark: isSelected)
                     presetStat(label: "УСТР.", value: "\(preset.devices)", dark: isSelected)
+                    presetStat(label: "ДНИ", value: "\(preset.defaultDays)", dark: isSelected)
                 }
                 .padding(.top, 12)
 
@@ -481,7 +473,7 @@ private struct PlanCheckoutSummary: View {
 
             HStack(spacing: 0) {
                 DarkStat(label: "ТРАФИК", value: plan.trafficLabel)
-                DarkStat(label: "WHITE-LIST", value: plan.whitelistGB > 0 ? "\(plan.whitelistGB) GB" : "—")
+                DarkStat(label: "СРОК", value: "\(plan.days) дн.")
                 DarkStat(label: "УСТРОЙСТВА", value: "\(plan.devices)")
             }
         }
@@ -489,6 +481,7 @@ private struct PlanCheckoutSummary: View {
         .background(DS.panel)
     }
 }
+#endif
 
 struct DirectPaymentMethodView: View {
     @ObservedObject var model: VPNConnectionModel
@@ -578,8 +571,10 @@ struct DirectAddOnsView: View {
     @State private var traffic = 0
     @State private var device = false
     @State private var day = false
+    @State private var liveTotal: Int?
 
     private var total: Int {
+        if let liveTotal { return liveTotal }
         let trafficPrice = traffic == 10 ? 79 : traffic == 50 ? 249 : traffic == 100 ? 399 : 0
         return trafficPrice + (device ? 149 : 0) + (day ? 29 : 0)
     }
@@ -600,12 +595,13 @@ struct DirectAddOnsView: View {
 
                 AccessSectionHeader(title: "УВЕЛИЧИТЬ ВОЗМОЖНОСТИ", meta: "ВЫБЕРИТЕ")
                     .padding(.top, 23)
-                AddOnRow(title: "Добавить трафик", subtitle: "Одноразовое пополнение") {
+                AddOnRow(title: "Добавить трафик", subtitle: "К остатку периода") {
                     ForEach([10, 50, 100], id: \.self) { value in
                         AddOnChip(title: "+\(value)", isSelected: traffic == value) {
                             let next = traffic == value ? 0 : value
                             traffic = next
                             HapticManager.shared.play(.selection)
+                            Task { await refreshQuote() }
                         }
                     }
                 }
@@ -613,12 +609,14 @@ struct DirectAddOnsView: View {
                     AddOnChip(title: "+1", isSelected: device) {
                         device.toggle()
                         HapticManager.shared.play(device ? .toggleOn : .toggleOff)
+                        Task { await refreshQuote() }
                     }
                 }
                 AddOnRow(title: "Продлить подписку", subtitle: "Ещё один день доступа") {
                     AddOnChip(title: "+1 день", isSelected: day) {
                         day.toggle()
                         HapticManager.shared.play(day ? .toggleOn : .toggleOff)
+                        Task { await refreshQuote() }
                     }
                 }
 
@@ -664,6 +662,35 @@ struct DirectAddOnsView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
+        }
+        .onAppear {
+            Task {
+                await model.refreshAppCatalog()
+                await refreshQuote()
+            }
+        }
+    }
+
+    private func refreshQuote() async {
+        DirectBackendRuntime.warmUp()
+        guard traffic > 0 || device || day else {
+            await MainActor.run { liveTotal = nil }
+            return
+        }
+        guard let quote = DirectBackendRuntime.quoteCheckout else { return }
+        do {
+            let q = try await quote(
+                DirectCheckoutQuoteRequest(
+                    productKind: "addon",
+                    tariffID: nil,
+                    days: day ? 1 : nil,
+                    devices: device ? 1 : nil,
+                    trafficGB: traffic > 0 ? traffic : nil
+                )
+            )
+            await MainActor.run { liveTotal = q.amount }
+        } catch {
+            await MainActor.run { liveTotal = nil }
         }
     }
 }

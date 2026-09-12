@@ -41,7 +41,7 @@ public enum DetailPage: Equatable {
     case tunnelSettings
     case onDemandSettings
     case accessChoice
-    case freeAccess
+    // freeAccess removed — free-via-ads abandoned; tariffs live under premiumPlans
     case premiumPlans
     case planConstructor
     case payment
@@ -51,12 +51,13 @@ public enum DetailPage: Equatable {
     case authCode
     case authRegister
     case authRecovery
-    case authTelegram
+    // authTelegram (Login Widget hub) removed — bot code / phone only
     case authBot
     case authPhone
     case authPhoneCode
     case authSuccess
     case paymentProcessing
+    case paymentWaiting
     case paymentCancelled
     case paymentError
     case paymentSuccess
@@ -71,8 +72,88 @@ public enum AccessSource: Equatable {
 }
 
 public enum PaymentMethod: String, CaseIterable, Codable {
+    // TEMP: Apple IAP / StoreKit not wired yet — kept until Apple docs & agreements are ready.
+    // UI still shows this option; hooks finalize without charging Apple ID. Do not change until then.
     case apple = "Покупка через Apple"
     case external = "Другие способы"
+}
+
+public struct DirectAppCatalog: Equatable {
+    public var currency: String
+    public var tariffs: [DirectAppTariff]
+    public var constructor: DirectPricingSettings?
+    public var addons: DirectPricingSettings?
+    /// Period day → multiplier for preset tariff scaling (30/90/180/365).
+    public var monthMultipliers: [Int: Double]
+}
+
+public struct DirectAppTariff: Identifiable, Equatable {
+    public let id: Int
+    public let name: String
+    public let description: String
+    public let days: Int
+    public let price: Int
+    public let currency: String
+    public let devices: Int
+    public let trafficGB: Int?
+}
+
+public struct DirectDeviceDiscount: Equatable {
+    public var minDevices: Int
+    public var percent: Double
+}
+
+public struct DirectTrafficDiscount: Equatable {
+    public var minTrafficGB: Int
+    public var percent: Double
+}
+
+public struct DirectPricingSettings: Equatable {
+    public var pricePerDevice: Double
+    public var pricePerGB: Double
+    public var pricePerDay: Double
+    public var minDevices: Int
+    public var minTrafficGB: Int
+    public var minDays: Int
+    public var durationDiscounts: [Int: Double]
+    public var deviceDiscounts: [DirectDeviceDiscount]
+    public var trafficDiscounts: [DirectTrafficDiscount]
+}
+
+public struct DirectCheckoutQuoteRequest: Equatable {
+    public var productKind: String
+    public var tariffID: Int?
+    public var days: Int?
+    public var devices: Int?
+    public var trafficGB: Int?
+}
+
+public struct DirectCheckoutQuote: Equatable {
+    public var productKind: String
+    public var amount: Int
+    public var currency: String
+    public var days: Int?
+    public var devices: Int?
+    public var trafficGB: Int?
+    public var title: String
+    public var planName: String?
+    public var tariffID: Int?
+}
+
+public struct DirectCheckoutStatus: Equatable {
+    public var paymentId: String?
+    public var status: String?
+    public var amount: Int?
+    public var title: String?
+    public var fulfilled: Bool?
+    public var subscriptionUrl: String?
+    public var hasSubscription: Bool?
+    public var remainingDays: Int?
+    public var devices: Int?
+    /// Plan traffic limit in GB (`traffic_gb` from /me).
+    public var trafficGB: Int?
+    /// Remaining traffic in GB (`traffic_gb_remaining` from /me).
+    public var trafficGBRemaining: Int?
 }
 
 public enum DirectBuiltinProfile {

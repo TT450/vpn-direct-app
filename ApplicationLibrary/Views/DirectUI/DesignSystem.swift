@@ -22,6 +22,28 @@ extension View {
             .font(.system(size: 9, weight: .semibold, design: .monospaced))
             .foregroundStyle(color)
     }
+
+    /// Pull-to-refresh for Direct screens. No-op when `enabled` is false (e.g. home).
+    func directRefreshable(
+        enabled: Bool = true,
+        action: @escaping () async -> Void
+    ) -> some View {
+        modifier(DirectRefreshableModifier(enabled: enabled, action: action))
+    }
+}
+
+private struct DirectRefreshableModifier: ViewModifier {
+    let enabled: Bool
+    let action: () async -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content.refreshable { await action() }
+        } else {
+            content
+        }
+    }
 }
 
 struct Hairline: View {

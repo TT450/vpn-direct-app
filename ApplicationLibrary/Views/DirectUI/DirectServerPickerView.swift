@@ -5,6 +5,73 @@ import SwiftUI
 struct DirectServerPickerView: View {
     @ObservedObject var model: VPNConnectionModel
     @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            DirectServerPickerContent(
+                model: model,
+                serverSource: .activeSubscription,
+                selectServer: { model.select(serverID: $0) }
+            )
+        }
+        .background(DS.paper.ignoresSafeArea())
+        .preferredColorScheme(.light)
+    }
+
+    private var header: some View {
+        HStack(alignment: .bottom, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 7) {
+                    Text("01").microLabel(color: DS.green)
+                    Rectangle()
+                        .fill(DS.acid)
+                        .frame(width: 14, height: 2)
+                    Text("SERVER / LOCATIONS").microLabel()
+                }
+
+                Text("Локации")
+                    .font(.system(size: 34, weight: .semibold, design: .rounded))
+                    .foregroundStyle(DS.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Text("Выберите сервер для текущего подключения")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(DS.muted)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .frame(width: 38, height: 38)
+                    .background(DS.ink)
+                    .foregroundStyle(DS.acid)
+            }
+            .buttonStyle(HapticButtonStyle())
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 28)
+        .padding(.bottom, 15)
+    }
+}
+
+/// Shared server list + auto row used by the change-server sheet and the Локации tab.
+struct DirectServerPickerContent: View {
+    enum ServerSource {
+        case activeSubscription
+        case liveDirect
+    }
+
+    @ObservedObject var model: VPNConnectionModel
+    var serverSource: ServerSource = .activeSubscription
+    var selectServer: (String?) -> Void
+
     @State private var query = ""
     @State private var tab = PickerTab.all
     /// Snapshot so 1 Hz runtime / traffic publishes do not re-sort the whole list.
@@ -58,7 +125,6 @@ struct DirectServerPickerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
             searchBar
             tabs
 
@@ -74,10 +140,11 @@ struct DirectServerPickerView: View {
                         emptyState
                     } else {
                         ForEach(Array(servers.enumerated()), id: \.element.id) { index, server in
-                            ServerRow(
+                            DirectServerPickerRow(
                                 model: model,
                                 index: index + 1,
-                                server: server
+                                server: server,
+                                selectServer: selectServer
                             )
                         }
                     }
@@ -86,8 +153,6 @@ struct DirectServerPickerView: View {
                 .padding(.bottom, 24)
             }
         }
-        .background(DS.paper.ignoresSafeArea())
-        .preferredColorScheme(.light)
         .hapticScrollThresholds()
         .hapticSelection(tab)
         .onAppear {
@@ -108,47 +173,6 @@ struct DirectServerPickerView: View {
             return "Определяем…"
         }
         return "—"
-    }
-
-    private var header: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 7) {
-                    Text("01").microLabel(color: DS.green)
-                    Rectangle()
-                        .fill(DS.acid)
-                        .frame(width: 14, height: 2)
-                    Text("SERVER / LOCATIONS").microLabel()
-                }
-
-                Text("Локации")
-                    .font(.system(size: 34, weight: .semibold, design: .rounded))
-                    .foregroundStyle(DS.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                Text("Выберите сервер для текущего подключения")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(DS.muted)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 8)
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .bold))
-                    .frame(width: 38, height: 38)
-                    .background(DS.ink)
-                    .foregroundStyle(DS.acid)
-            }
-            .buttonStyle(HapticButtonStyle())
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 28)
-        .padding(.bottom, 15)
     }
 
     private var searchBar: some View {
@@ -238,7 +262,7 @@ struct DirectServerPickerView: View {
 
     private var autoSelectionRow: some View {
         Button {
-            model.select(serverID: nil)
+            selectServer(nil)
         } label: {
             HStack(spacing: 11) {
                 ZStack {
@@ -316,16 +340,28 @@ struct DirectServerPickerView: View {
     }
 
     private func captureSnapshot() {
-        let sub = model.activeSubscription
-        snapshotServers = sub?.servers ?? []
-        snapshotName = sub?.name ?? ""
+        switch serverSource {
+        case .activeSubscription:
+            let sub = model.activeSubscription
+            snapshotServers = (sub?.servers ?? []).filter { server in
+                let id = server.id.lowercased()
+                return !id.isEmpty && id != "direct" && id != "auto"
+            }
+            snapshotName = sub?.name ?? ""
+        case .liveDirect:
+            snapshotServers = model.liveDirectServers
+            snapshotName = model.premiumSubscription?.name
+                ?? model.freeSubscription?.name
+                ?? "VPN DIRECT"
+        }
     }
 }
 
-private struct ServerRow: View {
+private struct DirectServerPickerRow: View {
     @ObservedObject var model: VPNConnectionModel
     let index: Int
     let server: VPNServer
+    var selectServer: (String?) -> Void
 
     private var isSelected: Bool {
         model.selectedServerID == server.id
@@ -338,7 +374,7 @@ private struct ServerRow: View {
     var body: some View {
         HStack(spacing: 0) {
             Button {
-                model.select(serverID: server.id)
+                selectServer(server.id)
             } label: {
                 HStack(spacing: 10) {
                     Text(String(format: "%02d", index))

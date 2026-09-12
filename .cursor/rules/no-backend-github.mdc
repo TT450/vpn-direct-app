@@ -41,3 +41,13 @@ A public clone may not compile Direct checkout. That is intended. Do not “fix�
 ## When working on backend
 
 Keep API client, hooks, hosts, and patches **local and/or on the server**. Sync with scp/rsync/SSH — never the public git remote.
+
+## Partner patch / TheTochka — hard ban
+
+**Never** read, edit, commit, upload, zip-rebuild, or run `partner-patch-*` / `install-partner-patch` / `update-partner` against:
+
+- any `partner-patch-vpn-bot` tree or zip in this workspace or on servers
+- partner-patch static assets under provider portal installs
+- any TheTochka / cross_platform partner payments templates for “VPN Direct app” UI
+
+That stack is **provider prod**. Direct admin changes go **only** to Direct’s own `web_admin` on the Direct server. Do not “borrow” partner-patch for Direct badges or menus unless the user explicitly names partner-patch and asks to change it.

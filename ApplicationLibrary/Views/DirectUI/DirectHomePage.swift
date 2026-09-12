@@ -8,9 +8,15 @@ struct DirectHomePage: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            Text("DIRECT / VPN")
+                .microLabel()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.top, DS.pageTop)
+                .padding(.bottom, 7)
+
             header
                 .padding(.horizontal, 20)
-                .padding(.top, 14)
 
             Spacer(minLength: 0)
 
@@ -22,7 +28,9 @@ struct DirectHomePage: View {
             Spacer(minLength: 0)
 
             serverRow
-            controlsRow
+            if showsExternalSubscriptionControls {
+                controlsRow
+            }
             telemetryRow
         }
         .background(DS.paper.ignoresSafeArea())
@@ -306,14 +314,20 @@ struct DirectHomePage: View {
         }
     }
 
-    private var canSoftRemove: Bool {
+    /// Нижний блок (обновить / подписка / сервер / убрать) — только для внешней подписки.
+    private var showsExternalSubscriptionControls: Bool {
         guard let sub = model.activeSubscription else { return false }
-        return !DirectBuiltinProfile.isBuiltin(sub.profile.remoteURL)
+        return !DirectBuiltinProfile.isDirectOwned(sub.profile.remoteURL)
+    }
+
+    private var canSoftRemove: Bool {
+        showsExternalSubscriptionControls
     }
 
     private var canUpdate: Bool {
-        guard let sub = model.activeSubscription else { return false }
-        if DirectBuiltinProfile.isBuiltin(sub.profile.remoteURL) { return false }
+        guard showsExternalSubscriptionControls,
+              let sub = model.activeSubscription
+        else { return false }
         let remote = sub.profile.remoteURL?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return sub.profile.type == .remote && !remote.isEmpty
     }

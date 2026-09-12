@@ -51,6 +51,7 @@
 				<string>sing-box</string>
 				<string>vless</string>
 				<string>vpndirect</string>
+				<string>com.googleusercontent.apps.339265326344-pelgbn624rga7bp3mbkm7fa8k2cdq1pj</string>
 			</array>
 		</dict>
 	</array>
@@ -80,6 +81,7 @@
 	<array>
 		<string>fetch</string>
 		<string>processing</string>
+		<string>remote-notification</string>
 	</array>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
