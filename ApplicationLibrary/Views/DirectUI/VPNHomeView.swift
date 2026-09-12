@@ -57,7 +57,7 @@ public struct VPNHomeView: View {
                         case .onDemandSettings:
                             DirectOnDemandSettingsView(model: model)
                         case .accessChoice:
-                            DirectAccessChoiceView(model: model)
+                            DirectNativeAccessChoiceView(model: model)
                         case .freeAccess:
                             DirectFreeAccessView(model: model)
                         case .premiumPlans:
