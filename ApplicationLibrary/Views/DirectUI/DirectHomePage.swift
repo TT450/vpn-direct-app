@@ -294,7 +294,7 @@ struct DirectHomePage: View {
     }
 
     private var serverSubtitle: String {
-        guard model.activeSubscription != nil else { return "Подписка не выбрана" }
+        guard model.activeSubscription != nil else { return "Выберите подписку" }
         if model.usesAutoSelection {
             if let server = model.activeServer {
                 return "Сейчас: \(server.locationLabel)"

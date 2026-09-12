@@ -8,21 +8,67 @@ struct DirectSubscriptionPickerView: View {
     @ObservedObject var model: VPNConnectionModel
     @Environment(\.dismiss) private var dismiss
 
-    private var items: [VPNSubscriptionItem] { model.selectableSubscriptions }
+    private var imported: [VPNSubscriptionItem] {
+        model.importedSubscriptions
+    }
+
+    private var hasDirectBlock: Bool {
+        model.hasNativeDirectSubscription || model.preferredNativeDirectSubscription != nil
+    }
+
+    private var isDirectActive: Bool {
+        model.isNativeDirectSubscriptionActive
+    }
+
+    private var directDetail: String {
+        if let live = model.preferredNativeDirectSubscription {
+            let servers = live.servers.count
+            if model.hasPremiumEntitlement {
+                let traffic = model.premiumTrafficDisplayLabel
+                let days = model.premiumRemainingDays
+                if servers > 0 {
+                    return "\(days) дн · \(traffic) · \(servers) лок."
+                }
+                return "\(days) дн · \(traffic) · \(model.premiumDevicesUsed)/\(model.premiumDeviceLimit)"
+            }
+            if servers > 0 {
+                return "\(servers) локаций · \(live.expiry)"
+            }
+            return live.updated
+        }
+        if model.hasPremiumEntitlement {
+            return "\(model.premiumRemainingDays) дн · \(model.premiumTrafficDisplayLabel) · \(model.premiumDevicesUsed)/\(model.premiumDeviceLimit)"
+        }
+        return "Тариф VPN Direct на аккаунте"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             header
 
-            if items.isEmpty {
+            if !hasDirectBlock, imported.isEmpty {
                 emptyState
             } else {
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 0) {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            subscriptionRow(item, index: index)
-                            if index < items.count - 1 {
-                                Hairline()
+                    VStack(alignment: .leading, spacing: 0) {
+                        if hasDirectBlock {
+                            nativeDirectBlock
+                                .padding(.top, 18)
+                        }
+
+                        if !imported.isEmpty {
+                            HStack {
+                                Text("ДОБАВЛЕННЫЕ ПОДПИСКИ").microLabel(color: DS.ink)
+                                Spacer()
+                                Text(String(format: "%02d", imported.count)).microLabel(color: DS.green)
+                            }
+                            .frame(height: 36)
+                            .overlay(alignment: .top) { Hairline(color: DS.ink) }
+                            .padding(.top, hasDirectBlock ? 22 : 18)
+
+                            ForEach(Array(imported.enumerated()), id: \.element.id) { index, subscription in
+                                importedRow(subscription)
+                                    .padding(.top, index == 0 ? 0 : 1)
                             }
                         }
                     }
@@ -43,7 +89,7 @@ struct DirectSubscriptionPickerView: View {
                     Rectangle()
                         .fill(DS.acid)
                         .frame(width: 14, height: 2)
-                    Text("ACCOUNT / SUBSCRIPTIONS").microLabel()
+                    Text("ПОДКЛЮЧЕНИЕ / ПОДПИСКИ").microLabel()
                 }
 
                 Text("Подписки")
@@ -52,7 +98,7 @@ struct DirectSubscriptionPickerView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
 
-                Text("Выберите источник для подключения")
+                Text("VPN Direct — первым, добавленные — ниже")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(DS.muted)
                     .lineLimit(1)
@@ -112,63 +158,129 @@ struct DirectSubscriptionPickerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private func subscriptionRow(_ item: VPNSubscriptionItem, index: Int) -> some View {
-        let isActive = item.id == model.activeSubscriptionID
-        let isDirect = DirectBuiltinProfile.isDirectOwned(item.profile.remoteURL)
+    /// Firm black Direct block — single native access, no Free/Premium split.
+    private var nativeDirectBlock: some View {
+        Button {
+            activateNativeDirect()
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("VPN DIRECT · ОСНОВНАЯ")
+                            .microLabel(color: DS.acid)
+                        Text("VPN Direct")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Text(directDetail)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.52))
+                            .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 10)
+
+                    VStack(alignment: .trailing, spacing: 8) {
+                        Text("ОСНОВНАЯ")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundStyle(DS.acid)
+                            .padding(.horizontal, 8)
+                            .frame(height: 27)
+                            .overlay(Rectangle().stroke(DS.acid.opacity(0.72)))
+
+                        if isDirectActive {
+                            HStack(spacing: 5) {
+                                Text("АКТИВНА").microLabel(color: DS.acid)
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(DS.acid)
+                            }
+                        } else {
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(DS.acid)
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DS.ink)
+            .overlay {
+                if isDirectActive {
+                    Color.white.opacity(0.06)
+                }
+            }
+            .overlay(Rectangle().stroke(DS.acid.opacity(0.72), lineWidth: 1))
+        }
+        .buttonStyle(HapticButtonStyle())
+    }
+
+    private func importedRow(_ subscription: VPNSubscriptionItem) -> some View {
+        let isActive = model.isSubscriptionActive(subscription.id)
 
         return Button {
-            model.pickSubscriptionFromSheet(item.id)
+            model.pickSubscriptionFromSheet(subscription.id)
+            dismiss()
         } label: {
             HStack(spacing: 12) {
-                Text(String(format: "%02d", index + 1))
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(DS.acid)
-                    .frame(width: 42, height: 42)
-                    .background(DS.ink)
+                Text("URL")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(isActive ? DS.acid : DS.ink)
+                    .frame(width: 48, height: 42)
+                    .background(isActive ? DS.ink : Color.white.opacity(0.72))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(isDirect ? "VPN DIRECT" : "ВНЕШНЯЯ")
-                        .microLabel(color: DS.muted)
-                    Text(item.name)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(DS.ink)
-                        .lineLimit(1)
-                    Text(detailLine(for: item, isDirect: isDirect))
+                    HStack(spacing: 7) {
+                        Text(subscription.name)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(DS.ink)
+                            .lineLimit(1)
+                        if isActive {
+                            Text("АКТИВНА").microLabel(color: DS.green)
+                        }
+                    }
+                    Text(importedDetail(subscription))
                         .font(.system(size: 10))
                         .foregroundStyle(DS.muted)
                         .lineLimit(1)
                 }
 
                 Spacer(minLength: 8)
-
-                if isActive {
-                    Text("АКТИВНА")
-                        .microLabel(color: DS.green)
-                } else {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(DS.muted)
-                }
+                Image(systemName: isActive ? "checkmark" : "arrow.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(isActive ? DS.green : DS.muted)
             }
-            .padding(.vertical, 14)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 68)
             .contentShape(Rectangle())
         }
         .buttonStyle(HapticButtonStyle())
+        .background(isActive ? DS.acid.opacity(0.16) : Color.white.opacity(0.72))
+        .overlay(Rectangle().stroke(isActive ? DS.green : DS.line))
     }
 
-    private func detailLine(for item: VPNSubscriptionItem, isDirect: Bool) -> String {
-        if isDirect {
-            return model.accessStripDetail
-        }
-        let servers = item.servers.count
-        let expiry = item.expiry
+    private func importedDetail(_ subscription: VPNSubscriptionItem) -> String {
+        let servers = subscription.servers.count
+        let expiry = subscription.expiry
         if servers > 0, !expiry.isEmpty, expiry != "—" {
-            return "\(servers) лок. · \(expiry)"
+            return "Внешний провайдер · \(servers) лок. · \(expiry)"
         }
         if servers > 0 {
-            return "\(servers) локаций"
+            return "Внешний провайдер · \(servers) локаций"
         }
-        return item.updated
+        if !expiry.isEmpty, expiry != "—" {
+            return "Внешний провайдер · \(expiry)"
+        }
+        return "Внешний провайдер · \(subscription.updated)"
+    }
+
+    private func activateNativeDirect() {
+        if let live = model.preferredNativeDirectSubscription {
+            model.pickSubscriptionFromSheet(live.id)
+        } else {
+            model.useNativeDirectSubscription()
+        }
+        dismiss()
     }
 }
 
