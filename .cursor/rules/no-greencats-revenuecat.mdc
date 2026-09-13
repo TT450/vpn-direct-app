@@ -1,0 +1,33 @@
+---
+description: Hard ban — never touch GreenCats / Cloud Phone RevenueCat
+alwaysApply: true
+---
+
+# RevenueCat — GreenCats / Cloud Phone — NEVER TOUCH
+
+Hard ban. Applies to every agent turn, including “just checking”, TestFlight, IAP setup, and MCP tools.
+
+## Forbidden project / apps
+
+Never read-for-mutation, update, create, archive, unarchive, attach, detach, rename, or deploy against:
+
+- RevenueCat project **GreenCats MMC** / id `proj7a63da49`
+- App **Direct Cloud Phone** / `com.directcloudphone.app` / `appc61e1576dc`
+- Any `com.dcp.*` products, `phone_*` / `wallet` / `addons` offerings in that project
+- The mistaken VPN Direct app in that project (`appab133d1e78`, labeled `ZZZ DELETE — VPN Direct mistake`)
+
+Do **not** use Cursor RevenueCat MCP against GreenCats when the task is VPN Direct.
+
+## VPN Direct only
+
+VPN Direct IAP / RevenueCat work uses **only**:
+
+- Project **`proj71192482`** (VPN Direct)
+- Bundle `com.vpndirect.vpndirectapp`
+- Keys/secrets that belong to that project (never GreenCats / Cloud Phone keys)
+
+If unsure which project a key belongs to — **stop and ask**. Do not “fix” against GreenCats.
+
+## If asked to change Cloud Phone
+
+Refuse unless the user explicitly names **Cloud Phone / GreenCats** and asks to change it. VPN Direct requests never authorize GreenCats edits.

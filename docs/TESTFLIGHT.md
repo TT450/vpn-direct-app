@@ -18,11 +18,11 @@ How to install beta builds and invite people. **No signing secrets belong in thi
 | Field | Value |
 | --- | --- |
 | Marketing version | **1.0.11** |
-| Build | **63** (in-widget toggle, status labels, Control Center harden) |
+| Build | **106** (checkout host allowlist + Apple/RC credit packs) |
 | Bundle ID | `com.vpndirect.vpndirectapp` |
-| GitHub tag | [`v1.0.11.63`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.63) |
+| GitHub tag | [`v1.0.11.106`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.106) |
 
-Build **63** is on TestFlight (public link + Internal). Prefer **63+**. Older builds (e.g. **33**) may still appear in history.
+Prefer **106+**. Older builds may still appear in history.
 
 ## How to add testers (you / App Store Connect)
 
@@ -33,7 +33,7 @@ Use [App Store Connect](https://appstoreconnect.apple.com) → **Apps** → **VP
 1. Open **Internal Testing**.
 2. Select the group (or create one).
 3. **Testers** → add Apple IDs that are already **Users** of your App Store Connect team (Users and Access).
-4. Assign the latest build (1.0.11 / **63+**).
+4. Assign the latest build (1.0.11 / **106+**).
 5. Testers install the **TestFlight** app and accept the invite email / notification.
 
 Limits: up to **100** Internal testers; they must be on your ASC team.
@@ -53,12 +53,14 @@ Limits: up to **10_000** External testers per app (Apple’s current cap). Publi
 2. [TestFlight](https://apps.apple.com/app/testflight/id899247664) installed.
 3. Invite accepted with the **same Apple ID** used on the device.
 
-### D) What to verify on 63
+### D) Sandbox IAP (credits)
 
-1. Home Screen small widget: tap power → VPN toggles **without** opening the app; label **Включен** / **Включить**.
-2. Control Center: **Add a Control** → **VPN Direct** appears and can be added.
-3. Imported (third-party) subscription still connects after app relaunch.
-4. Russian bypass (Обход РФ) on/off does not break dial.
+TestFlight purchases use Apple Sandbox + RevenueCat. Packs: `direct.credits.4.99` … `199.99`.
+
+1. Install **106+** from TestFlight.
+2. Sign in to VPN Direct account.
+3. Buy a credit pack — Apple Sheet is sandbox (no real charge with Sandbox Apple ID).
+4. Balance should credit after RC verification on the Direct ledger.
 
 ## Engineering upload (maintainers)
 
