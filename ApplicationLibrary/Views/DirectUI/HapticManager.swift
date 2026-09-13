@@ -25,6 +25,11 @@ public enum HapticEvent: Hashable {
     case warning
     case error
     case loading
+    case refreshStarted
+    case refreshCompleted
+    case dataArrived
+    case validationSuccess
+    case validationFailure
     case vpnConnecting
     case vpnConnected
     case vpnDisconnecting
@@ -116,7 +121,9 @@ public final class HapticManager {
 
         switch event {
         case .touchDown:
-            impactSoft.impactOccurred(intensity: 0.34)
+            // A soft first pulse makes the UI feel physically responsive; semantic
+            // action feedback can then add its own second, meaningful pattern.
+            impactSoft.impactOccurred(intensity: 0.30)
         case .navigation:
             impactLight.impactOccurred(intensity: 0.48)
         case .selection:
@@ -140,7 +147,15 @@ public final class HapticManager {
         case .error:
             notification.notificationOccurred(.error)
         case .loading:
-            impactSoft.impactOccurred(intensity: 0.28)
+            playPattern([(0.00, 0.20, 0.18), (0.12, 0.30, 0.24)], fallback: { impactSoft.impactOccurred(intensity: 0.28) })
+        case .refreshStarted:
+            playPattern([(0.00, 0.24, 0.20), (0.10, 0.34, 0.28)], fallback: { impactLight.impactOccurred(intensity: 0.34) })
+        case .refreshCompleted, .dataArrived:
+            playPattern([(0.00, 0.28, 0.24), (0.075, 0.52, 0.48)], fallback: { notification.notificationOccurred(.success) })
+        case .validationSuccess:
+            playPattern([(0.00, 0.22, 0.22), (0.07, 0.44, 0.42)], fallback: { impactLight.impactOccurred(intensity: 0.42) })
+        case .validationFailure:
+            playPattern([(0.00, 0.48, 0.58), (0.08, 0.26, 0.32)], fallback: { notification.notificationOccurred(.error) })
         case .vpnConnecting:
             playPattern([(0.00, 0.30, 0.24), (0.11, 0.44, 0.36), (0.22, 0.60, 0.48)], fallback: { impactMedium.impactOccurred(intensity: 0.55) })
         case .vpnConnected:
@@ -165,18 +180,20 @@ public final class HapticManager {
     private func prepareFeedbackGenerators() {
         impactLight.prepare()
         impactSoft.prepare()
+        impactMedium.prepare()
+        impactRigid.prepare()
         selection.prepare()
         notification.prepare()
     }
 
     private func playReduced(_ event: HapticEvent) {
         switch event {
-        case .error:
+        case .error, .validationFailure:
             notification.notificationOccurred(.error)
         case .warning:
             notification.notificationOccurred(.warning)
-        case .vpnConnected, .vpnSwitched,
-             .purchaseCompleted, .copied, .shared, .saved, .imported:
+        case .vpnConnected, .vpnSwitched, .purchaseCompleted,
+             .copied, .shared, .saved, .imported, .refreshCompleted, .dataArrived:
             notification.notificationOccurred(.success)
         case .selection, .swipeThreshold:
             selection.selectionChanged()
@@ -219,16 +236,38 @@ public final class HapticManager {
 }
 
 /// Default physical acknowledgement for every SwiftUI Button in the app.
-/// Visual styling is unchanged — only touch-down haptics are added.
+/// The tiny spring makes the control feel pressed; semantic action feedback
+/// is intentionally separate so important actions can have richer patterns.
 public struct HapticButtonStyle: ButtonStyle {
     public init() {}
+
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            // Full label bounds are tappable — not only the text glyphs.
             .contentShape(Rectangle())
+            .scaleEffect(configuration.isPressed ? 0.975 : 1.0)
+            .opacity(configuration.isPressed ? 0.88 : 1.0)
+            .animation(.spring(response: 0.18, dampingFraction: 0.72), value: configuration.isPressed)
             .onChangeCompat(of: configuration.isPressed) { isPressed in
                 if isPressed { HapticManager.shared.play(.touchDown) }
             }
+    }
+}
+
+private struct HapticTouchSurfaceModifier: ViewModifier {
+    @State private var didFireForGesture = false
+
+    func body(content: Content) -> some View {
+        content.simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    guard !didFireForGesture else { return }
+                    didFireForGesture = true
+                    HapticManager.shared.play(.touchDown)
+                }
+                .onEnded { _ in
+                    didFireForGesture = false
+                }
+        )
     }
 }
 
@@ -240,7 +279,6 @@ private struct HapticScrollThresholdModifier: ViewModifier {
         content.simultaneousGesture(
             DragGesture(minimumDistance: 12)
                 .onChanged { value in
-                    // Ignore mostly-horizontal pans so tab pages don't feel like a website.
                     guard abs(value.translation.height) >= abs(value.translation.width) else { return }
                     let distance = hypot(value.translation.width, value.translation.height)
                     if distance > 44, !crossedFirst {
@@ -261,6 +299,12 @@ private struct HapticScrollThresholdModifier: ViewModifier {
 }
 
 public extension View {
+    /// Covers controls that deliberately use `.plain` or another local style.
+    /// It does not alter their visuals or gesture behavior.
+    func hapticTouchSurface() -> some View {
+        modifier(HapticTouchSurfaceModifier())
+    }
+
     func hapticScrollThresholds() -> some View {
         modifier(HapticScrollThresholdModifier())
     }
