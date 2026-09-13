@@ -72,8 +72,7 @@ public enum AccessSource: Equatable {
 }
 
 public enum PaymentMethod: String, CaseIterable, Codable {
-    // TEMP: Apple IAP / StoreKit not wired yet — kept until Apple docs & agreements are ready.
-    // UI still shows this option; hooks finalize without charging Apple ID. Do not change until then.
+    /// Apple IAP via RevenueCat consumable credit packs.
     case apple = "Покупка через Apple"
     case external = "Другие способы"
 }

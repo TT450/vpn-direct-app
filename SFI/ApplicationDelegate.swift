@@ -33,6 +33,10 @@ class ApplicationDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCe
         notificationCenter.delegate = self
         requestPushAuthorization(application)
         setup()
+        #if os(iOS)
+        DirectBackendRuntime.warmUp()
+        DirectRevenueCat.configureIfNeeded()
+        #endif
         return true
     }
 

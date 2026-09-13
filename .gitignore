@@ -67,3 +67,7 @@ tests/VPNDirectParserPackage/.build/
 # Google OAuth local plist (never GitHub)
 **/GoogleOAuth.local.plist
 **/client_*.apps.googleusercontent.com.plist
+
+# Local ASC / RevenueCat key material
+**/ApplicationLibrary/Views/DirectUI/secrets/
+**/SubscriptionKey_*.p8

@@ -495,12 +495,12 @@ struct DirectPaymentMethodView: View {
 
                 AccessSectionHeader(title: "ОПЛАТА", meta: "02 СПОСОБА")
                     .padding(.top, 25)
-                PaymentOption(model: model, method: .apple, mark: "APPLE", subtitle: "Системная оплата · активация автоматически")
+                PaymentOption(model: model, method: .apple, mark: "APPLE", subtitle: "Apple · пополнение баланса")
                 PaymentOption(model: model, method: .external, mark: "WEB", subtitle: "Защищённая страница платёжного партнёра")
                     .padding(.top, 8)
 
                 Text(model.paymentMethod == .apple
-                    ? "Покупка будет подтверждена через Apple ID. После оплаты подписка появится автоматически."
+                    ? "Оплата через Apple ID: спишется пакет кредитов, затем тариф активируется на сервере."
                     : "Внешний вариант показывается только в тех storefront, где он разрешён правилами Apple и настроен для приложения.")
                     .font(.system(size: 10)).foregroundStyle(DS.muted).lineSpacing(3)
                     .padding(12)
