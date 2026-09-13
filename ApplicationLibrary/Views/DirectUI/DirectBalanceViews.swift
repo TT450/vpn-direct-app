@@ -221,14 +221,19 @@ struct DirectBalanceTopUpView: View {
                         Text("Пополнить").font(.system(size: 13, weight: .semibold))
                         if recommended { Text("РЕКОМЕНДУЕМ").microLabel(color: DS.green) }
                     }
-                    Text(product.localizedPriceString)
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(DS.ink)
+                    // Balance ledger is USD-only. Prefer our face-value credit over
+                    // StoreKit localizedPriceString (RU storefront → ₽).
                     if let credit {
-                        Text("На баланс \(DirectMoney.formatUSD(cents: credit))")
+                        Text(DirectMoney.formatUSD(cents: credit))
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(DS.ink)
+                        Text("Зачислится на баланс · Apple In-App")
                             .font(.system(size: 9)).foregroundStyle(DS.muted)
                     } else {
-                        Text("Apple In-App Purchase · direct.credits.*")
+                        Text(product.localizedPriceString)
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(DS.ink)
+                        Text("Apple In-App Purchase")
                             .font(.system(size: 9)).foregroundStyle(DS.muted)
                     }
                 }

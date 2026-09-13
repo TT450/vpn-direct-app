@@ -258,6 +258,7 @@ struct DirectPlansView: View {
     private func purchase(_ plan: DirectPresetPlan) {
         model.applySelectedPlan(configuration(for: plan), presetID: plan.id)
         model.pendingCheckoutTariffID = nil
+        model.checkoutEntrySource = .selectedPlan
         model.checkoutReturnPage = .premiumPlans
         model.openDetail(.payment)
     }
@@ -272,7 +273,7 @@ struct DirectPlansView: View {
         )
         model.applySelectedPlan(config, presetID: "app-\(tariff.id)")
         model.checkoutPrice = price
-        model.checkoutTitle = tariff.name
+        model.checkoutEntrySource = .selectedPlan
         model.checkoutReturnPage = .premiumPlans
         model.pendingCheckoutTariffID = tariff.id
         PendingCheckout.save(

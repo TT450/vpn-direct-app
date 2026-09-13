@@ -68,13 +68,17 @@ struct DirectManagementPage: View {
             .padding(.horizontal, 20)
         }
         .background(DS.paper.ignoresSafeArea())
+        .onAppear {
+            if model.hasPremiumEntitlement {
+                model.syncSelectedPlanFromActiveSubscription()
+            }
+        }
     }
 
     private var planNameLabel: String {
-        if let name = model.selectedPlan.name, model.hasPremiumEntitlement {
-            return name.uppercased()
-        }
-        return model.hasPremiumEntitlement ? "DIRECT" : "БЕЗ ТАРИФА"
+        guard model.hasPremiumEntitlement else { return "БЕЗ ТАРИФА" }
+        let name = model.activePlanDisplayName
+        return name.isEmpty ? "DIRECT" : name.uppercased()
     }
 
     private var planSummaryLine: String {
@@ -354,14 +358,9 @@ struct DirectManagementPage: View {
 
     private func renew() {
         if model.hasPremiumEntitlement {
-            var plan = model.selectedPlan
-            if plan.devices <= 0 {
-                plan = VPNDirectPlanCatalog.defaultConfiguration()
+            Task { @MainActor in
+                await model.beginRenewCheckout()
             }
-            plan.days = max(plan.days, 30)
-            model.applySelectedPlan(plan)
-            model.checkoutReturnPage = .premiumPlans
-            model.openDetail(.payment)
         } else {
             model.openPremiumPlans(mode: .presets)
         }

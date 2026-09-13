@@ -56,6 +56,44 @@ struct PendingCheckout: Codable, Equatable {
     }
 }
 
+/// Last successful catalog tariff purchase — used to renew at the same quote path (not local demo pricing).
+struct LastPaidCatalogCheckout: Codable, Equatable {
+    let tariffID: Int
+    let planName: String
+    let periodDays: Int
+    let devices: Int
+    let trafficGB: Int?
+    let price: Int
+
+    private static let key = "vpndirect.last.paid.catalog.v1"
+
+    static var current: Self? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(Self.self, from: data)
+    }
+
+    static func save(_ value: Self) {
+        guard let data = try? JSONEncoder().encode(value) else { return }
+        UserDefaults.standard.set(data, forKey: key)
+    }
+
+    static func remember(from pending: PendingCheckout) {
+        guard (pending.productKind ?? "").lowercased() == "app_tariff",
+              let tariffID = pending.tariffID, tariffID > 0
+        else { return }
+        save(
+            Self(
+                tariffID: tariffID,
+                planName: pending.planName ?? pending.title,
+                periodDays: max(1, pending.periodDays),
+                devices: max(1, pending.devices),
+                trafficGB: pending.trafficGB,
+                price: max(0, pending.price)
+            )
+        )
+    }
+}
+
 // MARK: - Auth pages (each is its own DetailPage — no in-page route swapping)
 
 struct DirectAuthLoginView: View {

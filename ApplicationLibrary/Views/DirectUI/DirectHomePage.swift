@@ -34,6 +34,20 @@ struct DirectHomePage: View {
             telemetryRow
         }
         .background(DS.paper.ignoresSafeArea())
+        .overlay {
+            if model.showPrivacyDisclosure {
+                DirectPrivacyDisclosureView(
+                    onAccept: {
+                        HapticManager.shared.play(.sheetDismissed)
+                        model.acceptPrivacyDisclosureAndConnect()
+                    },
+                    onDecline: {
+                        HapticManager.shared.play(.sheetDismissed)
+                        model.declinePrivacyDisclosure()
+                    }
+                )
+            }
+        }
         .alert("Убрать подписку из клиента?", isPresented: $showRemoveImportedConfirmation) {
             Button("Убрать", role: .destructive) {
                 model.removeImportedFromClient()

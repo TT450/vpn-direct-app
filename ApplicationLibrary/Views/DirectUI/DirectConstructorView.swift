@@ -232,6 +232,7 @@ struct DirectConstructorView: View {
     private func purchase() {
         model.applySelectedPlan(configuration)
         model.checkoutPrice = price
+        model.checkoutEntrySource = .constructor
         model.checkoutReturnPage = .planConstructor
         model.pendingCheckoutTariffID = nil
         PendingCheckout.save(

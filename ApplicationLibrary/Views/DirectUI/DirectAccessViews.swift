@@ -235,6 +235,7 @@ struct DirectPremiumPlansView: View {
 
                 AccessButton(title: "Продолжить") {
                     model.applySelectedPlan(model.selectedPlan, presetID: model.selectedPresetID)
+                    model.checkoutEntrySource = .selectedPlan
                     model.checkoutReturnPage = .premiumPlans
                     model.openDetail(.payment)
                 }
@@ -516,13 +517,39 @@ struct DirectPaymentMethodView: View {
         balance.balanceCovers(checkoutPriceRubles: model.checkoutPrice)
     }
 
+    private var headingSubtitle: String {
+        switch model.checkoutEntrySource {
+        case .renewActive:
+            return "Продление активного тарифа"
+        case .selectedPlan:
+            return "Оплата выбранного тарифа"
+        case .constructor:
+            return "Оплата своего тарифа"
+        case .addOns:
+            return "Оплата дополнительных ресурсов"
+        }
+    }
+
+    private var orderKicker: String {
+        switch model.checkoutEntrySource {
+        case .renewActive:
+            return "АКТИВНЫЙ ТАРИФ"
+        case .selectedPlan:
+            return "ВЫБРАННЫЙ ТАРИФ"
+        case .constructor:
+            return "СВОЙ ТАРИФ"
+        case .addOns:
+            return "ДОПОЛНЕНИЯ"
+        }
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 PageHeading(
                     kicker: "ОФОРМЛЕНИЕ / ОПЛАТА",
                     title: "Способ оплаты",
-                    subtitle: "Выберите источник оплаты"
+                    subtitle: headingSubtitle
                 )
                 .padding(.top, DS.pageTop)
 
@@ -564,8 +591,13 @@ struct DirectPaymentMethodView: View {
 
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("ВАШ ЗАКАЗ").microLabel(color: .white.opacity(0.42))
+                        Text(orderKicker).microLabel(color: .white.opacity(0.42))
                         Text(model.checkoutTitle).font(.system(size: 18, weight: .semibold))
+                        if model.checkoutEntrySource != .addOns {
+                            Text(model.selectedPlan.summaryLine)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.48))
+                        }
                     }
                     Spacer()
                     Text(orderPriceLabel)

@@ -79,6 +79,16 @@ public enum PaymentMethod: String, CaseIterable, Codable {
     case external = "Другие способы"
 }
 
+/// Where the payment-method screen was opened from — drives which plan is shown.
+public enum CheckoutEntrySource: String, Equatable {
+    /// Management → «Продлить»: active / last-paid tariff.
+    case renewActive
+    /// Tariffs / presets: the plan the user just picked.
+    case selectedPlan
+    case constructor
+    case addOns
+}
+
 /// Device row for Account → Devices (filled by local backend hooks).
 public struct DirectAccountDevice: Identifiable, Equatable {
     public var id: String

@@ -149,7 +149,7 @@ struct DirectBalanceAccountView: View {
                 .frame(width: 40)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
+                Text(item.displayTitle)
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
                 HStack(spacing: 6) {

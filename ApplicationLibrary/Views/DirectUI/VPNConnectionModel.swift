@@ -18,6 +18,8 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var isMenuOpen = false
     @Published public private(set) var isConnected = false
     @Published public private(set) var phase: ConnectionPhase = .idle
+    /// Full-screen Guideline 5.4 disclosure before first VPN connect (all users until accepted).
+    @Published public var showPrivacyDisclosure = false
     @Published public var subscriptions: [VPNSubscriptionItem] = []
     @Published public var activeSubscriptionID: Int64 = 0
     /// `nil` means balancer / auto-select for the active subscription.
@@ -47,7 +49,9 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var premiumWhitelistGB = 0
     @Published public var premiumDevicesUsed = 1
     @Published public var premiumDeviceLimit = 5
-    /// Active plan configuration for presets / constructor checkout.
+    /// Paid / active tariff name for Management — never overwritten by catalog browsing.
+    @Published public var activePlanName = ""
+    /// Checkout cart only (browse / buy). Must not drive Management subscription card.
     @Published public var selectedPlan: PlanConfiguration = VPNDirectPlanCatalog.defaultConfiguration()
     @Published public var planBrowseMode: VPNDirectPlanMode = .presets
     @Published public var selectedPresetID: String = VPNDirectPlanCatalog.featured.id
@@ -55,6 +59,8 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var paymentMethod: PaymentMethod = .apple
     @Published public var checkoutTitle = "Plus · 30 дней"
     @Published public var checkoutPrice = 799
+    /// Payment screen entry: renew shows active tariff; plan pick shows selected tariff.
+    @Published public var checkoutEntrySource: CheckoutEntrySource = .selectedPlan
     @Published public var checkoutReturnPage: DetailPage = .premiumPlans
     @Published public var pendingAddOnTrafficGB = 0
     @Published public var pendingAddOnDevice = false
@@ -146,6 +152,9 @@ public final class VPNConnectionModel: ObservableObject {
     private static let premiumDeviceLimitKey = "vpndirect.access.premium.devices.limit"
     private static let premiumAutoRenewKey = "vpndirect.access.premium.autorenew"
     private static let builtinsSeededKey = "vpndirect.access.builtins.seeded.v1"
+    private static let premiumPeriodDaysKey = "vpndirect.access.premium.period.days"
+    private static let activePlanNameKey = "vpndirect.access.premium.plan.name"
+    private static let privacyDisclosureAcceptedKey = "vpndirect.privacyDisclosureAccepted.v1"
     /// Sentinel for Unlimited traffic in local demo entitlement.
     public static let unlimitedTrafficGB = 100_000
 
@@ -181,10 +190,50 @@ public final class VPNConnectionModel: ObservableObject {
         if UserDefaults.standard.object(forKey: Self.premiumAutoRenewKey) != nil {
             autoRenewPremium = UserDefaults.standard.bool(forKey: Self.premiumAutoRenewKey)
         }
-        selectedPlan = VPNDirectPlanCatalog.defaultConfiguration()
-        checkoutTitle = Self.checkoutTitle(for: selectedPlan)
-        checkoutPrice = VPNDirectPricingEngine.price(for: selectedPlan)
+        activePlanName = UserDefaults.standard.string(forKey: Self.activePlanNameKey) ?? ""
+        if let last = LastPaidCatalogCheckout.current {
+            if activePlanName.isEmpty {
+                activePlanName = last.planName
+            }
+            selectedPlan = PlanConfiguration(
+                name: last.planName,
+                days: last.periodDays,
+                devices: last.devices,
+                trafficGB: last.trafficGB,
+                whitelistGB: 0
+            )
+            pendingCheckoutTariffID = last.tariffID
+            checkoutTitle = Self.checkoutTitle(for: selectedPlan)
+            checkoutPrice = last.price
+        } else {
+            selectedPlan = VPNDirectPlanCatalog.defaultConfiguration()
+            let storedPeriod = UserDefaults.standard.integer(forKey: Self.premiumPeriodDaysKey)
+            if hasPremiumEntitlement {
+                selectedPlan = PlanConfiguration(
+                    name: activePlanName.isEmpty ? selectedPlan.name : activePlanName,
+                    days: VPNDirectPlanCatalog.presetPeriodDays.contains(storedPeriod) ? storedPeriod : selectedPlan.days,
+                    devices: premiumDeviceLimit,
+                    trafficGB: premiumTrafficGB >= Self.unlimitedTrafficGB ? nil : premiumTrafficGB,
+                    whitelistGB: premiumWhitelistGB
+                )
+            }
+            checkoutTitle = Self.checkoutTitle(for: selectedPlan)
+            checkoutPrice = VPNDirectPricingEngine.price(for: selectedPlan)
+        }
         activeAccess = Self.loadAccessSource()
+    }
+
+    /// Name shown on Management / subscription chrome (active paid plan, not checkout cart).
+    public var activePlanDisplayName: String {
+        if !activePlanName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return activePlanName
+        }
+        if let name = LastPaidCatalogCheckout.current?.planName,
+           !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            return name
+        }
+        return ""
     }
 
     public var selectedPlanPrice: Int {
@@ -563,6 +612,14 @@ public final class VPNConnectionModel: ObservableObject {
 
     public func select(tab: AppTab) {
         selectedTab = tab
+        // Management always shows the paid plan — never a browsed unpaid cart.
+        if tab == .management, hasPremiumEntitlement {
+            if detailPage == .payment {
+                restoreActiveSubscriptionAfterAbandonedCheckout()
+            } else {
+                syncSelectedPlanFromActiveSubscription()
+            }
+        }
         closeDetail()
         isMenuOpen = false
         HapticManager.shared.play(.navigation)
@@ -589,6 +646,7 @@ public final class VPNConnectionModel: ObservableObject {
             abandonPaymentFlow(returnToPaymentMethod: page == .paymentWaiting || page == .paymentError || page == .paymentProcessing)
             return
         }
+        let leavingPayment = detailPage == .payment
         if let previous = detailStack.popLast() {
             if Self.isPaymentFlowPage(previous) {
                 abandonPaymentFlow(returnToPaymentMethod: true)
@@ -598,6 +656,17 @@ public final class VPNConnectionModel: ObservableObject {
         } else {
             detailPage = nil
         }
+        if leavingPayment {
+            restoreActiveSubscriptionAfterAbandonedCheckout()
+        }
+    }
+
+    /// Browsed cart must not stick on Management after Back from payment without purchase.
+    public func restoreActiveSubscriptionAfterAbandonedCheckout() {
+        clearPendingCheckout()
+        guard hasPremiumEntitlement else { return }
+        syncSelectedPlanFromActiveSubscription()
+        checkoutEntrySource = .selectedPlan
     }
 
     private static func isPaymentFlowPage(_ page: DetailPage) -> Bool {
@@ -1048,6 +1117,7 @@ public final class VPNConnectionModel: ObservableObject {
         pendingCheckoutTariffID = nil
         checkoutTitle = "Дополнительные ресурсы"
         checkoutPrice = price
+        checkoutEntrySource = .addOns
         checkoutReturnPage = .addOns
         PendingCheckout.save(
             PendingCheckout(
@@ -1231,11 +1301,229 @@ public final class VPNConnectionModel: ObservableObject {
             directSubscriptionURL = url
             await attachDirectSubscription(url: url)
         }
-        applyLocalPremiumFromCheckout(pending: PendingCheckout.current)
+        let pending = PendingCheckout.current
+        applyLocalPremiumFromCheckout(pending: pending)
         paymentActivationPending = false
         PendingCheckout.forgetPaymentID(paymentId)
         clearPendingCheckout()
         openDetail(.paymentSuccess)
+    }
+
+    /// Renew current Direct tariff via catalog quote (same path as first purchase).
+    /// Entry source is `.renewActive` so payment shows the active plan, not a browsed catalog pick.
+    @MainActor
+    public func beginRenewCheckout() async {
+        DirectBackendRuntime.warmUp()
+        // Prefer local last-paid immediately; refresh account only when renew context is missing.
+        if LastPaidCatalogCheckout.current == nil, isDirectAuthenticated {
+            await refreshDirectAccount()
+        }
+        if appCatalog == nil || (appCatalog?.tariffs.isEmpty ?? true) {
+            await refreshAppCatalog()
+        }
+
+        let last = LastPaidCatalogCheckout.current
+        let days = renewPeriodDays(last: last)
+        guard let tariff = renewTariff(last: last) else {
+            openPremiumPlans(mode: .presets)
+            return
+        }
+
+        var price = scaledCatalogPrice(tariff: tariff, days: days)
+        if let quote = DirectBackendRuntime.quoteCheckout {
+            do {
+                let q = try await quote(
+                    DirectCheckoutQuoteRequest(
+                        productKind: "app_tariff",
+                        tariffID: tariff.id,
+                        days: days,
+                        devices: tariff.devices,
+                        trafficGB: tariff.trafficGB
+                    )
+                )
+                price = q.amount
+            } catch {
+                HapticManager.shared.play(.networkError)
+            }
+        }
+
+        let config = PlanConfiguration(
+            name: tariff.name,
+            days: days,
+            devices: tariff.devices,
+            trafficGB: tariff.trafficGB,
+            whitelistGB: 0
+        )
+        applySelectedPlan(config, presetID: "app-\(tariff.id)", playHaptic: false)
+        setActivePlanName(tariff.name)
+        checkoutPrice = price
+        checkoutTitle = Self.checkoutTitle(for: config)
+        checkoutEntrySource = .renewActive
+        checkoutReturnPage = .premiumPlans
+        pendingCheckoutTariffID = tariff.id
+        let pending = PendingCheckout(
+            title: tariff.name,
+            price: price,
+            periodDays: days,
+            paymentMethodRaw: paymentMethod.rawValue,
+            returnPage: String(describing: DetailPage.premiumPlans),
+            planName: tariff.name,
+            trafficGB: tariff.trafficGB,
+            devices: tariff.devices,
+            whitelistGB: 0,
+            createdAt: Date(),
+            productKind: "app_tariff",
+            tariffID: tariff.id,
+            addonDays: nil,
+            addonDevices: nil,
+            addonTrafficGB: nil
+        )
+        PendingCheckout.save(pending)
+        LastPaidCatalogCheckout.remember(from: pending)
+        if VPNDirectPlanCatalog.presetPeriodDays.contains(days) {
+            UserDefaults.standard.set(days, forKey: Self.premiumPeriodDaysKey)
+        }
+        openDetail(.payment)
+    }
+
+    /// Period for renew: last paid / stored — never browsed `selectedPlan.days` (often START 30).
+    private func renewPeriodDays(last: LastPaidCatalogCheckout?) -> Int {
+        let storedPeriod = UserDefaults.standard.integer(forKey: Self.premiumPeriodDaysKey)
+        let candidates = [
+            last?.periodDays ?? 0,
+            storedPeriod,
+            lastSuccessPeriodDays,
+        ]
+        for days in candidates where VPNDirectPlanCatalog.presetPeriodDays.contains(days) {
+            return days
+        }
+        return 30
+    }
+
+    /// Active tariff for renew: last paid id → entitlement devices/traffic → last paid name.
+    /// Ignores browsed `selectedPlan` / stale `pendingCheckoutTariffID` (e.g. earlier START tap).
+    private func renewTariff(last: LastPaidCatalogCheckout?) -> DirectAppTariff? {
+        let tariffs = appCatalog?.tariffs ?? []
+        if let id = last?.tariffID,
+           let match = tariffs.first(where: { $0.id == id })
+        {
+            return match
+        }
+        let devices = premiumDeviceLimit > 0 ? premiumDeviceLimit : (last?.devices ?? 0)
+        let traffic: Int? = {
+            if let last {
+                return last.trafficGB
+            }
+            if premiumTrafficGB >= Self.unlimitedTrafficGB { return nil }
+            return premiumTrafficGB > 0 ? premiumTrafficGB : nil
+        }()
+        if devices > 0 {
+            let byDevices = tariffs.filter { $0.devices == devices }
+            if let match = byDevices.first(where: { Self.sameTraffic($0.trafficGB, traffic) }) {
+                return match
+            }
+            // Unlimited grants often leave local traffic as a stale finite value — prefer ∞ pack.
+            if premiumTrafficGB >= Self.unlimitedTrafficGB || last?.trafficGB == nil,
+               let match = byDevices.first(where: { $0.trafficGB == nil })
+            {
+                return match
+            }
+            if byDevices.count == 1 {
+                return byDevices[0]
+            }
+        }
+        let name = (last?.planName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty,
+           let match = tariffs.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame })
+        {
+            return match
+        }
+        return nil
+    }
+
+    private static func sameTraffic(_ a: Int?, _ b: Int?) -> Bool {
+        switch (a, b) {
+        case (nil, nil): return true
+        case let (x?, y?): return x == y
+        default: return false
+        }
+    }
+
+    private func scaledCatalogPrice(tariff: DirectAppTariff, days: Int) -> Int {
+        let months = Double(days) / Double(max(tariff.days, 1))
+        let mult = appCatalog?.monthMultipliers[days]
+            ?? VPNDirectPricingEngine.durationMultiplier(forDays: days)
+        return max(49, Int((Double(tariff.price) * months * mult / 10).rounded() * 10))
+    }
+
+    /// Seed last-paid renew context from the account profile (server source of truth).
+    func rememberLastPaidFromServer(
+        tariffID: Int?,
+        planName: String?,
+        title: String?,
+        amount: Int?,
+        periodDays: Int?,
+        devices: Int?,
+        trafficGB: Int?,
+        productKind: String?
+    ) {
+        guard let tariffID, tariffID > 0 else { return }
+        let period = periodDays ?? 30
+        let deviceCount = max(1, devices ?? premiumDeviceLimit)
+        let pending = PendingCheckout(
+            title: title ?? planName ?? "VPN Direct",
+            price: max(0, amount ?? 0),
+            periodDays: period,
+            paymentMethodRaw: paymentMethod.rawValue,
+            returnPage: String(describing: DetailPage.premiumPlans),
+            planName: planName ?? title,
+            trafficGB: trafficGB,
+            devices: deviceCount,
+            whitelistGB: 0,
+            createdAt: Date(),
+            productKind: productKind ?? "app_tariff",
+            tariffID: tariffID,
+            addonDays: nil,
+            addonDevices: nil,
+            addonTrafficGB: nil
+        )
+        LastPaidCatalogCheckout.remember(from: pending)
+        if VPNDirectPlanCatalog.presetPeriodDays.contains(period) {
+            UserDefaults.standard.set(period, forKey: Self.premiumPeriodDaysKey)
+        }
+        setActivePlanName(planName ?? title)
+        lastSuccessPeriodDays = period
+        if let name = planName ?? title, !name.isEmpty {
+            lastSuccessTitle = name
+        }
+        if let amount, amount > 0 {
+            lastSuccessPrice = amount
+        }
+    }
+
+    func syncSelectedPlanFromActiveSubscription() {
+        let last = LastPaidCatalogCheckout.current
+        let days: Int = {
+            if let d = last?.periodDays, VPNDirectPlanCatalog.presetPeriodDays.contains(d) { return d }
+            let stored = UserDefaults.standard.integer(forKey: Self.premiumPeriodDaysKey)
+            if VPNDirectPlanCatalog.presetPeriodDays.contains(stored) { return stored }
+            return selectedPlan.days
+        }()
+        let traffic: Int? = premiumTrafficGB >= Self.unlimitedTrafficGB ? nil : premiumTrafficGB
+        let name = last?.planName ?? (activePlanName.isEmpty ? selectedPlan.name : activePlanName)
+        selectedPlan = PlanConfiguration(
+            name: name,
+            days: days,
+            devices: premiumDeviceLimit > 0 ? premiumDeviceLimit : selectedPlan.devices,
+            trafficGB: traffic,
+            whitelistGB: premiumWhitelistGB
+        )
+        if let id = last?.tariffID {
+            pendingCheckoutTariffID = id
+        }
+        if let name, !name.isEmpty {
+            setActivePlanName(name)
+        }
     }
 
     public func refreshAppCatalog() async {
@@ -1554,6 +1842,16 @@ public final class VPNConnectionModel: ObservableObject {
             premiumWhitelistGB = pending?.whitelistGB ?? selectedPlan.whitelistGB
             premiumDeviceLimit = max(1, pending?.devices ?? selectedPlan.devices)
             premiumDevicesUsed = min(premiumDevicesUsed, premiumDeviceLimit)
+            if let pending {
+                LastPaidCatalogCheckout.remember(from: pending)
+                setActivePlanName(pending.planName ?? pending.title)
+                if VPNDirectPlanCatalog.presetPeriodDays.contains(pending.periodDays) {
+                    UserDefaults.standard.set(pending.periodDays, forKey: Self.premiumPeriodDaysKey)
+                }
+            } else if VPNDirectPlanCatalog.presetPeriodDays.contains(selectedPlan.days) {
+                UserDefaults.standard.set(selectedPlan.days, forKey: Self.premiumPeriodDaysKey)
+                setActivePlanName(selectedPlan.name)
+            }
         }
         persistPremiumState()
         setActiveAccess(.premium)
@@ -1598,6 +1896,19 @@ public final class VPNConnectionModel: ObservableObject {
         UserDefaults.standard.set(premiumDevicesUsed, forKey: Self.premiumDevicesUsedKey)
         UserDefaults.standard.set(premiumDeviceLimit, forKey: Self.premiumDeviceLimitKey)
         UserDefaults.standard.set(autoRenewPremium, forKey: Self.premiumAutoRenewKey)
+        if VPNDirectPlanCatalog.presetPeriodDays.contains(selectedPlan.days) {
+            UserDefaults.standard.set(selectedPlan.days, forKey: Self.premiumPeriodDaysKey)
+        }
+        if !activePlanName.isEmpty {
+            UserDefaults.standard.set(activePlanName, forKey: Self.activePlanNameKey)
+        }
+    }
+
+    func setActivePlanName(_ name: String?) {
+        let trimmed = (name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        activePlanName = trimmed
+        UserDefaults.standard.set(trimmed, forKey: Self.activePlanNameKey)
     }
 
     public func persistAutoRenewPreference() {
@@ -2617,7 +2928,36 @@ public final class VPNConnectionModel: ObservableObject {
             return
         }
         guard phase == .idle else { return }
+
+        // Disconnect / cancel never requires disclosure.
+        if dialIsConnected {
+            Task { await toggleConnectionAsync() }
+            return
+        }
+
+        // All users (including existing installs) must accept before first connect.
+        guard privacyDisclosureAccepted else {
+            showPrivacyDisclosure = true
+            HapticManager.shared.play(.sheetPresented)
+            return
+        }
+
         Task { await toggleConnectionAsync() }
+    }
+
+    public var privacyDisclosureAccepted: Bool {
+        UserDefaults.standard.bool(forKey: Self.privacyDisclosureAcceptedKey)
+    }
+
+    public func acceptPrivacyDisclosureAndConnect() {
+        UserDefaults.standard.set(true, forKey: Self.privacyDisclosureAcceptedKey)
+        showPrivacyDisclosure = false
+        guard phase == .idle, !dialIsConnected else { return }
+        Task { await toggleConnectionAsync() }
+    }
+
+    public func declinePrivacyDisclosure() {
+        showPrivacyDisclosure = false
     }
 
     public func handleDisconnectSettled() async {

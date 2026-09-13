@@ -27,13 +27,25 @@ public struct DirectBalanceTransaction: Identifiable, Equatable {
     public let amountUSDCents: Int
     public let title: String
     public let date: Date
+    public let productID: String?
+    public let transactionID: String?
 
-    public init(id: String, kind: Kind, amountUSDCents: Int, title: String, date: Date = Date()) {
+    public init(
+        id: String,
+        kind: Kind,
+        amountUSDCents: Int,
+        title: String,
+        date: Date = Date(),
+        productID: String? = nil,
+        transactionID: String? = nil
+    ) {
         self.id = id
         self.kind = kind
         self.amountUSDCents = amountUSDCents
         self.title = title
         self.date = date
+        self.productID = productID
+        self.transactionID = transactionID
     }
 
     public var isDebit: Bool {
@@ -41,6 +53,15 @@ public struct DirectBalanceTransaction: Identifiable, Equatable {
         case .purchase: return true
         case .topUp, .refund, .adjustment: return amountUSDCents < 0
         }
+    }
+
+    /// Prefer server title; fall back to a clean Direct label (never raw product ids).
+    public var displayTitle: String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty, !trimmed.contains("direct.credits") {
+            return trimmed
+        }
+        return DirectMoney.appleTopUpDisplayTitle(productID: productID, amountUSDCents: amountUSDCents)
     }
 }
 
@@ -185,16 +206,24 @@ public final class DirectBalanceFlow: ObservableObject {
             syncPublishedPending()
         }
         _ = await DirectMoney.refreshRapiraAskRate()
-        await reconcileUncreditedPurchases()
-        do {
-            let snapshot = try await DirectBalanceBackend.fetchBalance()
-            apply(snapshot)
-        } catch {
-            // Don't overwrite a pending-credit message with a transient balance fetch error.
-            if creditState != .creditPending {
-                errorMessage = error.localizedDescription
-            }
+        // Ledger first — never block UI on RC verify when credit is already booked.
+        await resolveStalePendingFromLedger()
+        if hasPendingCredit {
+            await reconcileUncreditedPurchases()
+            await resolveStalePendingFromLedger()
         }
+    }
+
+    public func prepareAccountSheetTopUp() {
+        topUpSource = .account
+        topUpRequiredRubles = 0
+        showTopUpSuccess = false
+        errorMessage = nil
+        Task { @MainActor in
+            await resolveStalePendingFromLedger()
+            if !hasPendingCredit { creditState = .idle }
+        }
+        if !hasPendingCredit { creditState = .idle }
     }
 
     public func payOrTopUp(model: VPNConnectionModel) {
@@ -209,14 +238,6 @@ public final class DirectBalanceFlow: ObservableObject {
 
     public func openTopUpFromAccount(model: VPNConnectionModel) {
         openTopUp(model: model, source: .account, requiredRubles: 0)
-    }
-
-    public func prepareAccountSheetTopUp() {
-        topUpSource = .account
-        topUpRequiredRubles = 0
-        showTopUpSuccess = false
-        errorMessage = nil
-        if !hasPendingCredit { creditState = .idle }
     }
 
     public func resetTopUpUIState() {
@@ -288,7 +309,12 @@ public final class DirectBalanceFlow: ObservableObject {
                     errorMessage = DirectBalanceError.purchaseProcessing.errorDescription
                     creditState = .creditPending
                     isPurchasing = false
-                    Task { await reconcileUncreditedPurchases() }
+                    Task {
+                        await resolveStalePendingFromLedger()
+                        if hasPendingCredit {
+                            await reconcileUncreditedPurchases()
+                        }
+                    }
                 }
             } catch {
                 isPurchasing = false
@@ -299,7 +325,10 @@ public final class DirectBalanceFlow: ObservableObject {
                     errorMessage = DirectBalanceError.purchaseProcessing.errorDescription
                     creditState = .creditPending
                     Task {
-                        await reconcileUncreditedPurchases()
+                        await resolveStalePendingFromLedger()
+                        if hasPendingCredit {
+                            await reconcileUncreditedPurchases()
+                        }
                         if !hasPendingCredit, balanceUSDCents > 0 {
                             creditState = .credited
                             errorMessage = nil
@@ -322,7 +351,13 @@ public final class DirectBalanceFlow: ObservableObject {
         errorMessage = nil
         creditState = .creditPending
         Task {
-            await reconcileUncreditedPurchases()
+            // 1) Instant path: balance/history already has this Apple tx.
+            await resolveStalePendingFromLedger()
+            // 2) Only then ask server to credit remaining pending rows.
+            if hasPendingCredit {
+                await reconcileUncreditedPurchases()
+                await resolveStalePendingFromLedger()
+            }
             isPurchasing = false
             syncPublishedPending()
             if !hasPendingCredit {
@@ -388,6 +423,8 @@ public final class DirectBalanceFlow: ObservableObject {
     /// App launch / foreground: push any Apple-confirmed purchases into the ledger.
     public func reconcileUncreditedPurchases() async {
         DirectRevenueCat.configureIfNeeded()
+        await resolveStalePendingFromLedger()
+
         var candidates = DirectPendingAppleCredits.all()
         if DirectRevenueCat.publicAPIKey.isEmpty == false {
             do {
@@ -399,6 +436,9 @@ public final class DirectBalanceFlow: ObservableObject {
                     DirectPendingAppleCredits.enqueue(row)
                     candidates.append(row)
                 }
+                // Drop anything RC still lists but ledger already has.
+                await resolveStalePendingFromLedger()
+                candidates = DirectPendingAppleCredits.all()
             } catch {
                 // Offline / RC not configured — still try local pending queue.
             }
@@ -406,7 +446,10 @@ public final class DirectBalanceFlow: ObservableObject {
 
         syncPublishedPending()
         guard !candidates.isEmpty else {
-            if creditState == .creditPending { creditState = .idle }
+            if creditState == .creditPending {
+                creditState = .idle
+                errorMessage = nil
+            }
             return
         }
 
@@ -432,6 +475,7 @@ public final class DirectBalanceFlow: ObservableObject {
             }
         }
 
+        await resolveStalePendingFromLedger()
         syncPublishedPending()
         if !hasPendingCredit {
             if creditState == .creditPending || creditState == .purchasing {
@@ -442,6 +486,58 @@ public final class DirectBalanceFlow: ObservableObject {
         } else if creditState != .purchasing {
             creditState = .creditPending
             errorMessage = DirectBalanceError.purchaseProcessing.errorDescription
+        }
+    }
+
+    /// Pull ledger and drop local pending rows that are already booked.
+    @discardableResult
+    public func resolveStalePendingFromLedger() async -> Bool {
+        do {
+            let snapshot = try await DirectBalanceBackend.fetchBalance()
+            apply(snapshot)
+            clearPendingAlreadyOnLedger(using: snapshot)
+            syncPublishedPending()
+            if !hasPendingCredit {
+                if creditState == .creditPending {
+                    creditState = .idle
+                }
+                errorMessage = nil
+                return true
+            }
+        } catch {
+            // keep pending
+        }
+        return !hasPendingCredit
+    }
+
+    /// Drop local pending rows that the ledger already acknowledges.
+    private func clearPendingAlreadyOnLedger(using snapshot: DirectBalanceSnapshot) {
+        let pending = DirectPendingAppleCredits.all()
+        guard !pending.isEmpty else { return }
+        for record in pending {
+            let tx = record.transactionID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !tx.isEmpty else { continue }
+            let cents = DirectMoney.creditCents(forProductID: record.productID)
+            let matched = snapshot.transactions.contains { row in
+                if let rowTx = row.transactionID?.trimmingCharacters(in: .whitespacesAndNewlines), rowTx == tx {
+                    return true
+                }
+                let id = row.id
+                if id == tx || id == "apple:\(tx)" { return true }
+                if id.hasSuffix(":\(tx)") { return true }
+                if id.contains(tx) { return true }
+                // Same pack already on ledger (covers admin/manual credit with alternate idempotency key).
+                if row.kind == .topUp,
+                   let cents,
+                   abs(row.amountUSDCents) == cents,
+                   (row.productID == record.productID || row.productID == nil) {
+                    return true
+                }
+                return false
+            }
+            if matched {
+                DirectPendingAppleCredits.remove(transactionID: record.transactionID)
+            }
         }
     }
 

@@ -93,6 +93,17 @@ public enum DirectMoney {
         return map[productID]
     }
 
+    public static func appleTopUpDisplayTitle(productID: String?, amountUSDCents: Int) -> String {
+        var cents = abs(amountUSDCents)
+        if cents <= 0, let productID, let mapped = creditCents(forProductID: productID) {
+            cents = mapped
+        }
+        if cents > 0 {
+            return "VPN Direct – \(formatUSD(cents: cents)) top-up"
+        }
+        return "VPN Direct – Apple top-up"
+    }
+
     // MARK: - Rapira rate
 
     @discardableResult

@@ -2,6 +2,15 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.11.109] — 2026-09-13
+
+### Privacy disclosure + renew fixes (build 109)
+
+- Privacy disclosure gate before VPN Connect (Apple Guideline 5.4); decline closes without connecting
+- Renew checkout prefers last-paid / active entitlement over browsed unpaid catalog plans
+- Management shows active tariff (not checkout cart) after Buy → Back
+- TestFlight **1.0.11 (109)**
+
 ## [1.0.11.108] — 2026-09-13
 
 ### Balance / checkout UI (build 108)
