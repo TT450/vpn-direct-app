@@ -63,6 +63,20 @@ public enum DirectBackendRuntime {
     /// Local hooks fill real hosts; empty on public GitHub.
     public static var checkoutSuccessHostSuffixes: [String] = []
 
+    /// Exact host or proper subdomain only — rejects `evilpay.example.com` vs `pay.example.com`.
+    public static func checkoutReturnHostAllowed(_ host: String, allowlist: [String]? = nil) -> Bool {
+        let h = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !h.isEmpty else { return false }
+        let list = (allowlist ?? checkoutSuccessHostSuffixes)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+        for entry in list {
+            if h == entry { return true }
+            if h.hasSuffix("." + entry) { return true }
+        }
+        return false
+    }
+
     /// Installs local-only hooks when present; no-op on public clones.
     ///
     /// Uses ObjC class lookup only — do **not** use `@_silgen_name` + `@_cdecl`

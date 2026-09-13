@@ -2,6 +2,13 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.11.106] — 2026-09-13
+
+### Checkout return-host helper (build 106)
+
+- Shared `checkoutReturnHostAllowed` helper for exact host / proper subdomain checks
+- External WebView `/success` continues to be a wait/poll signal only (not payment proof)
+
 ## [1.0.11.105] — 2026-09-13
 
 ### Checkout host allowlist hardening (build 105)
