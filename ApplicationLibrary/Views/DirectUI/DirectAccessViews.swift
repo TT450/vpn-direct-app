@@ -40,22 +40,47 @@ private struct AccessButton: View {
     let title: String
     var secondary = false
     let action: () -> Void
+    @State private var breathe = false
 
     var body: some View {
         Button(action: action) {
-            HStack {
+            HStack(spacing: 10) {
                 Text(title)
-                Spacer()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+                    .allowsTightening(true)
+                    .layoutPriority(1)
+                Spacer(minLength: 6)
                 Image(systemName: "arrow.right")
+                    .font(.system(size: secondary ? 12 : 14, weight: .bold))
+                    .offset(x: secondary ? 0 : (breathe ? 4 : 0))
+                    .fixedSize()
             }
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(secondary ? DS.ink : DS.acid)
-            .padding(.horizontal, 15)
-            .frame(height: 50)
-            .background(secondary ? Color.clear : DS.ink)
-            .overlay(Rectangle().stroke(secondary ? DS.ink : Color.clear))
+            .font(.system(size: secondary ? 12 : 14, weight: .semibold))
+            .foregroundStyle(DS.ink)
+            .padding(.horizontal, secondary ? 15 : 16)
+            .frame(minHeight: secondary ? 50 : 58)
+            .background(secondary ? Color.clear : DS.acid)
+            .overlay(
+                Rectangle().stroke(
+                    secondary ? DS.ink : DS.ink.opacity(breathe ? 0.28 : 0.12),
+                    lineWidth: secondary ? 1 : 1.5
+                )
+            )
+            .scaleEffect(secondary ? 1 : (breathe ? 1.015 : 1.0))
+            .shadow(
+                color: secondary ? .clear : DS.acid.opacity(breathe ? 0.45 : 0.18),
+                radius: secondary ? 0 : (breathe ? 10 : 4),
+                y: secondary ? 0 : 2
+            )
         }
         .buttonStyle(HapticButtonStyle())
+        .onAppear {
+            guard !secondary else { return }
+            withAnimation(.easeInOut(duration: 1.15).repeatForever(autoreverses: true)) {
+                breathe = true
+            }
+        }
     }
 }
 
@@ -491,10 +516,6 @@ struct DirectPaymentMethodView: View {
         balance.balanceCovers(checkoutPriceRubles: model.checkoutPrice)
     }
 
-    private var shortage: Int {
-        balance.shortageRubles(checkoutPriceRubles: model.checkoutPrice)
-    }
-
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
@@ -514,7 +535,7 @@ struct DirectPaymentMethodView: View {
                     title: "Оплатить с Баланса",
                     subtitle: balance.isLoadingBalance
                         ? "Проверяем баланс…"
-                        : "Баланс: \(balance.balanceDisplay)"
+                        : "Баланс: \(DirectMoney.formatUSD(cents: balance.balanceUSDCents))"
                 )
                 PaymentOption(
                     model: model,
@@ -530,21 +551,11 @@ struct DirectPaymentMethodView: View {
                         Text("BAL").microLabel(color: DS.acid)
                             .frame(width: 42, height: 42)
                             .background(DS.ink)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Баланс").font(.system(size: 12, weight: .semibold))
-                            Text(balance.balanceDisplay)
-                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(DS.green)
-                        }
+                        Text("Баланс").font(.system(size: 12, weight: .semibold))
                         Spacer()
-                        if shortage > 0 {
-                            Text("−\(DirectMoney.display(usdCents: balance.shortageUSDCents(checkoutPriceRubles: model.checkoutPrice)))")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(DS.danger)
-                                .multilineTextAlignment(.trailing)
-                        } else {
-                            Text("ХВАТАЕТ").microLabel(color: DS.green)
-                        }
+                        Text(DirectMoney.formatUSD(cents: balance.balanceUSDCents))
+                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(canPayFromBalance ? DS.green : DS.ink)
                     }
                     .padding(12)
                     .overlay(Rectangle().stroke(canPayFromBalance ? DS.green : DS.line))
@@ -557,7 +568,7 @@ struct DirectPaymentMethodView: View {
                         Text(model.checkoutTitle).font(.system(size: 18, weight: .semibold))
                     }
                     Spacer()
-                    Text(DirectMoney.display(rubles: model.checkoutPrice))
+                    Text(orderPriceLabel)
                         .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .foregroundStyle(DS.acid)
                         .multilineTextAlignment(.trailing)
@@ -595,14 +606,21 @@ struct DirectPaymentMethodView: View {
         }
     }
 
+    private var orderPriceLabel: String {
+        if model.paymentMethod == .apple {
+            return DirectMoney.displayUSDCharge(fromRubles: model.checkoutPrice)
+        }
+        return DirectMoney.formatRUB(model.checkoutPrice)
+    }
+
     private var actionTitle: String {
         if model.paymentMethod == .external {
-            return "Открыть защищённую страницу"
+            return "Открыть защищённую страницу · \(DirectMoney.formatRUB(model.checkoutPrice))"
         }
         if canPayFromBalance {
-            return "Списать с баланса · \(DirectMoney.display(rubles: model.checkoutPrice))"
+            return "Списать с баланса · \(DirectMoney.displayUSDCharge(fromRubles: model.checkoutPrice))"
         }
-        return "Пополнить баланс · не хватает \(DirectMoney.display(usdCents: balance.shortageUSDCents(checkoutPriceRubles: model.checkoutPrice)))"
+        return "Пополнить баланс · не хватает \(DirectMoney.formatUSD(cents: balance.shortageUSDCents(checkoutPriceRubles: model.checkoutPrice)))"
     }
 }
 

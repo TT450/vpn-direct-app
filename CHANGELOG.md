@@ -2,6 +2,22 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.11.108] — 2026-09-13
+
+### Balance / checkout UI (build 108)
+
+- Top-up sheet chrome aligned with other sheets; sticky header above packs list
+- Balance amounts shown in USD only; RUB for external payment methods
+- Interactive Apple purchase waiting states; payment CTA inverted + animated
+- Payment balance card shows actual balance only
+
+## [1.0.11.107] — 2026-09-13
+
+### TestFlight IAP fix (build 107)
+
+- Bakes the correct VPN Direct RevenueCat App Store public key for credit packs
+- No public API/backend changes in this build
+
 ## [1.0.11.106] — 2026-09-13
 
 ### Checkout return-host helper (build 106)

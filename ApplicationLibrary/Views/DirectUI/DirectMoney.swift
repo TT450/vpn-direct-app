@@ -56,21 +56,28 @@ public enum DirectMoney {
         return String(format: "%.2f$", value)
     }
 
-    /// Tariff / checkout amounts quoted in RUB → show charge USD.
-    public static func display(rubles: Int) -> String {
-        let charge = chargeUSD(fromRubles: rubles)
-        return "\(max(0, rubles)) ₽ / \(formatUSD(cents: charge.cents))"
+    public static func formatRUB(_ rubles: Int) -> String {
+        "\(max(0, rubles)) ₽"
     }
 
-    /// Balance ledger amounts stored as USD cents.
+    /// External / catalog amounts quoted in RUB (no USD dual label).
+    public static func display(rubles: Int) -> String {
+        formatRUB(rubles)
+    }
+
+    /// Balance / Apple-charge amounts — USD only.
     public static func display(usdCents cents: Int) -> String {
-        let rub = rubles(fromUSDCents: cents)
-        return "\(rub) ₽ / \(formatUSD(cents: cents))"
+        formatUSD(cents: cents)
+    }
+
+    /// Charge for a RUB tariff shown in USD (balance payment path).
+    public static func displayUSDCharge(fromRubles rubles: Int) -> String {
+        formatUSD(cents: usdCents(fromRubles: rubles))
     }
 
     public static func displaySigned(usdCents cents: Int) -> String {
         let sign = cents >= 0 ? "+" : "−"
-        return "\(sign)\(display(usdCents: abs(cents)))"
+        return "\(sign)\(formatUSD(cents: abs(cents)))"
     }
 
     /// Fixed IAP product → USD cents credit (1:1 with App Store face value).

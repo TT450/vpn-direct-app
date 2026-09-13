@@ -180,14 +180,24 @@ struct DirectBalanceAccountView: View {
     }
 }
 
+/// Same chrome as profile utility sheets: flat corners, drag handle, dismissible detents.
 private struct BalanceTopUpSheetChrome: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(iOS 16.0, *) {
+        if #available(iOS 16.4, *) {
             content
-                .presentationDetents([.large])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-        } else {
+                .presentationCornerRadius(0)
+                .interactiveDismissDisabled(false)
+                .preferredColorScheme(.light)
+        } else if #available(iOS 16.0, *) {
             content
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .interactiveDismissDisabled(false)
+                .preferredColorScheme(.light)
+        } else {
+            content.preferredColorScheme(.light)
         }
     }
 }

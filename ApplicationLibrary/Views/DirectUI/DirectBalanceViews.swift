@@ -21,6 +21,7 @@ private struct BalanceSectionHeader: View {
 struct DirectBalanceTopUpView: View {
     @ObservedObject var model: VPNConnectionModel
     @ObservedObject private var flow = DirectBalanceFlow.shared
+    @Environment(\.dismiss) private var dismiss
     /// When true, success/cancel call callbacks instead of pushing DetailPage.
     var embeddedInSheet: Bool = false
     var onFinished: (() -> Void)? = nil
@@ -43,68 +44,46 @@ struct DirectBalanceTopUpView: View {
 
     var body: some View {
         ZStack {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Button {
-                        cancel()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.left")
-                            Text(isStandalone ? "Баланс" : "Способ оплаты")
+            VStack(alignment: .leading, spacing: 0) {
+                stickyHeader
+                    .padding(.horizontal, 20)
+                    .padding(.top, embeddedInSheet ? 16 : DS.pageTop)
+                    .padding(.bottom, 4)
+                    .background(DS.paper)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if flow.products.isEmpty && !flow.isPurchasing {
+                            Text("Загружаем доступные покупки…")
+                                .font(.system(size: 11))
+                                .foregroundStyle(DS.muted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 18)
+                        } else {
+                            ForEach(sortedProducts, id: \.productIdentifier) { product in
+                                topUpRow(product)
+                            }
                         }
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(DS.muted)
-                    }
-                    .buttonStyle(HapticButtonStyle())
 
-                    PageHeading(
-                        kicker: "DIRECT / БАЛАНС",
-                        title: "Пополнить баланс",
-                        subtitle: isStandalone
-                            ? "Пополнение через Apple — средства сразу на балансе"
-                            : "Одно пополнение — несколько будущих покупок"
-                    )
-                    .padding(.top, 17)
-
-                    balanceHero.padding(.top, 23)
-
-                    if !isStandalone || shortageUSDCents > 0 {
-                        shortageBlock.padding(.top, 14)
-                    }
-
-                    BalanceSectionHeader(title: "ПОПОЛНЕНИЕ · APPLE", meta: "IN-APP")
-                        .padding(.top, 23)
-
-                    if flow.products.isEmpty && !flow.isPurchasing {
-                        Text("Загружаем доступные покупки…")
-                            .font(.system(size: 11))
-                            .foregroundStyle(DS.muted)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 18)
-                    } else {
-                        ForEach(sortedProducts, id: \.productIdentifier) { product in
-                            topUpRow(product)
+                        if let error = flow.errorMessage, flow.creditState != .purchasing {
+                            Text(error)
+                                .font(.system(size: 10))
+                                .foregroundStyle(flow.creditState == .creditPending ? DS.green : DS.danger)
+                                .lineSpacing(3)
+                                .padding(.top, 14)
                         }
-                    }
 
-                    if let error = flow.errorMessage, flow.creditState != .purchasing {
-                        Text(error)
+                        Text(isStandalone
+                             ? "Покупка проходит через Apple. После подтверждения сумма зачисляется на баланс."
+                             : "Покупка проходит через Apple. После подтверждения сумма зачисляется на баланс, и вы возвращаетесь к выбранному тарифу.")
                             .font(.system(size: 10))
-                            .foregroundStyle(flow.creditState == .creditPending ? DS.green : DS.danger)
+                            .foregroundStyle(DS.muted)
                             .lineSpacing(3)
-                            .padding(.top, 14)
+                            .padding(.top, 16)
+                            .padding(.bottom, 24)
                     }
-
-                    Text(isStandalone
-                         ? "Покупка проходит через Apple. После подтверждения сумма зачисляется на баланс."
-                         : "Покупка проходит через Apple. После подтверждения сумма зачисляется на баланс, и вы возвращаетесь к выбранному тарифу.")
-                        .font(.system(size: 10))
-                        .foregroundStyle(DS.muted)
-                        .lineSpacing(3)
-                        .padding(.top, 16)
+                    .padding(.horizontal, 20)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 24)
             }
             .background(DS.paper)
 
@@ -134,6 +113,49 @@ struct DirectBalanceTopUpView: View {
             if flow.hasPendingCredit {
                 flow.reconcilePendingCredit()
             }
+        }
+    }
+
+    private var stickyHeader: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if embeddedInSheet {
+                HStack(alignment: .top) {
+                    PageHeading(
+                        kicker: "DIRECT / БАЛАНС",
+                        title: "Пополнить баланс",
+                        subtitle: "Пополнение через Apple — средства сразу на балансе"
+                    )
+                    Button {
+                        cancel()
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .frame(width: 36, height: 36)
+                            .background(DS.ink)
+                            .foregroundStyle(DS.acid)
+                    }
+                    .buttonStyle(HapticButtonStyle())
+                    .padding(.top, 4)
+                }
+            } else {
+                PageHeading(
+                    kicker: "DIRECT / БАЛАНС",
+                    title: "Пополнить баланс",
+                    subtitle: isStandalone
+                        ? "Пополнение через Apple — средства сразу на балансе"
+                        : "Одно пополнение — несколько будущих покупок"
+                )
+            }
+
+            balanceHero.padding(.top, 23)
+
+            if !isStandalone || shortageUSDCents > 0 {
+                shortageBlock.padding(.top, 14)
+            }
+
+            BalanceSectionHeader(title: "ПОПОЛНЕНИЕ · APPLE", meta: "IN-APP")
+                .padding(.top, 23)
         }
     }
 

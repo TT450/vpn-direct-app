@@ -1,18 +1,18 @@
-# What's New — VPN Direct 1.0.11 (106)
+# What's New — VPN Direct 1.0.11 (108)
 
 Release date: 2026-09-13  
-App build: `106`  
-Prior: `105`
+App build: `108`  
+Prior: `107`
 
 ## App Store / short What's New
 
-- Safer external checkout return-host checks
-- Build **106**
+- Balance / top-up UI polish
+- Build **108**
 
 ## TestFlight
 
 | Field | Value |
 | --- | --- |
 | Version | **1.0.11** |
-| Build | **106** |
+| Build | **108** |
 | Join | https://testflight.apple.com/join/yfCEbunt |
