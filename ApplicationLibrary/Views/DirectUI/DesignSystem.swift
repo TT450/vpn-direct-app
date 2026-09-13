@@ -39,7 +39,11 @@ private struct DirectRefreshableModifier: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if enabled {
-            content.refreshable { await action() }
+            content.refreshable {
+                HapticManager.shared.play(.refreshStarted)
+                await action()
+                HapticManager.shared.play(.refreshCompleted)
+            }
         } else {
             content
         }
