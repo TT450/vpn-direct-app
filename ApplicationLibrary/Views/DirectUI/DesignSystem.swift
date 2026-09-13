@@ -118,7 +118,6 @@ struct DarkStat: View {
                 .font(.system(size: compact ? 11 : 15, weight: .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-                .contentTransition(.numericText())
         }
         .padding(.leading, 13)
         .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
@@ -131,7 +130,6 @@ struct DarkStat: View {
     }
 }
 
-/// Country flag from bundled PNG assets — never emoji (TheTochka placeholder square).
 struct FlagImage: View {
     let code: String
     var width: CGFloat = 30
@@ -145,10 +143,7 @@ struct FlagImage: View {
         let name = "flag-\(normalized.lowercased())"
         Group {
             if let image = Self.cachedImage(named: name) {
-                Image(uiImage: image)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
+                Image(uiImage: image).resizable().interpolation(.high).scaledToFill()
             } else {
                 Text(normalized.isEmpty ? "XX" : normalized)
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
@@ -170,13 +165,8 @@ struct FlagImage: View {
 
     private static func cachedImage(named name: String) -> UIImage? {
         let key = name as NSString
-        if let cached = imageCache.object(forKey: key) {
-            return cached === missToken ? nil : cached
-        }
-        if let image = loadImage(named: name) {
-            imageCache.setObject(image, forKey: key)
-            return image
-        }
+        if let cached = imageCache.object(forKey: key) { return cached === missToken ? nil : cached }
+        if let image = loadImage(named: name) { imageCache.setObject(image, forKey: key); return image }
         imageCache.setObject(missToken, forKey: key)
         return nil
     }
@@ -192,11 +182,8 @@ struct FlagImage: View {
             let nested = resourceURL.appendingPathComponent("ApplicationLibrary.bundle")
             if let bundle = Bundle(url: nested) { candidates.insert(bundle, at: 0) }
         }
-
         for bundle in candidates {
-            if let image = UIImage(named: name, in: bundle, compatibleWith: nil), image.size.width > 1 {
-                return image
-            }
+            if let image = UIImage(named: name, in: bundle, compatibleWith: nil), image.size.width > 1 { return image }
         }
         return UIImage(named: name)
     }
