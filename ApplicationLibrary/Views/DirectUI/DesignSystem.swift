@@ -12,8 +12,10 @@ enum DS {
     static let acid = Color(red: 0.66, green: 0.94, blue: 0.41)
     static let green = Color(red: 0.18, green: 0.55, blue: 0.31)
     static let danger = Color(red: 0.82, green: 0.24, blue: 0.20)
-    /// Top inset for page kickers / PageHeading — matches Home & Profile.
     static let pageTop: CGFloat = 24
+    static let directEntrance = Animation.easeOut(duration: 0.28)
+    static let directSpring = Animation.spring(response: 0.28, dampingFraction: 0.78)
+    static let directValue = Animation.easeInOut(duration: 0.22)
 }
 
 extension View {
@@ -23,12 +25,18 @@ extension View {
             .foregroundStyle(color)
     }
 
-    /// Pull-to-refresh for Direct screens. No-op when `enabled` is false (e.g. home).
-    func directRefreshable(
-        enabled: Bool = true,
-        action: @escaping () async -> Void
-    ) -> some View {
+    func directRefreshable(enabled: Bool = true, action: @escaping () async -> Void) -> some View {
         modifier(DirectRefreshableModifier(enabled: enabled, action: action))
+    }
+
+    /// Subtle one-shot entrance for Direct components.
+    func directEntrance(delay: Double = 0) -> some View {
+        modifier(DirectEntranceModifier(delay: delay))
+    }
+
+    /// Short value/state settling animation for compact Direct UI values.
+    func directValueAnimation<Value: Equatable>(_ value: Value) -> some View {
+        animation(DS.directValue, value: value)
     }
 }
 
@@ -50,6 +58,20 @@ private struct DirectRefreshableModifier: ViewModifier {
     }
 }
 
+private struct DirectEntranceModifier: ViewModifier {
+    let delay: Double
+    @State private var visible = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(visible ? 1 : 0)
+            .offset(y: visible ? 0 : 7)
+            .onAppear {
+                withAnimation(DS.directEntrance.delay(delay)) { visible = true }
+            }
+    }
+}
+
 struct Hairline: View {
     var color: Color = DS.line
     var body: some View { Rectangle().fill(color).frame(height: 1) }
@@ -59,6 +81,7 @@ struct PageHeading: View {
     let kicker: String
     let title: String
     let subtitle: String
+    @State private var appeared = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -76,6 +99,9 @@ struct PageHeading: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 6)
+        .onAppear { withAnimation(DS.directEntrance) { appeared = true } }
     }
 }
 
@@ -83,6 +109,7 @@ struct DarkStat: View {
     let label: String
     let value: String
     var compact = false
+    @State private var appeared = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -91,12 +118,16 @@ struct DarkStat: View {
                 .font(.system(size: compact ? 11 : 15, weight: .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
+                .contentTransition(.numericText())
         }
         .padding(.leading, 13)
         .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
         .overlay(alignment: .leading) { Hairline(color: .white.opacity(0.12)).frame(width: 1) }
         .overlay(alignment: .top) { Hairline(color: .white.opacity(0.12)) }
         .overlay(alignment: .bottom) { Hairline(color: .white.opacity(0.12)) }
+        .scaleEffect(appeared ? 1 : 0.985)
+        .opacity(appeared ? 1 : 0)
+        .onAppear { withAnimation(DS.directEntrance.delay(0.04)) { appeared = true } }
     }
 }
 
@@ -119,7 +150,6 @@ struct FlagImage: View {
                     .interpolation(.high)
                     .scaledToFill()
             } else {
-                // Same ink square + ISO letters as TheTochka — no broken emoji glyphs.
                 Text(normalized.isEmpty ? "XX" : normalized)
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
                     .foregroundStyle(DS.acid)
@@ -152,9 +182,6 @@ struct FlagImage: View {
     }
 
     private static func loadImage(named name: String) -> UIImage? {
-        // App target now ships flag assets in Bundle.main (SFI/Assets.xcassets).
-        // ApplicationLibrary is a staticlib — Bundle(for:) points at main, and the
-        // library's Assets.car is NOT embedded in the app unless we also copy flags.
         let libraryBundle = Bundle(for: FlagImageBundleToken.self)
         var candidates: [Bundle] = [.main, libraryBundle]
         if let frameworks = Bundle.main.privateFrameworksURL {
