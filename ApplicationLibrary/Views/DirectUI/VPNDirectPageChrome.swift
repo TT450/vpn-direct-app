@@ -11,6 +11,7 @@ struct VPNDirectPageAppBar<Trailing: View>: View {
     let title: String
     let subtitle: String
     let trailing: Trailing
+    @State private var appeared = false
 
     init(
         kicker: String,
@@ -26,32 +27,24 @@ struct VPNDirectPageAppBar<Trailing: View>: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            PageHeading(
-                kicker: kicker,
-                title: title,
-                subtitle: subtitle
-            )
-
+            PageHeading(kicker: kicker, title: title, subtitle: subtitle)
             trailing
+                .opacity(appeared ? 1 : 0)
+                .offset(x: appeared ? 0 : 5)
         }
         .padding(.top, DS.pageTop)
         .padding(.bottom, 18)
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 5)
+        .onAppear {
+            withAnimation(DS.directEntrance) { appeared = true }
+        }
     }
 }
 
 extension VPNDirectPageAppBar where Trailing == EmptyView {
-    init(
-        kicker: String,
-        title: String,
-        subtitle: String
-    ) {
-        self.init(
-            kicker: kicker,
-            title: title,
-            subtitle: subtitle
-        ) {
-            EmptyView()
-        }
+    init(kicker: String, title: String, subtitle: String) {
+        self.init(kicker: kicker, title: title, subtitle: subtitle) { EmptyView() }
     }
 }
 
@@ -66,10 +59,7 @@ struct VPNDirectSquareButton: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(DS.ink)
                 .frame(width: 38, height: 38)
-                .overlay(
-                    Rectangle()
-                        .stroke(DS.line, lineWidth: 1)
-                )
+                .overlay(Rectangle().stroke(DS.line, lineWidth: 1))
         }
         .buttonStyle(HapticButtonStyle())
         .accessibilityLabel(accessibilityLabel)
@@ -80,6 +70,7 @@ struct VPNDirectSectionLabel: View {
     let number: String
     let title: String
     let meta: String?
+    @State private var appeared = false
 
     init(number: String = "", title: String, meta: String? = nil) {
         self.number = number
@@ -89,26 +80,19 @@ struct VPNDirectSectionLabel: View {
 
     var body: some View {
         HStack(spacing: 9) {
-            if !number.isEmpty {
-                Text(number)
-                    .microLabel(color: DS.green)
-            }
-
-            Text(title)
-                .microLabel(color: DS.ink)
-
+            if !number.isEmpty { Text(number).microLabel(color: DS.green) }
+            Text(title).microLabel(color: DS.ink)
             Spacer(minLength: 8)
-
             if let meta {
-                Text(meta)
-                    .microLabel()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                Text(meta).microLabel().lineLimit(1).minimumScaleFactor(0.8)
             }
         }
         .frame(minHeight: 40)
-        .overlay(alignment: .top) {
-            Hairline(color: DS.ink)
+        .overlay(alignment: .top) { Hairline(color: DS.ink) }
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 4)
+        .onAppear {
+            withAnimation(DS.directEntrance.delay(0.04)) { appeared = true }
         }
     }
 }
@@ -138,13 +122,10 @@ struct VPNDirectOutlineButton: View {
                     Image(systemName: icon)
                         .font(.system(size: 11, weight: .semibold))
                 }
-
                 Text(title)
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .tracking(0.35)
-
                 Spacer(minLength: 5)
-
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 9, weight: .bold))
             }
@@ -152,10 +133,7 @@ struct VPNDirectOutlineButton: View {
             .padding(.horizontal, 13)
             .frame(minHeight: 46)
             .background(accent ? DS.ink : Color.clear)
-            .overlay(
-                Rectangle()
-                    .stroke(accent ? DS.ink : DS.line, lineWidth: 1)
-            )
+            .overlay(Rectangle().stroke(accent ? DS.ink : DS.line, lineWidth: 1))
         }
         .buttonStyle(HapticButtonStyle())
     }
