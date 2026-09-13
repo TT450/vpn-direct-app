@@ -538,7 +538,7 @@ struct DirectPaymentMethodView: View {
                         }
                         Spacer()
                         if shortage > 0 {
-                            Text("−\(DirectMoney.display(rubles: shortage))")
+                            Text("−\(DirectMoney.display(usdCents: balance.shortageUSDCents(checkoutPriceRubles: model.checkoutPrice)))")
                                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(DS.danger)
                                 .multilineTextAlignment(.trailing)
@@ -602,7 +602,7 @@ struct DirectPaymentMethodView: View {
         if canPayFromBalance {
             return "Списать с баланса · \(DirectMoney.display(rubles: model.checkoutPrice))"
         }
-        return "Пополнить баланс · не хватает \(DirectMoney.display(rubles: shortage))"
+        return "Пополнить баланс · не хватает \(DirectMoney.display(usdCents: balance.shortageUSDCents(checkoutPriceRubles: model.checkoutPrice)))"
     }
 }
 

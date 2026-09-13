@@ -2,6 +2,16 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.11.104] — 2026-09-13
+
+### Resilient Apple credit UX (build 104)
+
+- Apple top-up states: confirming purchase → funds processing → credited
+- No false “purchase failed” when Apple already confirmed and ledger sync is pending
+- Pending credit survives app restart; Sync Funds retries idempotent credit by transaction ID
+- Currency-aware credit-pack recommendation; Rapira ask + markup for ₽↔$ display
+- Checkout auto-continues after successful top-up when balance covers the tariff
+
 ## [1.0.11.103] — 2026-09-13
 
 ### Balance checkout + profile ledger (build 103)
@@ -9,7 +19,7 @@ All notable changes to VPN Direct (Apple client) are documented here.
 - Payment method: pay from in-app balance or other (webview) methods
 - Insufficient balance opens Apple credit-pack top-up; success returns to checkout or Profile → Balance
 - Profile → Balance screen with current amount (`₽ / $`) and transaction history
-- Shared `DirectMoney` presentation (84.25 ₽/$ bridge) for tariffs / constructor / checkout
+- Shared `DirectMoney` presentation for tariffs / constructor / checkout
 - Public RevenueCat facade for `direct.credits.*` consumables (empty SDK key on GitHub; local hooks fill it)
 - `.addOns` route remains normal add-ons; top-up uses a dedicated balance flow
 

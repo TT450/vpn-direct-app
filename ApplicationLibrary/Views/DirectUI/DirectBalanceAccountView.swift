@@ -39,7 +39,33 @@ struct DirectBalanceAccountView: View {
                 .buttonStyle(HapticButtonStyle())
                 .padding(.top, 12)
 
-                if let error = flow.errorMessage, !showTopUp {
+                if flow.hasPendingCredit || flow.creditState == .creditPending {
+                    Text(flow.errorMessage ?? DirectBalanceError.purchaseProcessing.errorDescription ?? "")
+                        .font(.system(size: 10))
+                        .foregroundStyle(DS.ink)
+                        .lineSpacing(3)
+                        .padding(.top, 10)
+
+                    Button {
+                        flow.retryPendingCredit()
+                    } label: {
+                        HStack {
+                            Text(flow.isPurchasing ? "СИНХРОНИЗИРУЕМ…" : "СИНХРОНИЗИРОВАТЬ СРЕДСТВА")
+                            Spacer()
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(DS.acid)
+                        .padding(.horizontal, 14)
+                        .frame(height: 44)
+                        .background(DS.ink)
+                    }
+                    .buttonStyle(HapticButtonStyle())
+                    .disabled(flow.isPurchasing)
+                    .padding(.top, 8)
+                }
+
+                if let error = flow.errorMessage, !showTopUp, flow.creditState != .creditPending {
                     Text(error)
                         .font(.system(size: 10))
                         .foregroundStyle(DS.danger)
@@ -92,8 +118,7 @@ struct DirectBalanceAccountView: View {
                     showTopUp = false
                 }
             )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+            .modifier(BalanceTopUpSheetChrome())
         }
     }
 
@@ -151,6 +176,18 @@ struct DirectBalanceAccountView: View {
         case .purchase: return "ПОДПИСКА"
         case .refund: return "ВОЗВРАТ"
         case .adjustment: return "КОРРЕКТИРОВКА"
+        }
+    }
+}
+
+private struct BalanceTopUpSheetChrome: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        } else {
+            content
         }
     }
 }

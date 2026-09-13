@@ -26,15 +26,19 @@ struct DirectBalanceTopUpView: View {
     var onFinished: (() -> Void)? = nil
     var onCancelled: (() -> Void)? = nil
 
-    private var shortageRubles: Int {
+    private var shortageUSDCents: Int {
         if flow.topUpSource == .account {
-            return max(0, flow.topUpRequiredRubles)
+            return DirectMoney.usdCents(fromRubles: max(0, flow.topUpRequiredRubles))
         }
-        return flow.shortageRubles(checkoutPriceRubles: model.checkoutPrice)
+        return flow.shortageUSDCents(checkoutPriceRubles: model.checkoutPrice)
     }
 
     private var isStandalone: Bool {
         flow.topUpSource == .account || embeddedInSheet
+    }
+
+    private var sortedProducts: [StoreProduct] {
+        DirectRevenueCat.sortedProducts(flow.products, coveringUSDCents: shortageUSDCents)
     }
 
     var body: some View {
@@ -64,7 +68,7 @@ struct DirectBalanceTopUpView: View {
 
                     balanceHero.padding(.top, 23)
 
-                    if !isStandalone || shortageRubles > 0 {
+                    if !isStandalone || shortageUSDCents > 0 {
                         shortageBlock.padding(.top, 14)
                     }
 
@@ -83,10 +87,10 @@ struct DirectBalanceTopUpView: View {
                         }
                     }
 
-                    if let error = flow.errorMessage {
+                    if let error = flow.errorMessage, flow.creditState != .purchasing {
                         Text(error)
                             .font(.system(size: 10))
-                            .foregroundStyle(DS.danger)
+                            .foregroundStyle(flow.creditState == .creditPending ? DS.green : DS.danger)
                             .lineSpacing(3)
                             .padding(.top, 14)
                     }
@@ -104,28 +108,33 @@ struct DirectBalanceTopUpView: View {
             }
             .background(DS.paper)
 
-            if flow.showTopUpSuccess {
+            if flow.isPurchasing || flow.creditState == .creditPending || flow.creditState == .failed {
+                Color.black.opacity(0.38).ignoresSafeArea()
+                DirectApplePurchaseStateView(
+                    flow: flow,
+                    retry: { flow.retryPendingCredit() },
+                    cancel: { cancel() }
+                )
+                .frame(maxWidth: 430)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 14)
+                .transition(.opacity)
+                .zIndex(20)
+            } else if flow.showTopUpSuccess {
                 Color.black.opacity(0.38).ignoresSafeArea()
                 successOverlay
                     .padding(14)
                     .frame(maxHeight: .infinity, alignment: .bottom)
+                    .zIndex(20)
             }
         }
         .task {
             await flow.refresh()
             await flow.loadProducts()
+            if flow.hasPendingCredit {
+                flow.reconcilePendingCredit()
+            }
         }
-    }
-
-    private var sortedProducts: [StoreProduct] {
-        guard shortageRubles > 0 else {
-            return flow.products.sorted { $0.price < $1.price }
-        }
-        let neededUSD = Decimal(shortageRubles) * DirectMoney.usdPerRub
-        let covering = flow.products.filter { $0.price >= neededUSD }.sorted { $0.price < $1.price }
-        let rest = flow.products.filter { $0.price < neededUSD }.sorted { $0.price < $1.price }
-        if covering.isEmpty { return flow.products.sorted { $0.price < $1.price } }
-        return covering + rest
     }
 
     private var balanceHero: some View {
@@ -154,11 +163,11 @@ struct DirectBalanceTopUpView: View {
             Rectangle().fill(DS.acid).frame(width: 3)
             VStack(alignment: .leading, spacing: 5) {
                 Text("НЕ ХВАТАЕТ").microLabel(color: DS.muted)
-                Text(DirectMoney.display(rubles: shortageRubles))
+                Text(DirectMoney.display(usdCents: shortageUSDCents))
                     .font(.system(size: 16, weight: .semibold, design: .monospaced))
                 Text(isStandalone
                      ? "Выберите пакет, чтобы пополнить баланс."
-                     : "После пополнения вы вернётесь прямо к выбранному тарифу.")
+                     : "После пополнения оплата тарифа продолжится автоматически.")
                     .font(.system(size: 10)).foregroundStyle(DS.muted)
             }
         }
@@ -167,19 +176,16 @@ struct DirectBalanceTopUpView: View {
     }
 
     private func topUpRow(_ product: StoreProduct) -> some View {
-        let neededUSD = Decimal(max(shortageRubles, 0)) * DirectMoney.usdPerRub
-        let coveringPrices = shortageRubles > 0
-            ? flow.products.filter { $0.price >= neededUSD }.map(\.price)
-            : []
-        let recommendedPrice = coveringPrices.min()
-        let recommended = shortageRubles > 0
-            && recommendedPrice == product.price
-            && product.price >= neededUSD
+        let recommended = DirectRevenueCat.isRecommended(
+            product,
+            among: flow.products,
+            coveringUSDCents: shortageUSDCents
+        )
         let credit = DirectMoney.creditCents(forProductID: product.productIdentifier)
 
         return Button {
             HapticManager.shared.play(.purchaseStarted)
-            flow.purchase(product: product)
+            flow.purchase(product: product, model: model)
         } label: {
             HStack(spacing: 12) {
                 Text("+")
@@ -213,7 +219,7 @@ struct DirectBalanceTopUpView: View {
             .overlay(Rectangle().stroke(recommended ? DS.green : DS.line))
         }
         .buttonStyle(HapticButtonStyle())
-        .disabled(flow.isPurchasing)
+        .disabled(flow.isPurchasing || flow.creditState == .creditPending)
         .padding(.top, 7)
     }
 
@@ -233,7 +239,9 @@ struct DirectBalanceTopUpView: View {
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
                     .padding(.top, 4)
             }
-            Text("Баланс обновлён. Возвращаем вас к месту, где началась покупка.")
+            Text(isStandalone
+                 ? "Баланс обновлён."
+                 : "Баланс обновлён. Продолжаем оплату тарифа…")
                 .font(.system(size: 11)).foregroundStyle(DS.muted).lineSpacing(3).padding(.top, 7)
 
             VStack(alignment: .leading, spacing: 5) {
@@ -250,7 +258,7 @@ struct DirectBalanceTopUpView: View {
                 finish()
             } label: {
                 HStack {
-                    Text("Продолжить")
+                    Text(isStandalone ? "Готово" : "Продолжить оплату")
                     Spacer()
                     Image(systemName: "arrow.right")
                 }
@@ -283,7 +291,9 @@ struct DirectBalanceTopUpView: View {
 
     private func cancel() {
         if let onCancelled {
-            flow.resetTopUpUIState()
+            if !flow.hasPendingCredit {
+                flow.resetTopUpUIState()
+            }
             onCancelled()
             return
         }
