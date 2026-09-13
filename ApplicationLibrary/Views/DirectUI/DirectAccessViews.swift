@@ -485,28 +485,71 @@ private struct PlanCheckoutSummary: View {
 
 struct DirectPaymentMethodView: View {
     @ObservedObject var model: VPNConnectionModel
+    @ObservedObject private var balance = DirectBalanceFlow.shared
+
+    private var canPayFromBalance: Bool {
+        balance.balanceCovers(checkoutPriceRubles: model.checkoutPrice)
+    }
+
+    private var shortage: Int {
+        balance.shortageRubles(checkoutPriceRubles: model.checkoutPrice)
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
+                PageHeading(
+                    kicker: "ОФОРМЛЕНИЕ / ОПЛАТА",
+                    title: "Способ оплаты",
+                    subtitle: "Выберите источник оплаты"
+                )
+                .padding(.top, DS.pageTop)
 
-                PageHeading(kicker: "ОФОРМЛЕНИЕ / ОПЛАТА", title: "Способ оплаты", subtitle: "Выберите доступный вариант")
-                    .padding(.top, DS.pageTop)
-
-                AccessSectionHeader(title: "ОПЛАТА", meta: "02 СПОСОБА")
+                AccessSectionHeader(title: "СПОСОБ", meta: "02 ВАРИАНТА")
                     .padding(.top, 25)
-                PaymentOption(model: model, method: .apple, mark: "APPLE", subtitle: "Apple · пополнение баланса")
-                PaymentOption(model: model, method: .external, mark: "WEB", subtitle: "Защищённая страница платёжного партнёра")
-                    .padding(.top, 8)
+                PaymentOption(
+                    model: model,
+                    method: .apple,
+                    mark: "BAL",
+                    title: "Оплатить с Баланса",
+                    subtitle: balance.isLoadingBalance
+                        ? "Проверяем баланс…"
+                        : "Баланс: \(balance.balanceDisplay)"
+                )
+                PaymentOption(
+                    model: model,
+                    method: .external,
+                    mark: "WEB",
+                    title: "Другие способы",
+                    subtitle: "Защищённая страница платёжного партнёра"
+                )
+                .padding(.top, 8)
 
-                Text(model.paymentMethod == .apple
-                    ? "Оплата через Apple ID: спишется пакет кредитов, затем тариф активируется на сервере."
-                    : "Внешний вариант показывается только в тех storefront, где он разрешён правилами Apple и настроен для приложения.")
-                    .font(.system(size: 10)).foregroundStyle(DS.muted).lineSpacing(3)
+                if model.paymentMethod == .apple {
+                    HStack(spacing: 12) {
+                        Text("BAL").microLabel(color: DS.acid)
+                            .frame(width: 42, height: 42)
+                            .background(DS.ink)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Баланс").font(.system(size: 12, weight: .semibold))
+                            Text(balance.balanceDisplay)
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(DS.green)
+                        }
+                        Spacer()
+                        if shortage > 0 {
+                            Text("−\(DirectMoney.display(rubles: shortage))")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(DS.danger)
+                                .multilineTextAlignment(.trailing)
+                        } else {
+                            Text("ХВАТАЕТ").microLabel(color: DS.green)
+                        }
+                    }
                     .padding(12)
-                    .overlay(alignment: .leading) { Rectangle().fill(DS.green).frame(width: 3) }
-                    .background(Color.white.opacity(0.28))
+                    .overlay(Rectangle().stroke(canPayFromBalance ? DS.green : DS.line))
                     .padding(.top, 12)
+                }
 
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 5) {
@@ -514,9 +557,10 @@ struct DirectPaymentMethodView: View {
                         Text(model.checkoutTitle).font(.system(size: 18, weight: .semibold))
                     }
                     Spacer()
-                    Text("\(model.checkoutPrice) ₽")
-                        .font(.system(size: 19, weight: .semibold, design: .monospaced))
+                    Text(DirectMoney.display(rubles: model.checkoutPrice))
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .foregroundStyle(DS.acid)
+                        .multilineTextAlignment(.trailing)
                 }
                 .padding(16)
                 .frame(minHeight: 86)
@@ -524,14 +568,41 @@ struct DirectPaymentMethodView: View {
                 .background(DS.panel)
                 .padding(.top, 16)
 
-                AccessButton(title: model.paymentMethod == .apple ? "Продолжить с Apple" : "Открыть защищённую страницу") {
-                    model.requestCheckoutPayment()
+                if let error = balance.errorMessage, model.paymentMethod == .apple {
+                    Text(error)
+                        .font(.system(size: 10))
+                        .foregroundStyle(DS.danger)
+                        .padding(.top, 10)
                 }
+
+                AccessButton(title: actionTitle) {
+                    HapticManager.shared.play(.purchaseStarted)
+                    if model.paymentMethod == .apple {
+                        balance.payOrTopUp(model: model)
+                    } else {
+                        model.requestCheckoutPayment()
+                    }
+                }
+                .opacity(balance.isPurchasing ? 0.55 : 1)
                 .padding(.top, 14)
+                .disabled(balance.isPurchasing || balance.isLoadingBalance)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
         }
+        .task {
+            await balance.refresh()
+        }
+    }
+
+    private var actionTitle: String {
+        if model.paymentMethod == .external {
+            return "Открыть защищённую страницу"
+        }
+        if canPayFromBalance {
+            return "Списать с баланса · \(DirectMoney.display(rubles: model.checkoutPrice))"
+        }
+        return "Пополнить баланс · не хватает \(DirectMoney.display(rubles: shortage))"
     }
 }
 
@@ -539,6 +610,7 @@ private struct PaymentOption: View {
     @ObservedObject var model: VPNConnectionModel
     let method: PaymentMethod
     let mark: String
+    let title: String
     let subtitle: String
 
     var body: some View {
@@ -550,7 +622,7 @@ private struct PaymentOption: View {
                 Text(mark).microLabel(color: DS.acid)
                     .frame(width: 44, height: 42).background(DS.ink)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(method.rawValue).font(.system(size: 13, weight: .semibold))
+                    Text(title).font(.system(size: 13, weight: .semibold))
                     Text(subtitle).font(.system(size: 9)).foregroundStyle(DS.muted)
                 }
                 Spacer()

@@ -45,6 +45,8 @@ public enum DetailPage: Equatable {
     case premiumPlans
     case planConstructor
     case payment
+    case balanceAccount
+    case balanceTopUp
     case addOns
     case authLogin
     case authEmail
@@ -72,8 +74,8 @@ public enum AccessSource: Equatable {
 }
 
 public enum PaymentMethod: String, CaseIterable, Codable {
-    /// Apple IAP via RevenueCat consumable credit packs.
-    case apple = "Покупка через Apple"
+    /// Internal USD balance (topped up via Apple IAP / RevenueCat).
+    case apple = "Оплатить с Баланса"
     case external = "Другие способы"
 }
 

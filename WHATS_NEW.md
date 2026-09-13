@@ -1,19 +1,21 @@
-# What's New — VPN Direct 1.0.11 (102)
+# What's New — VPN Direct 1.0.11 (103)
 
 Release date: 2026-09-13  
-App build: `102`  
-Prior: `101`
+App build: `103`  
+Prior: `102`
 
 ## App Store / short What's New
 
-- Apple IAP path prepared for credit packs (StoreKit via RevenueCat SDK facade)
-- Payment copy clarified; external/webview checkout unchanged
-- Build **102**
+- Balance-first checkout: pay from balance or other methods
+- Apple credit packs for balance top-up; return to the same purchase screen
+- Profile → Balance with amount and transaction history
+- Prices shown as `₽ / $` (shared money helper)
+- Build **103**
 
 ## TestFlight
 
 | Field | Value |
 | --- | --- |
 | Version | **1.0.11** |
-| Build | **102** |
+| Build | **103** |
 | Join | https://testflight.apple.com/join/yfCEbunt |

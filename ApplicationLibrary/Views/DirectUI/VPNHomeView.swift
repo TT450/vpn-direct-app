@@ -77,6 +77,10 @@ public struct VPNHomeView: View {
                                 DirectConstructorView(model: model)
                             case .payment:
                                 DirectPaymentMethodView(model: model)
+                            case .balanceAccount:
+                                DirectBalanceAccountView(model: model)
+                            case .balanceTopUp:
+                                DirectBalanceTopUpView(model: model)
                             case .addOns:
                                 DirectAddOnsView(model: model)
                             case .authLogin:
@@ -229,6 +233,7 @@ public struct VPNHomeView: View {
             consumePlansDeepLinkIfNeeded()
             consumeAccountDeepLinkIfNeeded()
             model.resumeOpenPaymentsIfNeeded()
+            Task { await DirectBalanceFlow.shared.refresh() }
         }
         .onChangeCompat(of: scenePhase) { phase in
             if phase == .active {
@@ -240,6 +245,7 @@ public struct VPNHomeView: View {
                 consumePlansDeepLinkIfNeeded()
                 consumeAccountDeepLinkIfNeeded()
                 model.resumeOpenPaymentsIfNeeded()
+                Task { await DirectBalanceFlow.shared.refresh() }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .vpnDirectWidgetToggle)) { _ in

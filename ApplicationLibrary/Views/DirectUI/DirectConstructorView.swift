@@ -60,7 +60,7 @@ struct DirectConstructorView: View {
 
                     Spacer()
 
-                    Text("\(price) ₽")
+                    Text(DirectMoney.display(rubles: price))
                         .font(.system(size: 25, weight: .semibold, design: .monospaced))
                 }
 

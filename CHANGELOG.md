@@ -2,6 +2,17 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.11.103] — 2026-09-13
+
+### Balance checkout + profile ledger (build 103)
+
+- Payment method: pay from in-app balance or other (webview) methods
+- Insufficient balance opens Apple credit-pack top-up; success returns to checkout or Profile → Balance
+- Profile → Balance screen with current amount (`₽ / $`) and transaction history
+- Shared `DirectMoney` presentation (84.25 ₽/$ bridge) for tariffs / constructor / checkout
+- Public RevenueCat facade for `direct.credits.*` consumables (empty SDK key on GitHub; local hooks fill it)
+- `.addOns` route remains normal add-ons; top-up uses a dedicated balance flow
+
 ## [1.0.11.87] — 2026-09-09
 
 ### Direct-first UI + locations (build 87)

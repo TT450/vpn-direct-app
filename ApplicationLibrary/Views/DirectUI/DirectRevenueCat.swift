@@ -98,36 +98,35 @@ public enum DirectRevenueCat {
         case "USD":
             return amount
         case "RUB":
-            // Rough bridge until backend returns explicit iap_product_id / USD quote.
-            return amount / Decimal(90)
+            return amount / DirectMoney.rublesPerUSD
         default:
             return amount
         }
     }
 
-    public static func purchase(package: Package) async throws -> CustomerInfo {
+    public static func purchase(package: Package) async throws -> (CustomerInfo, String?) {
         configureIfNeeded()
         let result = try await Purchases.shared.purchase(package: package)
         if result.userCancelled {
             throw DirectRevenueCatError.cancelled
         }
-        return result.customerInfo
+        return (result.customerInfo, result.transaction?.transactionIdentifier)
     }
 
-    public static func purchase(product: StoreProduct) async throws -> CustomerInfo {
+    public static func purchase(product: StoreProduct) async throws -> (CustomerInfo, String?) {
         configureIfNeeded()
         let result = try await Purchases.shared.purchase(product: product)
         if result.userCancelled {
             throw DirectRevenueCatError.cancelled
         }
-        return result.customerInfo
+        return (result.customerInfo, result.transaction?.transactionIdentifier)
     }
 
     /// Buys the cheapest credit pack that covers `amount`, then returns product id + customer info.
     @discardableResult
     public static func purchaseCreditsCovering(amount: Decimal, currencyCode: String?) async throws -> (productID: String, info: CustomerInfo) {
         if let package = try await packageCovering(amount: amount, currencyCode: currencyCode) {
-            let info = try await purchase(package: package)
+            let (info, _) = try await purchase(package: package)
             return (package.storeProduct.productIdentifier, info)
         }
         let products = try await fetchCreditStoreProducts()
@@ -145,7 +144,7 @@ public enum DirectRevenueCat {
             }
             return false
         } ?? products.first!
-        let info = try await purchase(product: pick)
+        let (info, _) = try await purchase(product: pick)
         return (pick.productIdentifier, info)
     }
 }

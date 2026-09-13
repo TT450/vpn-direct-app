@@ -81,6 +81,14 @@ struct DirectProfilePage: View {
 
                 sectionHeader("АККАУНТ", "01")
                     .padding(.top, 18)
+                UtilityProfileRow(
+                    mark: "BAL",
+                    title: "Баланс",
+                    detail: DirectBalanceFlow.shared.balanceDisplay,
+                    accent: true
+                ) {
+                    model.openDetail(.balanceAccount)
+                }
                 UtilityProfileRow(mark: "DEV", title: "Устройства", detail: "Активные сеансы и лимит тарифа") {
                     utility = .devices
                 }

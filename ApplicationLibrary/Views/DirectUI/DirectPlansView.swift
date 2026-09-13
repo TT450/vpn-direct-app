@@ -107,7 +107,7 @@ struct DirectPlansView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(price) ₽")
+                    Text(DirectMoney.display(rubles: price))
                         .font(.system(size: 18, weight: .semibold, design: .monospaced))
                     Text(period.priceSuffix)
                         .microLabel(color: DS.muted)
@@ -161,7 +161,7 @@ struct DirectPlansView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(displayPrice(for: plan)) ₽")
+                    Text(DirectMoney.display(rubles: displayPrice(for: plan)))
                         .font(.system(size: 18, weight: .semibold, design: .monospaced))
                     Text(period.priceSuffix)
                         .microLabel(color: DS.muted)

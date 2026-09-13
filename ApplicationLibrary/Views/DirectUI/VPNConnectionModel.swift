@@ -637,6 +637,8 @@ public final class VPNConnectionModel: ObservableObject {
         case .premiumPlans: return "Тарифы"
         case .planConstructor: return "Конструктор"
         case .payment: return "Оплата"
+        case .balanceAccount: return "Баланс"
+        case .balanceTopUp: return "Пополнение"
         case .accessChoice: return "Доступ"
         case .addOns: return "Дополнения"
         case .systemSettings: return "Настройки"
@@ -1140,7 +1142,7 @@ public final class VPNConnectionModel: ObservableObject {
         guard !PendingCheckout.openPaymentIDs.isEmpty else { return }
         if let page = detailPage {
             switch page {
-            case .payment, .paymentError, .paymentCancelled, .paymentSuccess, .paymentProcessing,
+            case .payment, .balanceAccount, .balanceTopUp, .paymentError, .paymentCancelled, .paymentSuccess, .paymentProcessing,
                  .authLogin, .authEmail, .authCode, .authRegister, .authRecovery, .authBot,
                  .authPhone, .authPhoneCode, .authSuccess, .premiumPlans, .planConstructor, .addOns, .accessChoice:
                 // Stay on the current auth/checkout screen; poll in background.
