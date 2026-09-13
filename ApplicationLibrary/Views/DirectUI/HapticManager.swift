@@ -8,6 +8,7 @@ import UIKit
 /// must always mean the same thing, regardless of the screen that emitted it.
 public enum HapticEvent: Hashable {
     case touchDown
+    case touchUp
     case navigation
     case selection
     case toggleOn
@@ -43,9 +44,7 @@ public enum HapticEvent: Hashable {
 @MainActor
 public final class HapticManager {
     public static let shared = HapticManager()
-
     private static let enabledKey = "hapticsEnabled"
-
     private var engine: CHHapticEngine?
     private var lastPlayedAt: [HapticEvent: CFTimeInterval] = [:]
     private var lastGlobalAt: CFTimeInterval = 0
@@ -57,73 +56,45 @@ public final class HapticManager {
     private let selection = UISelectionFeedbackGenerator()
     private let notification = UINotificationFeedbackGenerator()
 
-    private init() {
-        prepare()
-    }
+    private init() { prepare() }
 
     public var isEnabled: Bool {
-        get {
-            if UserDefaults.standard.object(forKey: Self.enabledKey) == nil { return true }
-            return UserDefaults.standard.bool(forKey: Self.enabledKey)
-        }
+        get { UserDefaults.standard.object(forKey: Self.enabledKey) == nil || UserDefaults.standard.bool(forKey: Self.enabledKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.enabledKey) }
     }
 
     public func prepare() {
-        impactLight.prepare()
-        impactSoft.prepare()
-        impactMedium.prepare()
-        impactRigid.prepare()
-        selection.prepare()
-        notification.prepare()
-
+        impactLight.prepare(); impactSoft.prepare(); impactMedium.prepare(); impactRigid.prepare(); selection.prepare(); notification.prepare()
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
         do {
             let engine = try CHHapticEngine()
             engine.isAutoShutdownEnabled = true
             engine.stoppedHandler = { _ in }
-            engine.resetHandler = { [weak self] in
-                Task { @MainActor in try? self?.engine?.start() }
-            }
+            engine.resetHandler = { [weak self] in Task { @MainActor in try? self?.engine?.start() } }
             try engine.start()
             self.engine = engine
-        } catch {
-            engine = nil
-        }
+        } catch { engine = nil }
     }
 
     public func setEnabled(_ enabled: Bool) {
-        if enabled {
-            isEnabled = true
-            play(.toggleOn)
-        } else {
-            play(.toggleOff)
-            isEnabled = false
-        }
+        if enabled { isEnabled = true; play(.toggleOn) }
+        else { play(.toggleOff); isEnabled = false }
     }
 
     public func play(_ event: HapticEvent) {
         guard isEnabled else { return }
-
         let now = CACurrentMediaTime()
         let perEventWindow: CFTimeInterval = event == .selection || event == .swipeThreshold ? 0.07 : 0.12
         guard now - (lastPlayedAt[event] ?? 0) >= perEventWindow else { return }
-
-        if event != .touchDown, now - lastGlobalAt < 0.035 { return }
-        lastPlayedAt[event] = now
-        lastGlobalAt = now
-
-        if UIAccessibility.isReduceMotionEnabled {
-            playReduced(event)
-            prepareFeedbackGenerators()
-            return
-        }
+        if event != .touchDown && event != .touchUp && now - lastGlobalAt < 0.035 { return }
+        lastPlayedAt[event] = now; lastGlobalAt = now
+        if UIAccessibility.isReduceMotionEnabled { playReduced(event); prepareFeedbackGenerators(); return }
 
         switch event {
         case .touchDown:
-            // A soft first pulse makes the UI feel physically responsive; semantic
-            // action feedback can then add its own second, meaningful pattern.
-            impactSoft.impactOccurred(intensity: 0.30)
+            playPattern([(0.00, 0.18, 0.12), (0.055, 0.30, 0.28)], fallback: { impactSoft.impactOccurred(intensity: 0.30) })
+        case .touchUp:
+            impactLight.impactOccurred(intensity: 0.20)
         case .navigation:
             impactLight.impactOccurred(intensity: 0.48)
         case .selection:
@@ -173,74 +144,32 @@ public final class HapticManager {
         case .purchaseCompleted:
             playPattern([(0.00, 0.44, 0.36), (0.075, 0.72, 0.68), (0.17, 1.00, 0.86)], fallback: { notification.notificationOccurred(.success) })
         }
-
         prepareFeedbackGenerators()
     }
 
-    private func prepareFeedbackGenerators() {
-        impactLight.prepare()
-        impactSoft.prepare()
-        impactMedium.prepare()
-        impactRigid.prepare()
-        selection.prepare()
-        notification.prepare()
-    }
+    private func prepareFeedbackGenerators() { impactLight.prepare(); impactSoft.prepare(); impactMedium.prepare(); impactRigid.prepare(); selection.prepare(); notification.prepare() }
 
     private func playReduced(_ event: HapticEvent) {
         switch event {
-        case .error, .validationFailure:
-            notification.notificationOccurred(.error)
-        case .warning:
-            notification.notificationOccurred(.warning)
-        case .vpnConnected, .vpnSwitched, .purchaseCompleted,
-             .copied, .shared, .saved, .imported, .refreshCompleted, .dataArrived:
-            notification.notificationOccurred(.success)
-        case .selection, .swipeThreshold:
-            selection.selectionChanged()
-        case .touchDown, .sheetDismissed, .menuClosed, .toggleOff,
-             .vpnDisconnected, .deleted:
-            impactSoft.impactOccurred(intensity: 0.35)
-        default:
-            impactLight.impactOccurred(intensity: 0.45)
+        case .error, .validationFailure: notification.notificationOccurred(.error)
+        case .warning: notification.notificationOccurred(.warning)
+        case .vpnConnected, .vpnSwitched, .purchaseCompleted, .copied, .shared, .saved, .imported, .refreshCompleted, .dataArrived: notification.notificationOccurred(.success)
+        case .selection, .swipeThreshold: selection.selectionChanged()
+        case .touchDown, .touchUp, .sheetDismissed, .menuClosed, .toggleOff, .vpnDisconnected, .deleted: impactSoft.impactOccurred(intensity: 0.35)
+        default: impactLight.impactOccurred(intensity: 0.45)
         }
     }
 
-    private func playPattern(
-        _ pulses: [(time: TimeInterval, intensity: Float, sharpness: Float)],
-        fallback: () -> Void
-    ) {
-        guard let engine, CHHapticEngine.capabilitiesForHardware().supportsHaptics else {
-            fallback()
-            return
-        }
-
-        let events = pulses.map { pulse in
-            CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: pulse.intensity),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: pulse.sharpness),
-                ],
-                relativeTime: pulse.time
-            )
-        }
-
-        do {
-            try engine.start()
-            let player = try engine.makePlayer(with: CHHapticPattern(events: events, parameters: []))
-            try player.start(atTime: CHHapticTimeImmediate)
-        } catch {
-            fallback()
-        }
+    private func playPattern(_ pulses: [(time: TimeInterval, intensity: Float, sharpness: Float)], fallback: () -> Void) {
+        guard let engine, CHHapticEngine.capabilitiesForHardware().supportsHaptics else { fallback(); return }
+        let events = pulses.map { pulse in CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: pulse.intensity), CHHapticEventParameter(parameterID: .hapticSharpness, value: pulse.sharpness)], relativeTime: pulse.time) }
+        do { try engine.start(); let player = try engine.makePlayer(with: CHHapticPattern(events: events, parameters: [])); try player.start(atTime: CHHapticTimeImmediate) }
+        catch { fallback() }
     }
 }
 
-/// Default physical acknowledgement for every SwiftUI Button in the app.
-/// The tiny spring makes the control feel pressed; semantic action feedback
-/// is intentionally separate so important actions can have richer patterns.
 public struct HapticButtonStyle: ButtonStyle {
     public init() {}
-
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .contentShape(Rectangle())
@@ -248,78 +177,43 @@ public struct HapticButtonStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.88 : 1.0)
             .animation(.spring(response: 0.18, dampingFraction: 0.72), value: configuration.isPressed)
             .onChangeCompat(of: configuration.isPressed) { isPressed in
-                if isPressed { HapticManager.shared.play(.touchDown) }
+                HapticManager.shared.play(isPressed ? .touchDown : .touchUp)
             }
     }
 }
 
 private struct HapticTouchSurfaceModifier: ViewModifier {
     @State private var didFireForGesture = false
-
     func body(content: Content) -> some View {
-        content.simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    guard !didFireForGesture else { return }
-                    didFireForGesture = true
-                    HapticManager.shared.play(.touchDown)
-                }
-                .onEnded { _ in
-                    didFireForGesture = false
-                }
-        )
+        content.simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { _ in
+            guard !didFireForGesture else { return }
+            didFireForGesture = true
+            HapticManager.shared.play(.touchDown)
+        }.onEnded { _ in
+            didFireForGesture = false
+            HapticManager.shared.play(.touchUp)
+        })
     }
 }
 
 private struct HapticScrollThresholdModifier: ViewModifier {
     @State private var crossedFirst = false
     @State private var crossedSecond = false
-
     func body(content: Content) -> some View {
-        content.simultaneousGesture(
-            DragGesture(minimumDistance: 12)
-                .onChanged { value in
-                    guard abs(value.translation.height) >= abs(value.translation.width) else { return }
-                    let distance = hypot(value.translation.width, value.translation.height)
-                    if distance > 44, !crossedFirst {
-                        crossedFirst = true
-                        HapticManager.shared.play(.swipeThreshold)
-                    }
-                    if distance > 128, !crossedSecond {
-                        crossedSecond = true
-                        HapticManager.shared.play(.swipeThreshold)
-                    }
-                }
-                .onEnded { _ in
-                    crossedFirst = false
-                    crossedSecond = false
-                }
-        )
+        content.simultaneousGesture(DragGesture(minimumDistance: 12).onChanged { value in
+            guard abs(value.translation.height) >= abs(value.translation.width) else { return }
+            let distance = hypot(value.translation.width, value.translation.height)
+            if distance > 44, !crossedFirst { crossedFirst = true; HapticManager.shared.play(.swipeThreshold) }
+            if distance > 128, !crossedSecond { crossedSecond = true; HapticManager.shared.play(.swipeThreshold) }
+        }.onEnded { _ in crossedFirst = false; crossedSecond = false })
     }
 }
 
 public extension View {
-    /// Covers controls that deliberately use `.plain` or another local style.
-    /// It does not alter their visuals or gesture behavior.
-    func hapticTouchSurface() -> some View {
-        modifier(HapticTouchSurfaceModifier())
-    }
-
-    func hapticScrollThresholds() -> some View {
-        modifier(HapticScrollThresholdModifier())
-    }
-
-    func hapticToggle(_ value: Bool) -> some View {
-        onChangeCompat(of: value) { newValue in
-            HapticManager.shared.play(newValue ? .toggleOn : .toggleOff)
-        }
-    }
-
-    func hapticSelection<Value: Equatable>(_ value: Value) -> some View {
-        onChangeCompat(of: value) { _ in
-            HapticManager.shared.play(.selection)
-        }
-    }
+    func hapticTouchSurface() -> some View { modifier(HapticTouchSurfaceModifier()) }
+    func hapticScrollThresholds() -> some View { modifier(HapticScrollThresholdModifier()) }
+    func hapticToggle(_ value: Bool) -> some View { onChangeCompat(of: value) { HapticManager.shared.play($0 ? .toggleOn : .toggleOff) } }
+    func hapticSelection<Value: Equatable>(_ value: Value) -> some View { onChangeCompat(of: value) { _ in HapticManager.shared.play(.selection) } }
 }
 
 #endif
