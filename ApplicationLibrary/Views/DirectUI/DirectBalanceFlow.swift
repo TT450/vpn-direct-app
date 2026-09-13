@@ -86,12 +86,14 @@ public enum DirectBalanceBackend {
     /// Optional identity binder before purchase (hooks → RevenueCat.logIn).
     public static var bindRevenueCatIdentity: ((VPNConnectionModel) async throws -> String) = { model in
         let device = UserDefaults.standard.string(forKey: "vpndirect.device.id") ?? UUID().uuidString
-        return DirectRevenueCat.appUserID(
-            email: model.directAccountEmail,
-            phone: model.directAccountPhone,
-            username: model.directAccountUsername,
-            deviceID: device
-        )
+        return await MainActor.run {
+            DirectRevenueCat.appUserID(
+                email: model.directAccountEmail,
+                phone: model.directAccountPhone,
+                username: model.directAccountUsername,
+                deviceID: device
+            )
+        }
     }
 }
 

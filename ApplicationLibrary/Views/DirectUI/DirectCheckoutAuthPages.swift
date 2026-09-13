@@ -727,19 +727,32 @@ private struct DirectWKWebView: UIViewRepresentable {
 
         private func maybeSucceed(_ navURL: URL) {
             guard !didFireSuccess else { return }
+            // WebView `/success` is only a UX return signal → begin waiting/poll.
+            // Never treat navigation itself as proof of payment; backend status is authoritative.
+            let scheme = (navURL.scheme ?? "").lowercased()
+            guard scheme == "https" else { return }
             let host = (navURL.host ?? "").lowercased()
             let path = navURL.path.lowercased()
-            let suffixes = DirectBackendRuntime.checkoutSuccessHostSuffixes
+            let allowlist = DirectBackendRuntime.checkoutSuccessHostSuffixes
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
                 .filter { !$0.isEmpty }
-            guard !suffixes.isEmpty else { return }
-            let isAllowedHost = suffixes.contains { suffix in
-                host == suffix || host.hasSuffix(".\(suffix)") || host.hasSuffix(suffix)
-            }
+            guard !allowlist.isEmpty else { return }
+            guard Self.hostIsAllowlisted(host, allowlist: allowlist) else { return }
             let isSuccess = path == "/success" || path.hasPrefix("/success/")
-            guard isAllowedHost, isSuccess else { return }
+            guard isSuccess else { return }
             didFireSuccess = true
             DispatchQueue.main.async { self.onSuccess?() }
+        }
+
+        /// Exact host or proper subdomain only.
+        /// Rejects suffix tricks like `evilpay.example.com` matching `pay.example.com`.
+        private static func hostIsAllowlisted(_ host: String, allowlist: [String]) -> Bool {
+            guard !host.isEmpty else { return false }
+            for entry in allowlist {
+                if host == entry { return true }
+                if host.hasSuffix("." + entry) { return true }
+            }
+            return false
         }
     }
 }

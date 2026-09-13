@@ -2,6 +2,14 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.11.105] — 2026-09-13
+
+### Checkout host allowlist hardening (build 105)
+
+- External WebView `/success` matches only exact host or proper subdomain (no raw `hasSuffix`)
+- Requires `https`; navigation remains a wait/poll signal — backend status is still authoritative
+- RevenueCat `nonSubscriptions` API shape fix for current SDK
+
 ## [1.0.11.104] — 2026-09-13
 
 ### Resilient Apple credit UX (build 104)

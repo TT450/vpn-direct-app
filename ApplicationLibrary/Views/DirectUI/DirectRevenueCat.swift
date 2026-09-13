@@ -158,20 +158,19 @@ public enum DirectRevenueCat {
     public static func creditPurchases(from info: CustomerInfo) -> [DirectPendingAppleCredits.Record] {
         var out: [DirectPendingAppleCredits.Record] = []
         let appUser = info.originalAppUserId
-        for (productID, list) in info.nonSubscriptions {
+        for tx in info.nonSubscriptions {
+            let productID = tx.productIdentifier
             guard creditProductIDs.contains(productID) else { continue }
-            for tx in list {
-                let id = tx.transactionIdentifier
-                guard !id.isEmpty else { continue }
-                out.append(
-                    DirectPendingAppleCredits.Record(
-                        productID: productID,
-                        transactionID: id,
-                        appUserID: appUser,
-                        purchasedAt: tx.purchaseDate
-                    )
+            let id = tx.transactionIdentifier
+            guard !id.isEmpty else { continue }
+            out.append(
+                DirectPendingAppleCredits.Record(
+                    productID: productID,
+                    transactionID: id,
+                    appUserID: appUser,
+                    purchasedAt: tx.purchaseDate
                 )
-            }
+            )
         }
         return out.sorted { $0.purchasedAt > $1.purchasedAt }
     }

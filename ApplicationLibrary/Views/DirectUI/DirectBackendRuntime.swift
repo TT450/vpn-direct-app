@@ -57,7 +57,10 @@ public enum DirectBackendRuntime {
     /// Optional Google OAuth client id (filled by local hooks). Empty = Google button shows setup error.
     public static var googleClientID: String = ""
     public static var googleRedirectURI: String = "vpndirect:/oauth2redirect/google"
-    /// Hosts/suffixes where external checkout WebView `/success` counts as paid (local hooks).
+    /// Allowed hosts for external-checkout WebView `/success` **return signal** only.
+    /// Exact host or proper subdomain (`a.b.example.com` for `example.com`).
+    /// Never treat this navigation as payment proof — backend status is authoritative.
+    /// Local hooks fill real hosts; empty on public GitHub.
     public static var checkoutSuccessHostSuffixes: [String] = []
 
     /// Installs local-only hooks when present; no-op on public clones.
