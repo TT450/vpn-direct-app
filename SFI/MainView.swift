@@ -33,6 +33,7 @@ struct MainView: View {
         }
         .task {
             HapticManager.shared.prepare()
+            HapticManager.shared.play(.loading)
             try? await Task.sleep(nanoseconds: splashDurationMilliseconds * 1_000_000)
             withAnimation(.easeInOut(duration: 0.42)) {
                 isShowingSplash = false
@@ -52,6 +53,7 @@ struct MainView: View {
             .onChangeCompat(of: scenePhase) { newValue in
                 if newValue == .active {
                     environments.postReload()
+                    HapticManager.shared.play(.dataArrived)
                 }
             }
             .environment(\.selection, $selection)
@@ -60,6 +62,9 @@ struct MainView: View {
             .environment(\.profileEditor, profileEditor)
             .handlesExternalEvents(preferring: [], allowing: ["*"])
             .onOpenURL(perform: openURL)
+            // Safety net for controls that intentionally use another ButtonStyle.
+            // Existing semantic haptics still layer on top for important actions.
+            .hapticTouchSurface()
     }
 
     private func openURL(url: URL) {
@@ -73,6 +78,7 @@ struct MainView: View {
         if VPNDirectDeepLink.isBotAuthURL(url) {
             VPNDirectDeepLink.markPendingBotAuth()
             NotificationCenter.default.post(name: .vpnDirectOpenBotAuth, object: nil)
+            HapticManager.shared.play(.navigation)
             return
         }
         // Merchant return → payment success / fail screens.
@@ -80,9 +86,11 @@ struct MainView: View {
             if paid {
                 VPNDirectDeepLink.markPendingPaySuccess()
                 NotificationCenter.default.post(name: .vpnDirectPaySuccess, object: nil)
+                HapticManager.shared.play(.purchaseCompleted)
             } else {
                 VPNDirectDeepLink.markPendingPayFail()
                 NotificationCenter.default.post(name: .vpnDirectPayFail, object: nil)
+                HapticManager.shared.play(.error)
             }
             return
         }
@@ -90,24 +98,31 @@ struct MainView: View {
         if VPNDirectDeepLink.isPlansURL(url) {
             VPNDirectDeepLink.markPendingPlans()
             NotificationCenter.default.post(name: .vpnDirectOpenPlans, object: nil)
+            HapticManager.shared.play(.navigation)
             return
         }
         if VPNDirectDeepLink.isAccountURL(url) {
             VPNDirectDeepLink.markPendingAccount()
             NotificationCenter.default.post(name: .vpnDirectOpenAccount, object: nil)
+            HapticManager.shared.play(.navigation)
             return
         }
         let absolute = AutoSubscriptionImporter.normalizeImportURL(url.absoluteString)
         if VLESSConfigBuilder.isVLESSLink(absolute) || SubscriptionConfigBuilder.isHTTPURL(absolute) {
+            HapticManager.shared.play(.loading)
             Task {
                 do {
                     if let profile = try await AutoSubscriptionImporter.importIfNeeded(url: absolute, environments: environments) {
                         environments.profileUpdate.send()
                         _ = profile
+                        await MainActor.run {
+                            HapticManager.shared.play(.imported)
+                        }
                     }
                 } catch {
                     await MainActor.run {
                         alert = AlertState(action: "import subscription", error: error)
+                        HapticManager.shared.play(.error)
                     }
                 }
             }
@@ -117,6 +132,7 @@ struct MainView: View {
         if url.scheme?.lowercased() == "vpndirect", url.host?.lowercased() == "add" {
             selection = .dashboard
             alert = AlertState(errorMessage: String(localized: "Paste a full vless:// or https:// subscription link."))
+            HapticManager.shared.play(.warning)
             return
         }
         if url.host == "import-remote-profile" {
@@ -124,20 +140,26 @@ struct MainView: View {
             importRemoteProfile = LibboxParseRemoteProfileImportLink(url.absoluteString, &error)
             if let error {
                 alert = AlertState(action: "parse remote profile import link", error: error)
+                HapticManager.shared.play(.error)
+            } else {
+                HapticManager.shared.play(.imported)
             }
         } else if url.pathExtension == "bpf" {
             do {
                 importProfile = try url.withSecurityScopedAccess {
                     try .from(Data(contentsOf: url))
                 }
+                HapticManager.shared.play(.imported)
             } catch {
                 alert = AlertState(action: "import profile from URL", error: error)
+                HapticManager.shared.play(.error)
             }
         } else if url.scheme?.lowercased() == "vpndirect" {
             // Unknown vpndirect:// path — open app quietly (no error alert).
             return
         } else {
             alert = AlertState(errorMessage: String(localized: "Handled unknown URL \(url.absoluteString)"))
+            HapticManager.shared.play(.warning)
         }
     }
 }
