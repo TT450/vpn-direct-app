@@ -1,49 +1,37 @@
 # VPN Direct Documentation
 
-Engineering docs map for **v1.0.11.63** (marketing **1.0.11**, TestFlight build **63**). Keep in sync with the GitHub README quick links.
+Engineering documentation for the **VPN Direct HarmonyOS NEXT platform** and its shared Core.
 
 ## Start here
 
-| Document | Use it for |
+| Document | Purpose |
 | --- | --- |
-| [`../WHATS_NEW.md`](../WHATS_NEW.md) | Latest release notes (`v1.0.11.63`) |
-| [`../CHANGELOG.md`](../CHANGELOG.md) | Full version history |
-| [`TESTFLIGHT.md`](TESTFLIGHT.md) | TestFlight beta + inviting testers (build **63**) |
-| [`core/ARCHITECTURE.md`](core/ARCHITECTURE.md) | Core + Apple import pipeline (current) |
-| [`core/BUILDING.md`](core/BUILDING.md) | Reproducing Libbox and Apple builds |
+| [`../README.md`](../README.md) | Project overview and architecture |
+| [`harmony/ARCHITECTURE.md`](harmony/ARCHITECTURE.md) | HarmonyOS platform architecture and lifecycle |
+| [`harmony/BUILDING.md`](harmony/BUILDING.md) | DevEco, native Core and HAP build guide |
+| [`harmony/DEVICE_QUALIFICATION.md`](harmony/DEVICE_QUALIFICATION.md) | Real-device acceptance checklist |
+| [`core/ARCHITECTURE.md`](core/ARCHITECTURE.md) | VPN Direct Core architecture |
+| [`core/BUILDING.md`](core/BUILDING.md) | Core pins and reproducible build process |
 | [`core/PROTOCOL_MATRIX.md`](core/PROTOCOL_MATRIX.md) | Authoritative protocol status |
-| [`../core/protocol-matrix.json`](../core/protocol-matrix.json) | Machine-readable matrix (CI / release gate) |
-| [`core/RELEASE_BLOCKER_LEDGER.md`](core/RELEASE_BLOCKER_LEDGER.md) | Open vs verified release blockers |
-| [`compatibility/README.md`](compatibility/README.md) | Panels, ecosystems, HTTP subscription quirks |
-| [`compatibility/COMPATIBILITY_MATRIX.md`](compatibility/COMPATIBILITY_MATRIX.md) | Panel × protocol support map |
-| [`battle/BATTLE_SOURCE_PLAN.md`](battle/BATTLE_SOURCE_PLAN.md) | Public harvest catalog plan |
-| [`device/IPHONE_QUALIFICATION.md`](device/IPHONE_QUALIFICATION.md) | Device evidence checklist |
-| [`device/IPHONE_INSTALL_2026-09-07.md`](device/IPHONE_INSTALL_2026-09-07.md) | Wi-Fi install recipe (SFI + `devicectl`) |
-| [`device/IPHONE_INSTALL_2026-09-08.md`](device/IPHONE_INSTALL_2026-09-08.md) | Wi-Fi install evidence (v1.0.10) |
-| [`device/IPHONE_INSTALL_2026-09-08_BUILD63.md`](device/IPHONE_INSTALL_2026-09-08_BUILD63.md) | TestFlight **1.0.11 (63)** upload evidence |
-| [`../interop/README.md`](../interop/README.md) | Interop lab scaffolds |
-| [`core/DONORS.md`](core/DONORS.md) | Upstream / donor source tracking |
-| [`core/LICENSE_AUDIT.md`](core/LICENSE_AUDIT.md) | Dependency / license notes |
-| [`../ROADMAP.md`](../ROADMAP.md) | Public product roadmap |
-| [`../SUPPORT.md`](../SUPPORT.md) | How to get help |
-| [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | PR / fixture / matrix rules |
+| [`../core/protocol-matrix.json`](../core/protocol-matrix.json) | Machine-readable protocol matrix |
+| [`compatibility/README.md`](compatibility/README.md) | Panels, subscriptions and protocol formats |
+| [`compatibility/COMPATIBILITY_MATRIX.md`](compatibility/COMPATIBILITY_MATRIX.md) | Compatibility status |
+| [`../CHANGELOG.md`](../CHANGELOG.md) | Project history |
+| [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Contribution and engineering rules |
+| [`../SECURITY.md`](../SECURITY.md) | Security reporting |
 
-## Supporting core notes
+## Platform vocabulary
 
-| Document | Use it for |
-| --- | --- |
-| [`core/REMOTES.md`](core/REMOTES.md) | Git remotes / submodule pins |
-| [`core/PANIC_BOUNDARY.md`](core/PANIC_BOUNDARY.md) | What must never crash the NE |
-| [`core/LEGACY_OUTBOUND_WRITERS.md`](core/LEGACY_OUTBOUND_WRITERS.md) | Remaining prebuilt-outbound writers |
-| [`core/REMEDIATION_EXECUTION_PLAN.md`](core/REMEDIATION_EXECUTION_PLAN.md) | Living remediation plan (REQ coverage) |
-| [`brand/README.md`](brand/README.md) | Brand assets |
+```text
+ArkUI → VpnExtensionAbility → TUN → N-API → VPN Direct Core → sing-box-lx
+```
 
-## Support vocabulary
+Source architecture and real-device qualification are tracked separately. A source implementation is not automatically `tested`.
+
+## Core status vocabulary
 
 ```text
 parsed → compiled → validated → interop-tested → device-tested → production (`tested`)
 ```
 
-A parser or builder alone is not proof of production support. Rows marked `parser+runtime` mean import + Core registration exist; live tunnel evidence is still required for `tested`.
-
-Historical one-shot audit/plan markdown from early Core 0.1 landings was removed in v1.0.10 — status lives in the matrix, ledger, and CHANGELOG.
+The protocol matrix remains the authority for Core feature status. Do not claim device support without real-device evidence.
