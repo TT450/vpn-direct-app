@@ -1,5 +1,6 @@
 import { DirectTheme } from './Theme';
 import { DirectBalanceParityHost } from './DirectBalanceParity';
+import { DirectBalanceTopUpParityV2 } from './DirectBalanceTopUpParityV2';
 import { DirectPlanParityV2Host } from './DirectPlanParityV2';
 import { DirectFullParityHost } from './DirectFullParity';
 import { DirectNativeFlowHost } from './DirectNativeFlows';
@@ -29,7 +30,9 @@ export struct DirectFlowHost {
     } else if ((this.flow >= DirectFlow.AuthLogin && this.flow <= DirectFlow.AuthSuccess) ||
       (this.flow >= DirectFlow.Security && this.flow <= DirectFlow.OnDemandSettings)) {
       DirectNativeFlowHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
-    } else if (this.flow === DirectFlow.Balance || this.flow === DirectFlow.BalanceTopUp) {
+    } else if (this.flow === DirectFlow.BalanceTopUp) {
+      DirectBalanceTopUpParityV2({ onClose: this.onClose, onFlow: this.onFlow });
+    } else if (this.flow === DirectFlow.Balance) {
       DirectBalanceParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     } else if (this.flow !== DirectFlow.None) {
       DirectFullParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
