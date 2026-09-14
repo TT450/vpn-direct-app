@@ -6,21 +6,28 @@ import { ManagementPage } from '../pages/ManagementPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { DirectFlow, DirectFlowHost } from '../ui/DirectFlows';
 import { DirectNativeFlowHost } from '../ui/DirectNativeFlows';
+import { DirectPrivacyDisclosure } from '../ui/DirectPrivacyDisclosure';
 
-export enum DirectTab {
-  Home = 0,
-  Locations = 1,
-  Management = 2,
-  Profile = 3
-}
+export enum DirectTab { Home = 0, Locations = 1, Management = 2, Profile = 3 }
 
 @Component
 export struct AppShell {
   @State private selectedTab: DirectTab = DirectTab.Home;
   @State private activeFlow: DirectFlow = DirectFlow.None;
+  @State private showPrivacyDisclosure: boolean = false;
+  @State private privacyAccepted: boolean = false;
   @Prop status: string = 'Disconnected';
   @Prop serverName: string = 'Авто';
   @Prop onToggle: () => void = () => {};
+
+  private requestConnect(): void {
+    if (!this.privacyAccepted) {
+      this.showPrivacyDisclosure = true;
+      DirectHaptics.navigation();
+      return;
+    }
+    this.onToggle();
+  }
 
   private usesNativePort(flow: DirectFlow): boolean {
     return flow === DirectFlow.Plans || flow === DirectFlow.Constructor || flow === DirectFlow.Payment ||
@@ -39,7 +46,7 @@ export struct AppShell {
           HomePage({
             status: this.status,
             serverName: this.serverName,
-            onToggle: this.onToggle,
+            onToggle: () => this.requestConnect(),
             onServerTap: () => { this.activeFlow = DirectFlow.ServerPicker; },
             onReport: () => { this.activeFlow = DirectFlow.ConnectionReport; },
             onProfiles: () => { this.activeFlow = DirectFlow.Profiles; }
@@ -51,7 +58,6 @@ export struct AppShell {
         } else {
           ProfilePage({ onFlow: (flow: DirectFlow) => this.activeFlow = flow });
         }
-
         Row() {
           this.tab('Главная', DirectTab.Home, 1);
           this.tab('Локации', DirectTab.Locations, 2);
@@ -64,19 +70,18 @@ export struct AppShell {
       if (this.activeFlow !== DirectFlow.None) {
         Column() {
           if (this.usesNativePort(this.activeFlow)) {
-            DirectNativeFlowHost({
-              flow: this.activeFlow,
-              onClose: () => this.activeFlow = DirectFlow.None,
-              onFlow: (flow: DirectFlow) => this.activeFlow = flow
-            });
+            DirectNativeFlowHost({ flow: this.activeFlow, onClose: () => this.activeFlow = DirectFlow.None, onFlow: (flow: DirectFlow) => this.activeFlow = flow });
           } else {
-            DirectFlowHost({
-              flow: this.activeFlow,
-              onClose: () => this.activeFlow = DirectFlow.None,
-              onFlow: (flow: DirectFlow) => this.activeFlow = flow
-            });
+            DirectFlowHost({ flow: this.activeFlow, onClose: () => this.activeFlow = DirectFlow.None, onFlow: (flow: DirectFlow) => this.activeFlow = flow });
           }
         }.width('100%').height('100%').backgroundColor(DirectTheme.paper).zIndex(100);
+      }
+
+      if (this.showPrivacyDisclosure) {
+        DirectPrivacyDisclosure({
+          onAccept: () => { this.privacyAccepted = true; this.showPrivacyDisclosure = false; this.onToggle(); },
+          onDecline: () => { this.showPrivacyDisclosure = false; }
+        }).zIndex(200);
       }
     }.width('100%').height('100%');
   }
