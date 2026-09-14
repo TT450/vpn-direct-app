@@ -1,13 +1,11 @@
 import { vpnExtension } from '@kit.NetworkKit';
 import { Want, common } from '@kit.AbilityKit';
-import { promptAction, UIContext } from '@kit.ArkUI';
+import { UIContext, promptAction } from '@kit.ArkUI';
 import { AppShell } from '../app/AppShell';
 import { DirectVpnProfile, VpnProfileRepository } from '../vpn/VpnProfileRepository';
 import { ImportedSubscriptionStore } from '../vpn/ImportedSubscriptionStore';
 import { VpnServerSelection, SelectedVpnServer } from '../vpn/VpnServerSelection';
 import { VpnStateStore, VpnRuntimeState } from '../vpn/VpnStateStore';
-import { DirectPrivacyDisclosure } from '../ui/DirectPrivacyDisclosure';
-import { DirectPrivacyConsentStore } from '../model/DirectPrivacyConsentStore';
 
 @Entry
 @Component
@@ -15,7 +13,6 @@ struct Index {
   @State private status: string = 'Disconnected';
   @State private connecting: boolean = false;
   @State private serverName: string = 'Авто';
-  @State private showPrivacyDisclosure: boolean = false;
   private desiredServerId: string = 'auto';
   private activeServerId: string = '';
   private stateTimer: number = -1;
@@ -26,7 +23,6 @@ struct Index {
 
   aboutToAppear(): void {
     this.appContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    this.showPrivacyDisclosure = !DirectPrivacyConsentStore.accepted();
     AppStorage.setOrCreate<string>('vpn_status', this.status);
     AppStorage.setOrCreate<string>('vpn_server_name', this.serverName);
     AppStorage.setOrCreate<string>('vpn_server_country_code', '');
@@ -54,10 +50,7 @@ struct Index {
     if (this.appContext === undefined) return;
     const runtime: VpnRuntimeState | null = VpnStateStore.readFresh(this.appContext, 8000);
     if (runtime === null) {
-      if (this.status === 'Connected' || this.status === 'Disconnecting') {
-        this.status = 'Disconnected';
-        this.connecting = false;
-      }
+      if (this.status === 'Connected' || this.status === 'Disconnecting') { this.status = 'Disconnected'; this.connecting = false; }
       AppStorage.setOrCreate<string>('vpn_status', this.status);
       return;
     }
@@ -111,32 +104,17 @@ struct Index {
 
   private async connect(): Promise<void> {
     if (this.connecting || this.status === 'Connected' || this.status === 'Connecting') return;
-    if (!DirectPrivacyConsentStore.accepted()) {
-      this.showPrivacyDisclosure = true;
-      return;
-    }
-    this.connecting = true;
-    this.status = 'Connecting';
+    this.connecting = true; this.status = 'Connecting';
     try {
       const activeSub = ImportedSubscriptionStore.active();
-      if (activeSub !== null && activeSub.singBoxConfig.length === 0 && activeSub.url.length > 0) {
-        console.info('VPN Direct: fetching subscription config before connect…');
-        await ImportedSubscriptionStore.fetchAndApplyActiveUrl();
-      }
+      if (activeSub !== null && activeSub.singBoxConfig.length === 0 && activeSub.url.length > 0) await ImportedSubscriptionStore.fetchAndApplyActiveUrl();
       const ok: boolean = await this.connectTo(this.desiredServerId);
       if (!ok) {
         this.status = 'Connection failed';
-        try {
-          const uiCtx: UIContext = this.getUIContext();
-          uiCtx.getPromptAction().showToast({ message: 'Нет конфигурации VPN. Импортируйте подписку или войдите в аккаунт Direct.', duration: 5000 });
-        } catch {
-          promptAction.showToast({ message: 'Нет конфигурации VPN. Импортируйте подписку или войдите в аккаунт Direct.', duration: 5000 });
-        }
+        try { const uiCtx: UIContext = this.getUIContext(); uiCtx.getPromptAction().showToast({ message: 'Нет конфигурации VPN. Импортируйте подписку или войдите в аккаунт Direct.', duration: 5000 }); }
+        catch { promptAction.showToast({ message: 'Нет конфигурации VPN. Импортируйте подписку или войдите в аккаунт Direct.', duration: 5000 }); }
       }
-    } finally {
-      this.connecting = false;
-      this.syncRuntimeState();
-    }
+    } finally { this.connecting = false; this.syncRuntimeState(); }
   }
 
   private async disconnect(): Promise<boolean> {
@@ -148,11 +126,8 @@ struct Index {
       const stopped: boolean = await this.waitForState('Disconnected', 10000);
       if (!stopped) this.status = 'Disconnect failed';
       return stopped;
-    } catch (error) {
-      this.status = 'Disconnect failed';
-      console.error(`VPN Direct: stop failed ${JSON.stringify(error)}`);
-      return false;
-    } finally { this.connecting = false; this.syncRuntimeState(); }
+    } catch (error) { this.status = 'Disconnect failed'; console.error(`VPN Direct: stop failed ${JSON.stringify(error)}`); return false; }
+    finally { this.connecting = false; this.syncRuntimeState(); }
   }
 
   private async switchServer(targetServerId: string): Promise<void> {
@@ -163,28 +138,14 @@ struct Index {
     this.switchInProgress = false;
   }
 
-  private acceptPrivacyAndConnect(): void {
-    DirectPrivacyConsentStore.accept();
-    this.showPrivacyDisclosure = false;
-    void this.connect();
-  }
-
   build() {
-    Stack() {
-      AppShell({
-        status: this.status,
-        serverName: this.serverName,
-        onToggle: () => {
-          if (this.status === 'Connected' || this.status === 'Connecting') void this.disconnect();
-          else void this.connect();
-        }
-      });
-      if (this.showPrivacyDisclosure) {
-        DirectPrivacyDisclosure({
-          onAccept: () => this.acceptPrivacyAndConnect(),
-          onDecline: () => { this.showPrivacyDisclosure = false; }
-        });
+    AppShell({
+      status: this.status,
+      serverName: this.serverName,
+      onToggle: () => {
+        if (this.status === 'Connected' || this.status === 'Connecting') void this.disconnect();
+        else void this.connect();
       }
-    }.width('100%').height('100%');
+    });
   }
 }
