@@ -1,0 +1,37 @@
+name: HarmonyOS Release Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - harmony-os-app
+
+jobs:
+  release-gate:
+    # A self-hosted runner is intentional: DevEco/OpenHarmony SDK + the pinned
+    # OpenHarmony Go toolchain are not available on GitHub-hosted runners.
+    runs-on: [self-hosted, harmonyos]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Bootstrap pinned sing-box core
+        run: bash scripts/bootstrap_core.sh
+
+      - name: Build OpenHarmony ARM64 core
+        run: bash scripts/build_harmony_core.sh
+
+      - name: Run release gate and build HAP
+        env:
+          RUN_HVIGOR_BUILD: '1'
+        run: bash harmony/scripts/release_gate.sh
+
+      - name: Upload HAP artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vpn-direct-harmony-hap
+          path: harmony/**/*.hap
+          if-no-files-found: error
