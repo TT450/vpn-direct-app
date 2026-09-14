@@ -11,8 +11,10 @@ struct Index {
   @State private status: string = 'Disconnected';
   @State private connecting: boolean = false;
   @State private serverName: string = 'Авто';
-  private serverId: string = 'auto';
+  private desiredServerId: string = 'auto';
+  private activeServerId: string = '';
   private stateTimer: number = -1;
+  private switchInProgress: boolean = false;
   private appContext?: common.UIAbilityContext;
   private readonly bundleName: string = 'com.vpndirect.vpndirectapp';
   private readonly extensionName: string = 'VpnDirectVpnExtension';
@@ -36,8 +38,13 @@ struct Index {
 
   private syncSelectedServer(): void {
     const selected: SelectedVpnServer = VpnServerSelection.get();
-    this.serverId = selected.id;
+    this.desiredServerId = selected.id;
     this.serverName = selected.displayName;
+
+    if (this.status === 'Connected' && this.activeServerId.length > 0 &&
+      this.desiredServerId !== this.activeServerId && !this.switchInProgress) {
+      this.switchServer(this.desiredServerId);
+    }
   }
 
   private syncRuntimeState(): void {
@@ -74,49 +81,67 @@ struct Index {
     };
   }
 
+  private async connectTo(serverId: string): Promise<boolean> {
+    const profile: DirectVpnProfile | null = await VpnProfileRepository.getProfile(serverId);
+    if (profile === null || profile.singBoxConfig.length === 0) {
+      console.error(`VPN Direct: no real sing-box profile for ${serverId}`);
+      return false;
+    }
+    try {
+      await vpnExtension.startVpnExtensionAbility(this.vpnWant(profile));
+      this.activeServerId = serverId;
+      return true;
+    } catch (error) {
+      console.error(`VPN Direct: start failed ${JSON.stringify(error)}`);
+      return false;
+    }
+  }
+
   private async connect(): Promise<void> {
     if (this.connecting || this.status === 'Connected' || this.status === 'Connecting') return;
     this.connecting = true;
     this.status = 'Connecting';
     try {
-      const profile: DirectVpnProfile | null = await VpnProfileRepository.getProfile(this.serverId);
-      if (profile === null || profile.singBoxConfig.length === 0) {
+      if (!(await this.connectTo(this.desiredServerId))) {
         this.status = 'Connection failed';
-        this.connecting = false;
-        console.error('VPN Direct: no real sing-box profile is configured');
-        return;
       }
-      await vpnExtension.startVpnExtensionAbility(this.vpnWant(profile));
-    } catch (error) {
-      this.status = 'Connection failed';
-      console.error(`VPN Direct: start failed ${JSON.stringify(error)}`);
     } finally {
       this.connecting = false;
       this.syncRuntimeState();
     }
   }
 
-  private async disconnect(): Promise<void> {
-    if (this.connecting || this.status === 'Disconnected' || this.status === 'Disconnecting') return;
+  private async disconnect(): Promise<boolean> {
+    if (this.status === 'Disconnected' || this.status === 'Disconnecting') return true;
     this.connecting = true;
     this.status = 'Disconnecting';
     try {
       await vpnExtension.stopVpnExtensionAbility({ deviceId: '', bundleName: this.bundleName, abilityName: this.extensionName });
+      return true;
     } catch (error) {
       this.status = 'Disconnect failed';
       console.error(`VPN Direct: stop failed ${JSON.stringify(error)}`);
+      return false;
     } finally {
       this.connecting = false;
       this.syncRuntimeState();
     }
+  }
+
+  private async switchServer(targetServerId: string): Promise<void> {
+    if (this.switchInProgress || this.status !== 'Connected') return;
+    this.switchInProgress = true;
+    const disconnected: boolean = await this.disconnect();
+    if (disconnected && this.desiredServerId === targetServerId) {
+      await this.connect();
+    }
+    this.switchInProgress = false;
   }
 
   build() {
     AppShell({ status: this.status, serverName: this.serverName, onToggle: () => {
       if (this.status === 'Connected' || this.status === 'Connecting') this.disconnect();
       else this.connect();
-    }, onServerTap: () => {
-      if (this.status === 'Disconnected' || this.status === 'Connection failed' || this.status === 'Disconnect failed') this.syncSelectedServer();
-    } });
+    }, onServerTap: () => this.syncSelectedServer() });
   }
 }
