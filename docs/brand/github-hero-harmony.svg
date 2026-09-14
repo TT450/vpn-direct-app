@@ -1,0 +1,20 @@
+<svg width="1440" height="480" viewBox="0 0 1440 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="bg" x1="80" y1="30" x2="1360" y2="450" gradientUnits="userSpaceOnUse"><stop stop-color="#07111F"/><stop offset="0.55" stop-color="#0A1D2A"/><stop offset="1" stop-color="#071A16"/></linearGradient>
+<radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1110 110) rotate(140) scale(560 430)"><stop stop-color="#21C77A" stop-opacity="0.30"/><stop offset="1" stop-color="#21C77A" stop-opacity="0"/></radialGradient>
+<linearGradient id="line" x1="860" y1="70" x2="1300" y2="390" gradientUnits="userSpaceOnUse"><stop stop-color="#5EF0A5" stop-opacity="0.9"/><stop offset="1" stop-color="#5EF0A5" stop-opacity="0.12"/></linearGradient>
+</defs>
+<rect width="1440" height="480" rx="28" fill="url(#bg)"/><rect width="1440" height="480" rx="28" fill="url(#glow)"/>
+<g opacity="0.95"><circle cx="1110" cy="238" r="112" stroke="#174D3A" stroke-width="1.5"/><circle cx="1110" cy="238" r="176" stroke="#123B30" stroke-width="1.5"/><circle cx="1110" cy="238" r="238" stroke="#102E27" stroke-width="1.5"/></g>
+<g stroke="url(#line)" stroke-width="2"><path d="M884 132L996 200L1110 238L1218 166L1322 220"/><path d="M866 309L988 282L1110 238L1222 318L1338 284"/><path d="M996 200L988 282"/><path d="M1218 166L1222 318"/></g>
+<g fill="#63F3AA"><circle cx="884" cy="132" r="6"/><circle cx="996" cy="200" r="7"/><circle cx="988" cy="282" r="6"/><circle cx="1110" cy="238" r="11"/><circle cx="1218" cy="166" r="7"/><circle cx="1222" cy="318" r="6"/><circle cx="1322" cy="220" r="6"/><circle cx="1338" cy="284" r="5"/></g>
+<circle cx="1110" cy="238" r="27" fill="#09261C" stroke="#5EF0A5" stroke-width="2"/><path d="M1100 238L1107 245L1121 228" stroke="#C7FFE0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+<g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif">
+<text x="92" y="150" fill="#F8FAFC" font-size="66" font-weight="700" letter-spacing="-2">VPN Direct</text>
+<text x="94" y="204" fill="#6EF2AE" font-size="24" font-weight="600">Native HarmonyOS NEXT VPN client · VPN Direct Core</text>
+<text x="94" y="263" fill="#AABFC0" font-size="22">ArkTS · ArkUI · VpnExtensionAbility · Native Core</text>
+<text x="94" y="301" fill="#AABFC0" font-size="22">Open source. Reproducible. Multi-protocol.</text>
+<rect x="94" y="351" width="194" height="42" rx="21" fill="#0B3023" stroke="#185A42"/><text x="191" y="378" fill="#BFFFD9" font-size="17" text-anchor="middle" font-weight="600">HarmonyOS NEXT</text>
+<rect x="304" y="351" width="147" height="42" rx="21" fill="#0B3023" stroke="#185A42"/><text x="377.5" y="378" fill="#BFFFD9" font-size="17" text-anchor="middle" font-weight="600">VPN Direct Core</text>
+<rect x="467" y="351" width="117" height="42" rx="21" fill="#0B3023" stroke="#185A42"/><text x="525.5" y="378" fill="#BFFFD9" font-size="17" text-anchor="middle" font-weight="600">GPLv3</text>
+</g></svg>
