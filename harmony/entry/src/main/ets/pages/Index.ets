@@ -1,5 +1,5 @@
-import { common } from '@kit.AbilityKit';
 import { vpnExtension } from '@kit.NetworkKit';
+import { Want } from '@kit.AbilityKit';
 
 @Entry
 @Component
@@ -9,20 +9,18 @@ struct Index {
   private readonly bundleName: string = 'com.vpndirect.vpndirectapp';
   private readonly extensionName: string = 'VpnDirectVpnExtension';
 
-  private vpnWant(): common.StartOptions {
+  private vpnWant(): Want {
     return {
-      want: {
-        deviceId: '',
-        bundleName: this.bundleName,
-        abilityName: this.extensionName,
-        parameters: {
-          profileJson: JSON.stringify({
-            address: '172.19.0.2',
-            dns: '1.1.1.1',
-            mtu: 1400,
-            ipv6: true
-          })
-        }
+      deviceId: '',
+      bundleName: this.bundleName,
+      abilityName: this.extensionName,
+      parameters: {
+        profileJson: JSON.stringify({
+          address: '172.19.0.2',
+          dns: '1.1.1.1',
+          mtu: 1400,
+          ipv6: true
+        })
       }
     };
   }
@@ -34,7 +32,7 @@ struct Index {
     this.connecting = true;
     this.status = 'Connecting';
     try {
-      await vpnExtension.startVpnExtensionAbility(this.vpnWant().want);
+      await vpnExtension.startVpnExtensionAbility(this.vpnWant());
       this.status = 'Connected';
     } catch (error) {
       this.status = 'Connection failed';
@@ -51,7 +49,7 @@ struct Index {
     this.connecting = true;
     this.status = 'Disconnecting';
     try {
-      await vpnExtension.stopVpnExtensionAbility(this.vpnWant().want);
+      await vpnExtension.stopVpnExtensionAbility(this.vpnWant());
       this.status = 'Disconnected';
     } catch (error) {
       this.status = 'Disconnect failed';
