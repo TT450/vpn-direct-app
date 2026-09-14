@@ -14,6 +14,13 @@ export interface AuthRepository {
   logout(): Promise<void>;
 }
 
+export interface PlanSummary {
+  id: string;
+  name: string;
+  price: number;
+  durationDays: number;
+}
+
 export interface SubscriptionSummary {
   id: string;
   planName: string;
@@ -23,14 +30,22 @@ export interface SubscriptionSummary {
 
 export interface SubscriptionRepository {
   getCurrent(): Promise<SubscriptionSummary | null>;
-  getPlans(): Promise<Array<Record<string, Object>>>;
+  getPlans(): Promise<PlanSummary[]>;
   activate(planId: string): Promise<SubscriptionSummary>;
   cancel(subscriptionId: string): Promise<void>;
 }
 
+export interface BalanceTransaction {
+  id: string;
+  amount: number;
+  currency: string;
+  createdAt: number;
+  status: string;
+}
+
 export interface BalanceRepository {
   getBalance(): Promise<number>;
-  getHistory(): Promise<Array<Record<string, Object>>>;
+  getHistory(): Promise<BalanceTransaction[]>;
 }
 
 export interface ImportRepository {
@@ -38,8 +53,22 @@ export interface ImportRepository {
   importFile(path: string): Promise<DirectVpnProfile>;
 }
 
+export interface AccountSummary {
+  userId: string;
+  email?: string;
+  phone?: string;
+  displayName?: string;
+}
+
+export interface DeviceSummary {
+  id: string;
+  name: string;
+  lastSeenAt: number;
+  current: boolean;
+}
+
 export interface AccountRepository {
-  getAccount(): Promise<Record<string, Object>>;
-  getDevices(): Promise<Array<Record<string, Object>>>;
+  getAccount(): Promise<AccountSummary>;
+  getDevices(): Promise<DeviceSummary[]>;
   revokeDevice(deviceId: string): Promise<void>;
 }
