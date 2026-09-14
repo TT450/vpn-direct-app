@@ -1,6 +1,8 @@
-[
-  {
-    "name": "app_name",
-    "value": "VPN Direct"
-  }
-]
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "VPN Direct"
+    }
+  ]
+}
