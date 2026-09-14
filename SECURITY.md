@@ -1,25 +1,34 @@
 # Security Policy
 
-## Supported versions
+## Supported scope
 
-Security fixes are accepted against the current `main` branch of this repository (VPN Direct Apple client + Core 0.1 scripts).
+This branch covers the **VPN Direct HarmonyOS NEXT platform layer and shared VPN Direct Core**.
+
+Security fixes are accepted against the active development branch for the affected component.
 
 ## Reporting a vulnerability
 
-Please **do not** open a public GitHub issue for unfixed security problems.
+Please **do not** open a public GitHub issue for an unfixed security problem.
 
-Email the maintainers using a private channel associated with the VPN Direct / TheTochka project, or open a **private** security advisory on GitHub if enabled for this repository.
+Use a private security advisory on GitHub if enabled, or contact the maintainers through a private channel associated with the VPN Direct / TheTochka project.
 
 Include:
 
-- Affected component (app, Extension, Libbox build, parser)
-- Steps to reproduce
-- Impact assessment
-- Whether a fix is already proposed
+- affected component (ArkTS UI, `VpnExtensionAbility`, N-API bridge, native Core, parser/builder);
+- steps to reproduce;
+- impact assessment;
+- device and HarmonyOS/API version when relevant;
+- Core revision and build configuration when relevant;
+- whether a fix or mitigation is already proposed.
 
-We aim to acknowledge reports within a reasonable time and coordinate disclosure after a fix or mitigation is available.
+## Security boundaries
 
-## Scope notes
+- Subscription/configuration input is untrusted data.
+- Remote configuration must not download or replace executable native code.
+- Native libraries must be packaged and signed with the application.
+- Signing credentials and private backend material never belong in this repository.
+- Third-party VPN server misconfiguration is out of scope unless it exposes a vulnerability in VPN Direct itself.
 
-- Misconfiguration of third-party VPN servers is out of scope
-- Issues that only affect outdated / unreproducible Libbox binaries without source pins should include `core/VERSION` and build tags
+## Device reports
+
+For VPN runtime issues, include the HarmonyOS device model, OS/API level, application version, Core revision and relevant logs with secrets redacted.
