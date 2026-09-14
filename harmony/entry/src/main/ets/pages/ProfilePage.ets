@@ -6,7 +6,7 @@ import { SESSION_HAS_SUBSCRIPTION, SESSION_DISPLAY_NAME, SESSION_REMAINING_DAYS,
 import { DirectBackendRuntime } from '../backend/DirectBackendRuntime';
 
 interface UtilityRowData { mark: string; title: string; detail: string; accent: boolean; flow: DirectFlow; }
-interface SettingsRowData { title: string; detail: string; flow: DirectFlow; }
+interface SettingsRowData { title: string; detail: string; flow: DirectFlow; icon: DirectIconName; }
 interface LegalRowData { title: string; subtitle: string; flow: DirectFlow; }
 
 @Component
@@ -21,11 +21,11 @@ export struct ProfilePage {
   @State private deviceCount: number = 0;
 
   private readonly settingsRows: SettingsRowData[] = [
-    { title: 'Безопасность', detail: 'Автоподключение, DNS и российские сайты', flow: DirectFlow.Security },
-    { title: 'Подключение', detail: 'Протокол, failover и антиблокировка', flow: DirectFlow.Connection },
-    { title: 'Диагностика', detail: 'Проверка и автоматическое исправление', flow: DirectFlow.Diagnostics },
-    { title: 'Мои серверы', detail: 'Избранное и история подключений', flow: DirectFlow.Activity },
-    { title: 'Системные настройки', detail: 'Ядро, туннель и служебные параметры', flow: DirectFlow.SystemSettings }
+    { title: 'Безопасность', detail: 'Автоподключение, DNS и российские сайты', flow: DirectFlow.Security, icon: DirectIconName.Shield },
+    { title: 'Подключение', detail: 'Протокол, failover и антиблокировка', flow: DirectFlow.Connection, icon: DirectIconName.Connection },
+    { title: 'Диагностика', detail: 'Проверка и автоматическое исправление', flow: DirectFlow.Diagnostics, icon: DirectIconName.Waveform },
+    { title: 'Мои серверы', detail: 'Избранное и история подключений', flow: DirectFlow.Activity, icon: DirectIconName.Star },
+    { title: 'Системные настройки', detail: 'Ядро, туннель и служебные параметры', flow: DirectFlow.SystemSettings, icon: DirectIconName.SlidersHorizontal }
   ];
   private readonly legalRows: LegalRowData[] = [
     { title: 'Политика конфиденциальности', subtitle: 'Какие данные обрабатываются, зачем и как удаляются', flow: DirectFlow.Privacy },
@@ -36,12 +36,7 @@ export struct ProfilePage {
 
   aboutToAppear(): void { void this.loadDeviceCount(); }
   private async loadDeviceCount(): Promise<void> {
-    try {
-      const devices = await DirectBackendRuntime.fetchAccountDevices();
-      this.deviceCount = devices.length;
-    } catch {
-      this.deviceCount = 0;
-    }
+    try { this.deviceCount = (await DirectBackendRuntime.fetchAccountDevices()).length; } catch { this.deviceCount = 0; }
   }
   private protectedTime(): string {
     if (this.vpnStatus !== 'Connected' || this.connectedAt <= 0) return '00:00';
@@ -66,11 +61,7 @@ export struct ProfilePage {
         DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 14, color: DirectTheme.acid, weight: 1.6 });
       }.width('100%').height(DirectTheme.profileHeroHeight).padding({ left: 16, right: 16 }).backgroundColor(DirectTheme.ink).margin({ top: 28 }).onClick(() => { DirectHaptics.selection(); this.onFlow(this.displayName.length > 0 ? DirectFlow.Management : DirectFlow.AuthLogin); });
 
-      Row() {
-        this.profileStat('ПОДПИСОК', this.hasSubscription ? '01' : '00');
-        this.profileStat('УСТРОЙСТВ', String(Math.min(this.deviceCount, 99)).padStart(2, '0'));
-        this.profileStat('ЗАЩИЩЕНО', this.protectedTime());
-      }.width('100%').height(DirectTheme.profileStatHeight).border({ width: { bottom: 1 }, color: DirectTheme.line });
+      Row() { this.profileStat('ПОДПИСОК', this.hasSubscription ? '01' : '00'); this.profileStat('УСТРОЙСТВ', String(Math.min(this.deviceCount, 99)).padStart(2, '0')); this.profileStat('ЗАЩИЩЕНО', this.protectedTime()); }.width('100%').height(DirectTheme.profileStatHeight).border({ width: { bottom: 1 }, color: DirectTheme.line });
 
       this.sectionHeader('01', 'АККАУНТ');
       this.utilityRow('BAL', 'Баланс', this.balanceLabel(), true, DirectFlow.Balance);
@@ -91,6 +82,6 @@ export struct ProfilePage {
   @Builder profileStat(label: string, value: string) { Column() { Text(label).fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); Text(value).fontSize(16).fontWeight(600).fontColor(DirectTheme.ink).fontFamily('monospace').margin({ top: 7 }).maxLines(1); }.layoutWeight(1).height('100%').alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center).padding({ left: 12 }).border({ width: { left: 1 }, color: DirectTheme.line }); }
   @Builder sectionHeader(number: string, title: string) { Row() { Text(number).fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace'); Text(title).fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace').margin({ left: 8 }); Blank(); }.width('100%').height(36).margin({ top: 18 }).border({ width: { top: 1 }, color: DirectTheme.ink }); }
   @Builder utilityRow(mark: string, title: string, detail: string, accent: boolean, flow: DirectFlow) { Row() { Text(mark).fontSize(8).fontWeight(FontWeight.Bold).fontColor(accent ? DirectTheme.acid : DirectTheme.ink).fontFamily('monospace').width(42).height(42).textAlign(TextAlign.Center).backgroundColor(accent ? DirectTheme.ink : DirectTheme.fieldFill).border({ width: accent ? 0 : 1, color: DirectTheme.line }); Column() { Text(title).fontSize(13).fontWeight(600).fontColor(DirectTheme.ink); Text(detail).fontSize(10).fontColor(DirectTheme.muted).margin({ top: 4 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 12 }); DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 11, color: DirectTheme.ink, weight: 1.5 }); }.width('100%').constraintSize({ minHeight: DirectTheme.utilityRowMin }).border({ width: { bottom: 1 }, color: DirectTheme.line }).onClick(() => { DirectHaptics.selection(); this.onFlow(flow); }); }
-  @Builder settingsRow(row: SettingsRowData, index: number) { Row() { Text(String(index).padStart(2, '0')).fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); Column() { DirectIcon({ name: DirectIconName.ChevronRight, iconSize: 11, color: DirectTheme.muted, weight: 1.5 }); }.width(23).alignItems(HorizontalAlign.Center).margin({ left: 13 }); Column() { Text(row.title).fontSize(14).fontWeight(600).fontColor(DirectTheme.ink).maxLines(1); Text(row.detail).fontSize(10).fontColor(DirectTheme.muted).margin({ top: 4 }).maxLines(2); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 13 }); DirectIcon({ name: DirectIconName.ArrowRight, iconSize: 11, color: DirectTheme.ink, weight: 1.5 }); }.width('100%').height(DirectTheme.profileSettingsRow).border({ width: { bottom: 1 }, color: DirectTheme.line }).onClick(() => { DirectHaptics.selection(); this.onFlow(row.flow); }); }
+  @Builder settingsRow(row: SettingsRowData, index: number) { Row({ space: 13 }) { Text(String(index).padStart(2, '0')).fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace').width(21); DirectIcon({ name: row.icon, iconSize: 23, color: DirectTheme.ink, weight: 1.5 }); Column() { Text(row.title).fontSize(14).fontWeight(600).fontColor(DirectTheme.ink).maxLines(1); Text(row.detail).fontSize(10).fontColor(DirectTheme.muted).margin({ top: 4 }).maxLines(2); }.alignItems(HorizontalAlign.Start).layoutWeight(1); DirectIcon({ name: DirectIconName.ArrowRight, iconSize: 11, color: DirectTheme.ink, weight: 1.5 }); }.width('100%').height(DirectTheme.profileSettingsRow).border({ width: { bottom: 1 }, color: DirectTheme.line }).onClick(() => { DirectHaptics.selection(); this.onFlow(row.flow); }); }
   @Builder legalRow(row: LegalRowData) { Row() { Column() { DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 11, color: DirectTheme.muted, weight: 1.5 }); }.width(23).alignItems(HorizontalAlign.Center); Column() { Text(row.title).fontSize(13).fontWeight(600).fontColor(DirectTheme.ink); Text(row.subtitle).fontSize(10).fontColor(DirectTheme.muted).margin({ top: 4 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 13 }); DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 11, color: DirectTheme.muted, weight: 1.5 }); }.width('100%').constraintSize({ minHeight: 62 }).border({ width: { bottom: 1 }, color: DirectTheme.line }).onClick(() => { DirectHaptics.selection(); this.onFlow(row.flow); }); }
 }
