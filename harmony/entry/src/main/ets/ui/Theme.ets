@@ -47,11 +47,11 @@ export class DirectTheme {
   static readonly authBrandH: number = 42;
   static readonly authPrimaryHeight: number = 52;
 
-  // iOS uses explicit weights; keeping them centralized prevents accidental
-  // Bold substitutions where the source uses Semibold/Medium.
+  // ArkUI exposes Normal/Regular/Medium/Bold enum weights. iOS Semibold is
+  // represented by the numeric 600 weight for closer typographic parity.
   static readonly weightRegular: FontWeight = FontWeight.Normal;
   static readonly weightMedium: FontWeight = FontWeight.Medium;
-  static readonly weightSemibold: FontWeight = FontWeight.SemiBold;
+  static readonly weightSemibold: number = 600;
   static readonly weightBold: FontWeight = FontWeight.Bold;
 
   static readonly radiusSmall: number = 0;
