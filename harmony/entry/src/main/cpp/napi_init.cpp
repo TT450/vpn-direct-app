@@ -1,24 +1,22 @@
 #include <napi/native_api.h>
 
 #include <atomic>
+#include <dlfcn.h>
 #include <mutex>
 #include <string>
 
-// Public platform bridge only. The actual VPN Direct Core is linked by the
-// HarmonyOS Core build. No private endpoints, credentials, or downloadable
-// executable payloads belong here.
 namespace {
 std::mutex g_mutex;
 std::atomic<bool> g_running{false};
-int g_tun_fd = -1;
+void* g_core_handle = nullptr;
 
-// The Core ABI is deliberately optional at this stage. Weak symbols let the
-// platform adapter build before the real ARM64 Core artifact is linked. Once
-// the Core is linked, these symbols become the real implementation.
-extern "C" int vpndirect_harmony_start(int tun_fd, const char* profile_json) __attribute__((weak));
-extern "C" int vpndirect_harmony_stop() __attribute__((weak));
+using CoreStartFn = int (*)(int, const char*);
+using CoreStopFn = int (*)();
+CoreStartFn g_core_start = nullptr;
+CoreStopFn g_core_stop = nullptr;
 
 constexpr int kCoreNotLinked = -1000;
+constexpr const char* kCoreLibrary = "libvpndirect_engine.so";
 
 napi_value MakeInt(napi_env env, int value) {
   napi_value result;
@@ -26,11 +24,28 @@ napi_value MakeInt(napi_env env, int value) {
   return result;
 }
 
+bool LoadCore() {
+  if (g_core_handle != nullptr && g_core_start != nullptr && g_core_stop != nullptr) return true;
+
+  g_core_handle = dlopen(kCoreLibrary, RTLD_NOW | RTLD_LOCAL);
+  if (g_core_handle == nullptr) return false;
+
+  g_core_start = reinterpret_cast<CoreStartFn>(dlsym(g_core_handle, "vpndirect_harmony_start"));
+  g_core_stop = reinterpret_cast<CoreStopFn>(dlsym(g_core_handle, "vpndirect_harmony_stop"));
+  if (g_core_start == nullptr || g_core_stop == nullptr) {
+    dlclose(g_core_handle);
+    g_core_handle = nullptr;
+    g_core_start = nullptr;
+    g_core_stop = nullptr;
+    return false;
+  }
+  return true;
+}
+
 napi_value Start(napi_env env, napi_callback_info info) {
   size_t argc = 2;
   napi_value argv[2] = {nullptr, nullptr};
-  napi_status status = napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
-  if (status != napi_ok || argc != 2) {
+  if (napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr) != napi_ok || argc != 2) {
     return MakeInt(env, -22);
   }
 
@@ -43,48 +58,28 @@ napi_value Start(napi_env env, napi_callback_info info) {
   if (napi_get_value_string_utf8(env, argv[1], nullptr, 0, &length) != napi_ok) {
     return MakeInt(env, -22);
   }
-
   std::string profile(length, '\0');
   if (napi_get_value_string_utf8(env, argv[1], profile.data(), length + 1, &length) != napi_ok) {
     return MakeInt(env, -22);
   }
 
   std::lock_guard<std::mutex> lock(g_mutex);
-  if (g_running.load()) {
-    return MakeInt(env, -114);
-  }
+  if (g_running.load()) return MakeInt(env, -114);
+  if (!LoadCore()) return MakeInt(env, kCoreNotLinked);
 
-  if (vpndirect_harmony_start == nullptr) {
-    return MakeInt(env, kCoreNotLinked);
-  }
-
-  const int rc = vpndirect_harmony_start(tun_fd, profile.c_str());
-  if (rc == 0) {
-    g_tun_fd = tun_fd;
-    g_running.store(true);
-  }
+  const int rc = g_core_start(tun_fd, profile.c_str());
+  if (rc == 0) g_running.store(true);
   return MakeInt(env, rc);
 }
 
 napi_value Stop(napi_env env, napi_callback_info info) {
   (void)info;
   std::lock_guard<std::mutex> lock(g_mutex);
+  if (!g_running.load()) return MakeInt(env, 0);
+  if (g_core_stop == nullptr) return MakeInt(env, kCoreNotLinked);
 
-  if (!g_running.load()) {
-    return MakeInt(env, 0);
-  }
-
-  if (vpndirect_harmony_stop == nullptr) {
-    g_tun_fd = -1;
-    g_running.store(false);
-    return MakeInt(env, kCoreNotLinked);
-  }
-
-  const int rc = vpndirect_harmony_stop();
-  if (rc == 0) {
-    g_tun_fd = -1;
-    g_running.store(false);
-  }
+  const int rc = g_core_stop();
+  if (rc == 0) g_running.store(false);
   return MakeInt(env, rc);
 }
 } // namespace
