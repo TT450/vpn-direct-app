@@ -5,7 +5,7 @@ import { ManagementPage } from '../pages/ManagementPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { DirectFlow, DirectFlowHost } from '../ui/DirectFlows';
 
-/** Mirrors iOS AppTab exactly: four bottom tabs; all other SwiftUI destinations are detail flows. */
+/** Mirrors iOS AppTab exactly: four bottom tabs; every other DirectUI destination is a detail flow. */
 export enum DirectTab {
   Home = 0,
   Locations = 1,
@@ -20,13 +20,19 @@ export struct AppShell {
   @Prop status: string = 'Disconnected';
   @Prop serverName: string = 'Авто';
   @Prop onToggle: () => void = () => {};
-  @Prop onServerTap: () => void = () => {};
 
   build() {
     Stack() {
       Column() {
         if (this.selectedTab === DirectTab.Home) {
-          HomePage({ status: this.status, serverName: this.serverName, onToggle: this.onToggle, onServerTap: () => { this.activeFlow = DirectFlow.ServerPicker; } });
+          HomePage({
+            status: this.status,
+            serverName: this.serverName,
+            onToggle: this.onToggle,
+            onServerTap: () => { this.activeFlow = DirectFlow.ServerPicker; },
+            onReport: () => { this.activeFlow = DirectFlow.ConnectionReport; },
+            onProfiles: () => { this.activeFlow = DirectFlow.Profiles; }
+          });
         } else if (this.selectedTab === DirectTab.Locations) {
           LocationsPage();
         } else if (this.selectedTab === DirectTab.Management) {
@@ -34,12 +40,14 @@ export struct AppShell {
         } else {
           ProfilePage({ onFlow: (flow: DirectFlow) => this.activeFlow = flow });
         }
+
         Row() {
           this.tab('Главная', DirectTab.Home, 1);
           this.tab('Локации', DirectTab.Locations, 2);
           this.tab('Управление', DirectTab.Management, 3);
           this.tab('Профиль', DirectTab.Profile, 4);
-        }.width('100%').height(DirectTheme.tabBarHeight).backgroundColor(DirectTheme.paper).border({ width: { top: 1 }, color: DirectTheme.line });
+        }.width('100%').height(DirectTheme.tabBarHeight)
+          .backgroundColor(DirectTheme.paper).border({ width: { top: 1 }, color: DirectTheme.line });
       }.width('100%').height('100%').backgroundColor(DirectTheme.paper);
 
       if (this.activeFlow !== DirectFlow.None) {
@@ -57,8 +65,12 @@ export struct AppShell {
   @Builder
   tab(title: string, tab: DirectTab, index: number) {
     Column() {
-      Text(String(index).padStart(2, '0')).fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(this.selectedTab === tab ? DirectTheme.green : DirectTheme.muted).fontFamily('monospace');
-      Text(title).fontSize(11).fontWeight(this.selectedTab === tab ? FontWeight.Medium : FontWeight.Regular).fontColor(DirectTheme.ink).margin({ top: 3 });
-    }.layoutWeight(1).justifyContent(FlexAlign.Center).height('100%').backgroundColor(this.selectedTab === tab ? '#A8F069' : DirectTheme.paper).onClick(() => this.selectedTab = tab);
+      Text(String(index).padStart(2, '0')).fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold)
+        .fontColor(this.selectedTab === tab ? DirectTheme.green : DirectTheme.muted).fontFamily('monospace');
+      Text(title).fontSize(11).fontWeight(this.selectedTab === tab ? FontWeight.Medium : FontWeight.Regular)
+        .fontColor(DirectTheme.ink).margin({ top: 3 });
+    }.layoutWeight(1).justifyContent(FlexAlign.Center).height('100%')
+      .backgroundColor(this.selectedTab === tab ? DirectTheme.acid : DirectTheme.paper)
+      .onClick(() => { if (this.selectedTab !== tab) DirectHaptics.navigation(); this.selectedTab = tab; });
   }
 }
