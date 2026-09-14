@@ -1,4 +1,5 @@
 import { DirectTheme, DirectTypography } from '../ui/Theme';
+import { DirectHaptics } from '../ui/Haptics';
 import { HomePage } from '../pages/HomePage';
 import { LocationsPage } from '../pages/LocationsPage';
 import { ManagementPage } from '../pages/ManagementPage';
