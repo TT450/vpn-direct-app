@@ -2,7 +2,7 @@ import { DirectTheme, DirectTypography } from '../ui/Theme';
 import { DirectHaptics } from '../ui/Haptics';
 import { DirectFlow } from '../ui/DirectFlows';
 import { DirectIcon, DirectIconName } from '../ui/DirectIcons';
-import { SESSION_DISPLAY_NAME, SESSION_PLAN_NAME, SESSION_REMAINING_DAYS } from '../model/DirectSessionStore';
+import { SESSION_HAS_SUBSCRIPTION, SESSION_PLAN_NAME, SESSION_REMAINING_DAYS } from '../model/DirectSessionStore';
 import { ImportedSubscriptionStore, ImportedSubscription } from '../vpn/ImportedSubscriptionStore';
 
 /** Pixel port of DirectManagementPage. VPN Direct has one subscription model; no Free/Premium UI. */
@@ -10,7 +10,7 @@ import { ImportedSubscriptionStore, ImportedSubscription } from '../vpn/Imported
 export struct ManagementPage {
   onFlow: (flow: DirectFlow) => void = (_flow: DirectFlow) => {};
   onAddSubscription: () => void = () => {};
-  @StorageProp(SESSION_DISPLAY_NAME) private displayName: string = '';
+  @StorageProp(SESSION_HAS_SUBSCRIPTION) private hasSubscription: boolean = false;
   @StorageProp(SESSION_PLAN_NAME) private planName: string = '';
   @StorageProp(SESSION_REMAINING_DAYS) private remainingDays: number = 0;
   @State private importedSubs: ImportedSubscription[] = [];
@@ -21,9 +21,9 @@ export struct ManagementPage {
   aboutToAppear(): void { this.refreshImported(); }
   private refreshImported(): void { this.importedSubs = ImportedSubscriptionStore.list(); this.activeImportId = ImportedSubscriptionStore.activeId(); }
   private activateSub(sub: ImportedSubscription): void { ImportedSubscriptionStore.setActive(sub.id); this.activeImportId = sub.id; DirectHaptics.selection(); }
-  private hasPlan(): boolean { return this.planName.trim().length > 0 || this.displayName.trim().length > 0; }
+  private hasPlan(): boolean { return this.hasSubscription && this.planName.trim().length > 0; }
   private shownPlan(): string { return this.planName.trim().length > 0 ? this.planName.toUpperCase() : 'VPN DIRECT'; }
-  private planSummary(): string { return this.planName.trim().length > 0 ? `${this.planName} · VPN Direct` : `${this.displayName} · VPN Direct`; }
+  private planSummary(): string { return this.planName.trim().length > 0 ? `${this.planName} · VPN Direct` : 'VPN Direct'; }
 
   build() {
     Scroll() { Column() {
