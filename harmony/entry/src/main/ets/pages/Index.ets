@@ -40,7 +40,6 @@ struct Index {
     const selected: SelectedVpnServer = VpnServerSelection.get();
     this.desiredServerId = selected.id;
     this.serverName = selected.displayName;
-
     if (this.status === 'Connected' && this.activeServerId.length > 0 &&
       this.desiredServerId !== this.activeServerId && !this.switchInProgress) {
       this.switchServer(this.desiredServerId);
@@ -61,23 +60,26 @@ struct Index {
     }
   }
 
+  private async waitForState(expected: string, timeoutMs: number): Promise<boolean> {
+    const startedAt: number = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      if (this.appContext !== undefined) {
+        const runtime: VpnRuntimeState | null = VpnStateStore.read(this.appContext);
+        if (runtime !== null && runtime.state === expected) return true;
+      }
+      await new Promise<void>((resolve: () => void) => setTimeout(resolve, 100));
+    }
+    return false;
+  }
+
   private vpnWant(profile: DirectVpnProfile): Want {
     const statePath: string = this.appContext === undefined ? '' : VpnStateStore.path(this.appContext);
     return {
-      deviceId: '',
-      bundleName: this.bundleName,
-      abilityName: this.extensionName,
-      parameters: {
-        profileJson: JSON.stringify({
-          statePath,
-          singBoxConfig: profile.singBoxConfig,
-          address: profile.address,
-          ipv6Address: profile.ipv6Address,
-          dns: profile.dns,
-          mtu: profile.mtu,
-          ipv6: profile.ipv6
-        })
-      }
+      deviceId: '', bundleName: this.bundleName, abilityName: this.extensionName,
+      parameters: { profileJson: JSON.stringify({
+        statePath, singBoxConfig: profile.singBoxConfig, address: profile.address,
+        ipv6Address: profile.ipv6Address, dns: profile.dns, mtu: profile.mtu, ipv6: profile.ipv6
+      }) }
     };
   }
 
@@ -102,9 +104,7 @@ struct Index {
     this.connecting = true;
     this.status = 'Connecting';
     try {
-      if (!(await this.connectTo(this.desiredServerId))) {
-        this.status = 'Connection failed';
-      }
+      if (!(await this.connectTo(this.desiredServerId))) this.status = 'Connection failed';
     } finally {
       this.connecting = false;
       this.syncRuntimeState();
@@ -112,12 +112,15 @@ struct Index {
   }
 
   private async disconnect(): Promise<boolean> {
-    if (this.status === 'Disconnected' || this.status === 'Disconnecting') return true;
+    if (this.status === 'Disconnected') return true;
+    if (this.status === 'Disconnecting') return await this.waitForState('Disconnected', 10000);
     this.connecting = true;
     this.status = 'Disconnecting';
     try {
       await vpnExtension.stopVpnExtensionAbility({ deviceId: '', bundleName: this.bundleName, abilityName: this.extensionName });
-      return true;
+      const stopped: boolean = await this.waitForState('Disconnected', 10000);
+      if (!stopped) this.status = 'Disconnect failed';
+      return stopped;
     } catch (error) {
       this.status = 'Disconnect failed';
       console.error(`VPN Direct: stop failed ${JSON.stringify(error)}`);
@@ -132,9 +135,7 @@ struct Index {
     if (this.switchInProgress || this.status !== 'Connected') return;
     this.switchInProgress = true;
     const disconnected: boolean = await this.disconnect();
-    if (disconnected && this.desiredServerId === targetServerId) {
-      await this.connect();
-    }
+    if (disconnected && this.desiredServerId === targetServerId) await this.connect();
     this.switchInProgress = false;
   }
 
