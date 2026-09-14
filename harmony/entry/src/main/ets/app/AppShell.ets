@@ -5,8 +5,8 @@ import { LocationsPage } from '../pages/LocationsPage';
 import { ManagementPage } from '../pages/ManagementPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { DirectFlow, DirectFlowHost } from '../ui/DirectFlows';
+import { DirectNativeFlowHost } from '../ui/DirectNativeFlows';
 
-/** Mirrors iOS AppTab exactly: four bottom tabs; every other DirectUI destination is a detail flow. */
 export enum DirectTab {
   Home = 0,
   Locations = 1,
@@ -21,6 +21,16 @@ export struct AppShell {
   @Prop status: string = 'Disconnected';
   @Prop serverName: string = 'Авто';
   @Prop onToggle: () => void = () => {};
+
+  private usesNativePort(flow: DirectFlow): boolean {
+    return flow === DirectFlow.Plans || flow === DirectFlow.Constructor || flow === DirectFlow.Payment ||
+      flow === DirectFlow.AuthLogin || flow === DirectFlow.AuthEmail || flow === DirectFlow.AuthCode ||
+      flow === DirectFlow.AuthRegister || flow === DirectFlow.AuthRecovery || flow === DirectFlow.AuthBot ||
+      flow === DirectFlow.AuthPhone || flow === DirectFlow.AuthPhoneCode || flow === DirectFlow.AuthSuccess ||
+      flow === DirectFlow.Security || flow === DirectFlow.Connection || flow === DirectFlow.Diagnostics ||
+      flow === DirectFlow.Activity || flow === DirectFlow.SystemSettings || flow === DirectFlow.ApplicationSettings ||
+      flow === DirectFlow.CoreSettings || flow === DirectFlow.TunnelSettings || flow === DirectFlow.OnDemandSettings;
+  }
 
   build() {
     Stack() {
@@ -47,17 +57,25 @@ export struct AppShell {
           this.tab('Локации', DirectTab.Locations, 2);
           this.tab('Управление', DirectTab.Management, 3);
           this.tab('Профиль', DirectTab.Profile, 4);
-        }.width('100%').height(DirectTheme.tabBarHeight)
-          .backgroundColor(DirectTheme.paper).border({ width: { top: 1 }, color: DirectTheme.line });
+        }.width('100%').height(DirectTheme.tabBarHeight).backgroundColor(DirectTheme.paper)
+          .border({ width: { top: 1 }, color: DirectTheme.line });
       }.width('100%').height('100%').backgroundColor(DirectTheme.paper);
 
       if (this.activeFlow !== DirectFlow.None) {
         Column() {
-          DirectFlowHost({
-            flow: this.activeFlow,
-            onClose: () => this.activeFlow = DirectFlow.None,
-            onFlow: (flow: DirectFlow) => this.activeFlow = flow
-          });
+          if (this.usesNativePort(this.activeFlow)) {
+            DirectNativeFlowHost({
+              flow: this.activeFlow,
+              onClose: () => this.activeFlow = DirectFlow.None,
+              onFlow: (flow: DirectFlow) => this.activeFlow = flow
+            });
+          } else {
+            DirectFlowHost({
+              flow: this.activeFlow,
+              onClose: () => this.activeFlow = DirectFlow.None,
+              onFlow: (flow: DirectFlow) => this.activeFlow = flow
+            });
+          }
         }.width('100%').height('100%').backgroundColor(DirectTheme.paper).zIndex(100);
       }
     }.width('100%').height('100%');
