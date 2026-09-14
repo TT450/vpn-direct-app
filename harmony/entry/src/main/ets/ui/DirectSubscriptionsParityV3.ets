@@ -2,6 +2,7 @@ import { DirectTheme, DirectTypography } from './Theme';
 import { DirectHaptics } from './Haptics';
 import { DirectFlow } from './DirectFlowModel';
 import { ImportedSubscriptionStore, ImportedSubscription } from '../vpn/ImportedSubscriptionStore';
+import { SESSION_HAS_SUBSCRIPTION, SESSION_REMAINING_DAYS } from '../model/DirectSessionStore';
 
 @Component
 export struct DirectSubscriptionsParityV3 {
@@ -9,8 +10,8 @@ export struct DirectSubscriptionsParityV3 {
   onFlow: (flow: DirectFlow) => void = (_flow: DirectFlow) => {};
   @State items: ImportedSubscription[] = [];
   @State activeId: string = '';
-  @StorageProp('session_has_subscription') private hasDirect: boolean = false;
-  @StorageProp('session_remaining_days') private remainingDays: number = 0;
+  @StorageProp(SESSION_HAS_SUBSCRIPTION) private hasDirect: boolean = false;
+  @StorageProp(SESSION_REMAINING_DAYS) private remainingDays: number = 0;
 
   aboutToAppear(): void { this.reload(); }
   private reload(): void { this.items = ImportedSubscriptionStore.list(); this.activeId = ImportedSubscriptionStore.activeId(); }
@@ -26,7 +27,7 @@ export struct DirectSubscriptionsParityV3 {
         Column() { Text('VPN DIRECT').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace'); Text('Основной доступ не активирован').fontSize(17).fontWeight(600).fontColor(DirectTheme.white).margin({ top: 6 }); Text('Оформите тариф VPN Direct или добавьте внешнюю подписку.').fontSize(10).fontColor('#85FFFFFF').margin({ top: 5 }); }.width('100%').padding(16).backgroundColor(DirectTheme.ink).margin({ left: 20, right: 20, top: 18 }).onClick(() => this.onFlow(DirectFlow.Plans));
       }
       if (this.items.length > 0) {
-        Row() { Text('ДОБАВЛЕННЫЕ ПОДПИСКИ').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace'); Blank(); Text(String(this.items.length).padStart(2, '0')).fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); }.width('100%').height(36).padding({ left: 20, right: 20 }).margin({ top: 22 }).border({ width: { top: 1 }, color: DirectTheme.ink });
+        Row() { Text('ДОБАВЛЕННЫЕ ПОДПИСКИ').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace'); Blank(); Text(String(this.items.length)).fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); }.width('100%').height(36).padding({ left: 20, right: 20 }).margin({ top: 22 }).border({ width: { top: 1 }, color: DirectTheme.ink });
         ForEach(this.items, (item: ImportedSubscription) => this.row(item), (item: ImportedSubscription) => item.id);
       }
       Row() { Text('+ ДОБАВИТЬ ПОДПИСКУ').fontSize(10).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace'); Blank(); Text('→').fontSize(13).fontColor(DirectTheme.acid); }.width('100%').height(52).padding({ left: 15, right: 15 }).backgroundColor(DirectTheme.ink).margin({ left: 20, right: 20, top: 16 }).onClick(() => { DirectHaptics.navigation(); this.onFlow(DirectFlow.ImportText); });
