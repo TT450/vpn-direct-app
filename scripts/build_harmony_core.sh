@@ -31,7 +31,10 @@ export CC="${CC_BIN}"
 export CXX="${CXX_BIN}"
 
 cd "${SING_BOX_DIR}"
-TAGS="${VPN_DIRECT_GO_TAGS:-with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api}"
+# Keep this in sync with the client feature set pinned in core/VERSION. The
+# libbox command surface is part of the fork and is required by its current
+# experimental/libbox package.
+TAGS="${VPN_DIRECT_GO_TAGS:-with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_naive_outbound,with_clash_api,with_xhttp,with_awg,with_lx_idle_suspend,with_lx_command,with_openvpn,with_openconnect,with_tailscale,with_shadowsocksr}"
 LDFLAGS="${VPN_DIRECT_GO_LDFLAGS:--s -w -checklinkname=0}"
 
 cleanup() { rm -rf "${BUILD_DIR}"; }
