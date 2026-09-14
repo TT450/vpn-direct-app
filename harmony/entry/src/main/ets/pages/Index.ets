@@ -25,6 +25,7 @@ struct Index {
     this.appContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
     AppStorage.setOrCreate<string>('vpn_status', this.status);
     AppStorage.setOrCreate<string>('vpn_server_name', this.serverName);
+    AppStorage.setOrCreate<string>('vpn_server_country_code', '');
     this.syncSelectedServer();
     this.syncRuntimeState();
     this.stateTimer = setInterval(() => { this.syncSelectedServer(); this.syncRuntimeState(); }, 250);
@@ -39,6 +40,7 @@ struct Index {
     this.desiredServerId = selected.id;
     this.serverName = selected.displayName;
     AppStorage.setOrCreate<string>('vpn_server_name', this.serverName);
+    AppStorage.setOrCreate<string>('vpn_server_country_code', selected.countryCode ?? '');
     if (this.status === 'Connected' && this.activeServerId.length > 0 && this.desiredServerId !== this.activeServerId && !this.switchInProgress) {
       this.switchServer(this.desiredServerId);
     }
@@ -87,12 +89,10 @@ struct Index {
   }
 
   private async connectTo(serverId: string): Promise<boolean> {
-    // Ensure the active imported subscription is wired before attempting connection
     ImportedSubscriptionStore.wireProvider();
     const profile: DirectVpnProfile | null = await VpnProfileRepository.getProfile(serverId);
     if (profile === null || profile.singBoxConfig.length === 0) {
-      console.error(`VPN Direct: no real sing-box profile for "${serverId}". ` +
-        `Active subscription id: "${ImportedSubscriptionStore.activeId()}"`);
+      console.error(`VPN Direct: no real sing-box profile for "${serverId}". Active subscription id: "${ImportedSubscriptionStore.activeId()}"`);
       return false;
     }
     try {
@@ -110,7 +110,6 @@ struct Index {
     this.connecting = true;
     this.status = 'Connecting';
     try {
-      // If no subscription is active, try to fetch+apply any pending URL before connecting
       const activeSub = ImportedSubscriptionStore.active();
       if (activeSub !== null && activeSub.singBoxConfig.length === 0 && activeSub.url.length > 0) {
         console.info('VPN Direct: fetching subscription config before connect…');
@@ -119,19 +118,11 @@ struct Index {
       const ok: boolean = await this.connectTo(this.desiredServerId);
       if (!ok) {
         this.status = 'Connection failed';
-        // Surface user-facing message in Russian via UIContext to avoid deprecation warning
         try {
           const uiCtx: UIContext = this.getUIContext();
-          uiCtx.getPromptAction().showToast({
-            message: 'Нет конфигурации VPN. Импортируйте подписку или войдите в аккаунт Direct.',
-            duration: 5000
-          });
+          uiCtx.getPromptAction().showToast({ message: 'Нет конфигурации VPN. Импортируйте подписку или войдите в аккаунт Direct.', duration: 5000 });
         } catch {
-          // Fallback for early builds where getPromptAction is unavailable
-          promptAction.showToast({
-            message: 'Нет конфигурации VPN. Импортируйте подписку или войдите в аккаунт Direct.',
-            duration: 5000
-          });
+          promptAction.showToast({ message: 'Нет конфигурации VPN. Импортируйте подписку или войдите в аккаунт Direct.', duration: 5000 });
         }
       }
     } finally {
@@ -149,8 +140,11 @@ struct Index {
       const stopped: boolean = await this.waitForState('Disconnected', 10000);
       if (!stopped) this.status = 'Disconnect failed';
       return stopped;
-    } catch (error) { this.status = 'Disconnect failed'; console.error(`VPN Direct: stop failed ${JSON.stringify(error)}`); return false; }
-    finally { this.connecting = false; this.syncRuntimeState(); }
+    } catch (error) {
+      this.status = 'Disconnect failed';
+      console.error(`VPN Direct: stop failed ${JSON.stringify(error)}`);
+      return false;
+    } finally { this.connecting = false; this.syncRuntimeState(); }
   }
 
   private async switchServer(targetServerId: string): Promise<void> {
@@ -167,11 +161,8 @@ struct Index {
         status: this.status,
         serverName: this.serverName,
         onToggle: () => {
-          if (this.status === 'Connected' || this.status === 'Connecting') {
-            this.disconnect();
-          } else {
-            this.connect();
-          }
+          if (this.status === 'Connected' || this.status === 'Connecting') this.disconnect();
+          else this.connect();
         }
       });
     }.width('100%').height('100%');
