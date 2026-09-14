@@ -1,29 +1,32 @@
-import { DirectTheme, DirectTypography, DirectSpacing } from '../ui/Theme';
+import { DirectTheme, DirectTypography } from '../ui/Theme';
 
 @Component
 export struct PlansPage {
-  private readonly periods: string[] = ['1 месяц', '3 месяца', '6 месяцев', '12 месяцев'];
+  private readonly periods: string[] = ['1 МЕСЯЦ', '3 МЕСЯЦА', '6 МЕСЯЦЕВ', '12 МЕСЯЦЕВ'];
+  private readonly prices: string[] = ['249 ₽', '699 ₽', '1 399 ₽', '2 599 ₽'];
   @State private selected: number = 0;
 
   build() {
     Column() {
-      Text('Тарифы').fontSize(DirectTypography.title).fontWeight(FontWeight.Bold).fontColor(DirectTheme.textPrimary)
-        .width('100%').margin({ bottom: DirectSpacing.lg });
-      Text('Выберите срок сервиса').fontSize(DirectTypography.secondary).fontColor(DirectTheme.textSecondary)
-        .width('100%').margin({ bottom: DirectSpacing.lg });
+      Text('DIRECT / PLANS').fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace').width('100%');
+      Text('Тарифы').fontSize(DirectTypography.pageTitle).fontWeight(FontWeight.Medium).fontColor(DirectTheme.ink).width('100%').margin({ top: 7 });
+      Text('Выберите срок сервиса').fontSize(13).fontColor(DirectTheme.muted).width('100%').margin({ top: 4, bottom: 16 });
+
       ForEach(this.periods, (period: string, index: number) => {
         Row() {
-          Text(period).fontSize(DirectTypography.body).fontColor(DirectTheme.textPrimary);
+          Text(String(index + 1).padStart(2, '0')).fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace').width(22);
+          Rectangle().width(3).height(14).fill(index === this.selected ? DirectTheme.acid : DirectTheme.line).margin({ right: 10 });
+          Text(period).fontSize(13).fontWeight(FontWeight.Medium).fontColor(DirectTheme.ink).fontFamily('monospace');
           Blank();
-          Text(index === 0 ? '249 ₽' : index === 1 ? '699 ₽' : index === 2 ? '1 399 ₽' : '2 599 ₽')
-            .fontSize(DirectTypography.body).fontWeight(FontWeight.Bold).fontColor(DirectTheme.textPrimary);
-        }.width('100%').height(60).padding({ left: 16, right: 16 }).backgroundColor(this.selected === index ? DirectTheme.surfaceElevated : DirectTheme.surface)
-          .borderRadius(DirectTheme.radiusMedium).margin({ bottom: 10 }).onClick(() => this.selected = index);
+          Text(this.prices[index]).fontSize(13).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace');
+        }.width('100%').height(58).padding({ left: 12, right: 12 }).backgroundColor(index === this.selected ? DirectTheme.paper : DirectTheme.paper)
+          .border({ width: { top: 1, bottom: 1 }, color: index === this.selected ? DirectTheme.ink : DirectTheme.line })
+          .onClick(() => this.selected = index);
       });
+
       Blank();
-      Button('Продолжить').width('100%').height(DirectTheme.controlHeight).fontSize(DirectTypography.body)
-        .fontWeight(FontWeight.Bold).backgroundColor(DirectTheme.textPrimary).fontColor(DirectTheme.background)
-        .borderRadius(DirectTheme.radiusMedium);
-    }.width('100%').height('100%').padding({ left: DirectTheme.pageHorizontal, right: DirectTheme.pageHorizontal, top: 24, bottom: 24 }).backgroundColor(DirectTheme.background);
+      Button('ПРОДОЛЖИТЬ').width('100%').height(47).fontSize(10).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid)
+        .backgroundColor(DirectTheme.ink);
+    }.width('100%').height('100%').padding({ left: DirectTheme.pageHorizontal, right: DirectTheme.pageHorizontal, top: DirectTheme.pageTop, bottom: 24 }).backgroundColor(DirectTheme.paper);
   }
 }
