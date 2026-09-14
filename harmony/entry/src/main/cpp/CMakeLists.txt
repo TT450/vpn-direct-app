@@ -17,6 +17,7 @@ endif()
 add_library(vpndirect_engine SHARED IMPORTED GLOBAL)
 set_target_properties(vpndirect_engine PROPERTIES
     IMPORTED_LOCATION "${VPN_ENGINE_SO}"
+    IMPORTED_NO_SONAME TRUE
 )
 
 add_library(vpndirect_core SHARED
@@ -29,4 +30,13 @@ target_include_directories(vpndirect_core PRIVATE
 
 target_link_libraries(vpndirect_core PUBLIC
     vpndirect_engine
+)
+
+# DevEco packages native outputs from the CMake target directory. Explicitly
+# copy the imported engine beside libvpndirect_core.so so dlopen() resolves the
+# exact artifact that was validated by the core build gate.
+add_custom_command(TARGET vpndirect_core POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${VPN_ENGINE_SO}"
+        "$<TARGET_FILE_DIR:vpndirect_core>/libvpndirect_engine.so"
 )
