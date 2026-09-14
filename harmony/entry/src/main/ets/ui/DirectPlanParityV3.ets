@@ -4,7 +4,7 @@ import { DirectFlow } from './DirectFlowModel';
 import { DirectBackendRuntime } from '../backend/DirectBackendRuntime';
 
 interface PlanParityItem { id: string; name: string; subtitle: string; traffic: string; devices: string; badge: string; tariffId: number; price: string; }
-const DAYS: number[] = [7, 30, 90, 180, 365];
+const DAYS: number[] = [30, 90, 180, 270, 365];
 const FALLBACK: PlanParityItem[] = [
   { id: 'start', name: 'START', subtitle: 'Для одного устройства', traffic: '100 GB', devices: '1', badge: '', tariffId: -1, price: '—' },
   { id: 'plus', name: 'PLUS', subtitle: 'Оптимальный вариант', traffic: '300 GB', devices: '3', badge: 'ПОПУЛЯРНЫЙ', tariffId: -1, price: '—' },
@@ -15,7 +15,8 @@ const FALLBACK: PlanParityItem[] = [
 function obj(row: Object, key: string): Object | undefined { return (row as Record<string, Object>)[key]; }
 function text(row: Object, key: string): string { const v = obj(row, key); return typeof v === 'string' ? v : ''; }
 function number(row: Object, key: string): number { const v = obj(row, key); return typeof v === 'number' && !Number.isNaN(v) ? v : -1; }
-function daysTitle(days: number): string { if (days === 7) return '7 дней'; if (days === 30) return '1 мес.'; if (days === 90) return '3 мес.'; if (days === 180) return '6 мес.'; return '1 год'; }
+function daysTitle(days: number): string { if (days === 30) return '1 мес.'; if (days === 90) return '3 мес.'; if (days === 180) return '6 мес.'; if (days === 270) return '9 мес.'; return '1 год'; }
+function priceSuffix(days: number): string { if (days === 30) return 'ЗА МЕСЯЦ'; if (days === 90) return 'ЗА 3 МЕС'; if (days === 180) return 'ЗА 6 МЕС'; if (days === 270) return 'ЗА 9 МЕС'; return 'ЗА ГОД'; }
 
 @Component
 export struct DirectPlanParityV3Host {
@@ -29,7 +30,7 @@ export struct DirectPlanParityV3Host {
 struct DirectPlansParityV3 {
   onClose: () => void = () => {};
   onFlow: (flow: DirectFlow) => void = (_flow: DirectFlow) => {};
-  @State periodIndex: number = 1;
+  @State periodIndex: number = 0;
   @State plans: PlanParityItem[] = FALLBACK;
   aboutToAppear(): void { void this.loadCatalog(); }
   private async loadCatalog(): Promise<void> {
@@ -46,7 +47,11 @@ struct DirectPlansParityV3 {
     } catch { }
   }
   private choose(plan: PlanParityItem): void {
-    AppStorage.setOrCreate<string>('pending_plan_name', plan.name); AppStorage.setOrCreate<string>('pending_plan_price', plan.price); AppStorage.setOrCreate<number>('pending_plan_id', plan.tariffId); AppStorage.setOrCreate<number>('pending_plan_days', DAYS[this.periodIndex]);
+    const days = DAYS[this.periodIndex];
+    AppStorage.setOrCreate<string>('pending_plan_name', plan.name);
+    AppStorage.setOrCreate<string>('pending_plan_price', plan.price);
+    AppStorage.setOrCreate<number>('pending_plan_id', plan.tariffId);
+    AppStorage.setOrCreate<number>('pending_plan_days', days);
     DirectHaptics.selection(); this.onFlow(DirectFlow.Payment);
   }
   build() {
@@ -60,7 +65,7 @@ struct DirectPlansParityV3 {
   }
   @Builder private card(plan: PlanParityItem) {
     Column() {
-      Row() { Column() { Row() { Text(plan.name).fontSize(20).fontWeight(600).fontColor(DirectTheme.ink).fontFamily('monospace'); if (plan.badge.length > 0) Text(plan.badge).fontSize(6).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace').padding({ left: 6, right: 6 }).height(20).backgroundColor(DirectTheme.acid).margin({ left: 7 }); }.height(20); Text(plan.subtitle).fontSize(9).fontColor(DirectTheme.muted).margin({ top: 4 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1); Column() { Text(plan.price).fontSize(18).fontWeight(600).fontColor(DirectTheme.ink).fontFamily('monospace'); Text(` / ${daysTitle(DAYS[this.periodIndex])}`).fontSize(9).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 2 }); }.alignItems(HorizontalAlign.End); }.width('100%');
+      Row() { Column() { Row() { Text(plan.name).fontSize(20).fontWeight(600).fontColor(DirectTheme.ink).fontFamily('monospace'); if (plan.badge.length > 0) Text(plan.badge).fontSize(6).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace').padding({ left: 6, right: 6 }).height(20).backgroundColor(DirectTheme.acid).margin({ left: 7 }); }.height(20); Text(plan.subtitle).fontSize(9).fontColor(DirectTheme.muted).margin({ top: 4 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1); Column() { Text(plan.price).fontSize(18).fontWeight(600).fontColor(DirectTheme.ink).fontFamily('monospace'); Text(priceSuffix(DAYS[this.periodIndex])).fontSize(6.5).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.End); }.width('100%');
       Row() { this.fact('ТРАФИК', plan.traffic); this.fact('УСТРОЙСТВА', plan.devices); this.fact('ДНИ', String(DAYS[this.periodIndex])); }.width('100%').padding({ top: 11, bottom: 11 }).border({ width: { top: 1 }, color: DirectTheme.line }).margin({ top: 11 });
       Row() { Text('КУПИТЬ').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace'); Blank(); Text('→').fontSize(12).fontColor(DirectTheme.acid); }.width('100%').height(44).padding({ left: 13, right: 13 }).backgroundColor(DirectTheme.ink).onClick(() => this.choose(plan));
     }.width('100%').padding(14).border({ width: plan.id === 'plus' ? 1.5 : 1, color: plan.id === 'plus' ? DirectTheme.ink : DirectTheme.line }).margin({ bottom: 10 });
