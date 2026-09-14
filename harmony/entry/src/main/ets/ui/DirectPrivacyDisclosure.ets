@@ -3,8 +3,8 @@ import { DirectHaptics } from './Haptics';
 
 @Component
 export struct DirectPrivacyDisclosure {
-  @Prop onAccept: () => void = () => {};
-  @Prop onDecline: () => void = () => {};
+  onAccept: () => void = () => {};
+  onDecline: () => void = () => {};
 
   build() {
     Stack() {
@@ -43,7 +43,7 @@ export struct DirectPrivacyDisclosure {
             .onClick(() => { DirectHaptics.success(); this.onAccept(); });
         }.width('100%').border({ width: { top: 1 }, color: '#24FFFFFF' });
       }.width('100%').height('100%').backgroundColor(DirectTheme.ink).border({ width: 1, color: '#B5F069' });
-      Rectangle().width('100%').height(3).fill(DirectTheme.acid).alignRules({ top: { anchor: '__container__', align: VerticalAlign.Top } });
+      Row().width('100%').height(3).backgroundColor(DirectTheme.acid).alignRules({ top: { anchor: '__container__', align: VerticalAlign.Top } });
     }.width('100%').height('100%').padding(20).backgroundColor('#38000000');
   }
 
@@ -63,7 +63,7 @@ export struct DirectPrivacyDisclosure {
     Row() {
       Text(title).fontSize(11).fontWeight(FontWeight.Medium).fontColor(DirectTheme.acid).layoutWeight(1);
       Text('↗').fontSize(10).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid);
-    }.width('100%').minHeight(36).padding({ left: 12, right: 12 }).border({ width: 1, color: '#24141714' }).onClick(() => { DirectHaptics.navigation(); this.open(url); });
+    }.width('100%').constraintSize({ minHeight: 36 }).padding({ left: 12, right: 12 }).border({ width: 1, color: '#24141714' }).onClick(() => { DirectHaptics.navigation(); this.open(url); });
   }
 
   private open(url: string) {

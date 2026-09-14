@@ -29,6 +29,8 @@ target_include_directories(vpndirect_core PRIVATE
 )
 
 target_link_libraries(vpndirect_core PUBLIC
+    ace_napi.z
+    dl
     vpndirect_engine
 )
 

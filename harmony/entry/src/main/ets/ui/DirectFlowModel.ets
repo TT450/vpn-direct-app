@@ -3,6 +3,8 @@ export enum DirectFlow {
   AuthLogin, AuthEmail, AuthCode, AuthRegister, AuthRecovery, AuthBot, AuthPhone, AuthPhoneCode, AuthSuccess,
   Plans, Constructor, Payment, PaymentProcessing, PaymentWaiting, PaymentCancelled, PaymentError, PaymentSuccess,
   Balance, BalanceTopUp, Management, Subscription, Security, Connection, Diagnostics, Activity, SystemSettings, About,
-  ServiceLog, ApplicationSettings, CoreSettings, TunnelSettings, OnDemandSettings, ImportFile, ImportText, Legal, Privacy,
+  ServiceLog, ApplicationSettings, CoreSettings, TunnelSettings, OnDemandSettings,
+  ImportFile, ImportText, ImportClipboard, ImportConfigText,
+  Legal, Privacy,
   Account, Devices, PaymentHistory
 }

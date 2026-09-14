@@ -15,6 +15,10 @@
     {
       "name": "vpn_extension_desc",
       "value": "VPN Direct network tunnel extension"
+    },
+    {
+      "name": "pasteboard_reason",
+      "value": "Чтение буфера обмена для импорта ссылки подписки VPN"
     }
   ]
 }

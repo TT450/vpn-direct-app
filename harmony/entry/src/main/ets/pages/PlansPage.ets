@@ -9,13 +9,13 @@ export struct PlansPage {
   build() {
     Column() {
       Text('DIRECT / PLANS').fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace').width('100%');
-      Text('Тарифы').fontSize(DirectTypography.pageTitle).fontWeight(FontWeight.Medium).fontColor(DirectTheme.ink).width('100%').margin({ top: 7 });
+      Text('Тарифы').fontSize(DirectTypography.pageTitle).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).width('100%').margin({ top: 7 });
       Text('Выберите срок сервиса').fontSize(13).fontColor(DirectTheme.muted).width('100%').margin({ top: 4, bottom: 16 });
 
       ForEach(this.periods, (period: string, index: number) => {
         Row() {
           Text(String(index + 1).padStart(2, '0')).fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace').width(22);
-          Rectangle().width(3).height(14).fill(index === this.selected ? DirectTheme.acid : DirectTheme.line).margin({ right: 10 });
+          Row().width(3).height(14).backgroundColor(index === this.selected ? DirectTheme.acid : DirectTheme.line).margin({ right: 10 });
           Text(period).fontSize(13).fontWeight(FontWeight.Medium).fontColor(DirectTheme.ink).fontFamily('monospace');
           Blank();
           Text(this.prices[index]).fontSize(13).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace');

@@ -1,6 +1,7 @@
-import { vpnExtension, VpnExtensionAbility } from '@kit.NetworkKit';
+import { connection, vpnExtension, VpnExtensionAbility } from '@kit.NetworkKit';
 import { Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { HarmonyCoreBridge } from './HarmonyCoreBridge';
 
 interface VpnProfileEnvelope {
@@ -11,6 +12,16 @@ interface VpnProfileEnvelope {
   ipv6?: boolean;
   statePath?: string;
   singBoxConfig?: string;
+}
+
+interface CoreEnvelope {
+  statePath: string;
+  singBoxConfig: string;
+  address: string;
+  ipv6Address: string;
+  dns: string;
+  mtu: number;
+  ipv6: boolean;
 }
 
 export default class VpnDirectVpnExtension extends VpnExtensionAbility {
@@ -27,7 +38,7 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
 
     const rawProfile = want.parameters?.['profileJson'];
     if (typeof rawProfile === 'string' && rawProfile.length > 0) {
-      this.start(rawProfile).catch((error) => {
+      this.start(rawProfile).catch((error: BusinessError) => {
         hilog.error(0xD1, 'VPNDirect', 'VPN start failed: %{public}s', JSON.stringify(error));
         this.stop().catch(() => undefined);
       });
@@ -41,7 +52,8 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
     try {
       profile = JSON.parse(rawProfileJson) as VpnProfileEnvelope;
     } catch (error) {
-      hilog.error(0xD1, 'VPNDirect', 'Invalid profile envelope: %{public}s', JSON.stringify(error));
+      const err = error as BusinessError;
+      hilog.error(0xD1, 'VPNDirect', 'Invalid profile envelope: %{public}s', JSON.stringify(err));
       return;
     }
 
@@ -58,39 +70,52 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
     const mtu: number = profile.mtu ?? 1400;
     const ipv6: boolean = profile.ipv6 ?? true;
 
-    const addresses = [
-      { address: { address, family: 1 }, prefixLength: 32 }
-    ];
-    const routes = [{
+    const v4Net: connection.NetAddress = { address: address, family: 1, port: 0 };
+    const v4Link: vpnExtension.LinkAddress = { address: v4Net, prefixLength: 32 };
+    const v4DestNet: connection.NetAddress = { address: '0.0.0.0', family: 1, port: 0 };
+    const v4Dest: vpnExtension.LinkAddress = { address: v4DestNet, prefixLength: 0 };
+    const v4Gw: connection.NetAddress = { address: '0.0.0.0', family: 1, port: 0 };
+    const v4Route: vpnExtension.RouteInfo = {
       interface: 'vpn-tun',
-      destination: { address: { address: '0.0.0.0', family: 1, port: 0 }, prefixLength: 0 },
-      gateway: { address: { address: '0.0.0.0', family: 1, port: 0 }, port: 0 },
+      destination: v4Dest,
+      gateway: v4Gw,
       hasGateway: false,
       isDefaultRoute: true
-    }];
+    };
+
+    const addresses: Array<vpnExtension.LinkAddress> = [v4Link];
+    const routes: Array<vpnExtension.RouteInfo> = [v4Route];
 
     if (ipv6) {
-      addresses.push({ address: { address: ipv6Address, family: 2 }, prefixLength: 128 });
-      routes.push({
+      const v6Net: connection.NetAddress = { address: ipv6Address, family: 2, port: 0 };
+      const v6Link: vpnExtension.LinkAddress = { address: v6Net, prefixLength: 128 };
+      const v6DestNet: connection.NetAddress = { address: '::', family: 2, port: 0 };
+      const v6Dest: vpnExtension.LinkAddress = { address: v6DestNet, prefixLength: 0 };
+      const v6Gw: connection.NetAddress = { address: '::', family: 2, port: 0 };
+      const v6Route: vpnExtension.RouteInfo = {
         interface: 'vpn-tun',
-        destination: { address: { address: '::', family: 2, port: 0 }, prefixLength: 0 },
-        gateway: { address: { address: '::', family: 2, port: 0 }, port: 0 },
+        destination: v6Dest,
+        gateway: v6Gw,
         hasGateway: false,
         isDefaultRoute: true
-      });
+      };
+      addresses.push(v6Link);
+      routes.push(v6Route);
     }
 
+    const emptyApps: Array<string> = [];
+    const dnsList: Array<string> = [dns];
     const config: vpnExtension.VpnConfig = {
-      addresses,
-      routes,
-      dnsAddresses: [dns],
-      mtu,
+      addresses: addresses,
+      routes: routes,
+      dnsAddresses: dnsList,
+      mtu: mtu,
       isIPv4Accepted: true,
       isIPv6Accepted: ipv6,
       isInternal: false,
       isBlocking: false,
-      trustedApplications: [],
-      blockedApplications: []
+      trustedApplications: emptyApps,
+      blockedApplications: emptyApps
     };
 
     try {
@@ -106,20 +131,22 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
       try {
         await this.vpnConnection.protectProcessNet();
       } catch (error) {
-        hilog.error(0xD1, 'VPNDirect', 'protectProcessNet failed: %{public}s', JSON.stringify(error));
+        const err = error as BusinessError;
+        hilog.error(0xD1, 'VPNDirect', 'protectProcessNet failed: %{public}s', JSON.stringify(err));
         await this.destroyVpnConnection();
         return;
       }
 
-      const envelope: string = JSON.stringify({
-        statePath,
-        singBoxConfig,
-        address,
-        ipv6Address,
-        dns,
-        mtu,
-        ipv6
-      });
+      const envelopeObj: CoreEnvelope = {
+        statePath: statePath,
+        singBoxConfig: singBoxConfig,
+        address: address,
+        ipv6Address: ipv6Address,
+        dns: dns,
+        mtu: mtu,
+        ipv6: ipv6
+      };
+      const envelope: string = JSON.stringify(envelopeObj);
       const started: boolean = this.core.start(this.tunFd, envelope);
       if (!started) {
         await this.destroyVpnConnection();
@@ -128,7 +155,8 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
       hilog.info(0xD1, 'VPNDirect', 'VPN started, tunFd=%{public}d', this.tunFd);
     } catch (error) {
       await this.destroyVpnConnection();
-      hilog.error(0xD1, 'VPNDirect', 'VPN setup failed: %{public}s', JSON.stringify(error));
+      const err = error as BusinessError;
+      hilog.error(0xD1, 'VPNDirect', 'VPN setup failed: %{public}s', JSON.stringify(err));
     }
   }
 
@@ -148,7 +176,8 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
       try {
         await this.vpnConnection.destroy(this.vpnId);
       } catch (error) {
-        hilog.error(0xD1, 'VPNDirect', 'VPN destroy failed: %{public}s', JSON.stringify(error));
+        const err = error as BusinessError;
+        hilog.error(0xD1, 'VPNDirect', 'VPN destroy failed: %{public}s', JSON.stringify(err));
       }
     }
     this.vpnId = '';
@@ -156,7 +185,7 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
   }
 
   onDestroy(): void {
-    this.stop().catch((error) => {
+    this.stop().catch((error: BusinessError) => {
       hilog.error(0xD1, 'VPNDirect', 'VPN cleanup failed: %{public}s', JSON.stringify(error));
     });
     hilog.info(0xD1, 'VPNDirect', 'VPN extension destroyed');

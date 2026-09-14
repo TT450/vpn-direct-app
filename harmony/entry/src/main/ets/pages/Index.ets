@@ -1,7 +1,9 @@
 import { vpnExtension } from '@kit.NetworkKit';
 import { Want, common } from '@kit.AbilityKit';
+import { promptAction, UIContext } from '@kit.ArkUI';
 import { AppShell } from '../app/AppShell';
 import { DirectVpnProfile, VpnProfileRepository } from '../vpn/VpnProfileRepository';
+import { ImportedSubscriptionStore } from '../vpn/ImportedSubscriptionStore';
 import { VpnServerSelection, SelectedVpnServer } from '../vpn/VpnServerSelection';
 import { VpnStateStore, VpnRuntimeState } from '../vpn/VpnStateStore';
 
@@ -21,6 +23,8 @@ struct Index {
 
   aboutToAppear(): void {
     this.appContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    AppStorage.setOrCreate<string>('vpn_status', this.status);
+    AppStorage.setOrCreate<string>('vpn_server_name', this.serverName);
     this.syncSelectedServer();
     this.syncRuntimeState();
     this.stateTimer = setInterval(() => { this.syncSelectedServer(); this.syncRuntimeState(); }, 250);
@@ -34,6 +38,7 @@ struct Index {
     const selected: SelectedVpnServer = VpnServerSelection.get();
     this.desiredServerId = selected.id;
     this.serverName = selected.displayName;
+    AppStorage.setOrCreate<string>('vpn_server_name', this.serverName);
     if (this.status === 'Connected' && this.activeServerId.length > 0 && this.desiredServerId !== this.activeServerId && !this.switchInProgress) {
       this.switchServer(this.desiredServerId);
     }
@@ -47,6 +52,7 @@ struct Index {
         this.status = 'Disconnected';
         this.connecting = false;
       }
+      AppStorage.setOrCreate<string>('vpn_status', this.status);
       return;
     }
     switch (runtime.state) {
@@ -57,6 +63,7 @@ struct Index {
       case 'Failed': this.status = 'Connection failed'; this.connecting = false; break;
       default: break;
     }
+    AppStorage.setOrCreate<string>('vpn_status', this.status);
   }
 
   private async waitForState(expected: string, timeoutMs: number): Promise<boolean> {
@@ -80,17 +87,57 @@ struct Index {
   }
 
   private async connectTo(serverId: string): Promise<boolean> {
+    // Ensure the active imported subscription is wired before attempting connection
+    ImportedSubscriptionStore.wireProvider();
     const profile: DirectVpnProfile | null = await VpnProfileRepository.getProfile(serverId);
-    if (profile === null || profile.singBoxConfig.length === 0) { console.error(`VPN Direct: no real sing-box profile for ${serverId}`); return false; }
-    try { await vpnExtension.startVpnExtensionAbility(this.vpnWant(profile)); this.activeServerId = serverId; return true; }
-    catch (error) { console.error(`VPN Direct: start failed ${JSON.stringify(error)}`); return false; }
+    if (profile === null || profile.singBoxConfig.length === 0) {
+      console.error(`VPN Direct: no real sing-box profile for "${serverId}". ` +
+        `Active subscription id: "${ImportedSubscriptionStore.activeId()}"`);
+      return false;
+    }
+    try {
+      await vpnExtension.startVpnExtensionAbility(this.vpnWant(profile));
+      this.activeServerId = serverId;
+      return true;
+    } catch (error) {
+      console.error(`VPN Direct: start failed ${JSON.stringify(error)}`);
+      return false;
+    }
   }
 
   private async connect(): Promise<void> {
     if (this.connecting || this.status === 'Connected' || this.status === 'Connecting') return;
-    this.connecting = true; this.status = 'Connecting';
-    try { if (!(await this.connectTo(this.desiredServerId))) this.status = 'Connection failed'; }
-    finally { this.connecting = false; this.syncRuntimeState(); }
+    this.connecting = true;
+    this.status = 'Connecting';
+    try {
+      // If no subscription is active, try to fetch+apply any pending URL before connecting
+      const activeSub = ImportedSubscriptionStore.active();
+      if (activeSub !== null && activeSub.singBoxConfig.length === 0 && activeSub.url.length > 0) {
+        console.info('VPN Direct: fetching subscription config before connect…');
+        await ImportedSubscriptionStore.fetchAndApplyActiveUrl();
+      }
+      const ok: boolean = await this.connectTo(this.desiredServerId);
+      if (!ok) {
+        this.status = 'Connection failed';
+        // Surface user-facing message in Russian via UIContext to avoid deprecation warning
+        try {
+          const uiCtx: UIContext = this.getUIContext();
+          uiCtx.getPromptAction().showToast({
+            message: 'Нет конфигурации VPN. Импортируйте подписку или войдите в аккаунт Direct.',
+            duration: 5000
+          });
+        } catch {
+          // Fallback for early builds where getPromptAction is unavailable
+          promptAction.showToast({
+            message: 'Нет конфигурации VPN. Импортируйте подписку или войдите в аккаунт Direct.',
+            duration: 5000
+          });
+        }
+      }
+    } finally {
+      this.connecting = false;
+      this.syncRuntimeState();
+    }
   }
 
   private async disconnect(): Promise<boolean> {
@@ -115,8 +162,18 @@ struct Index {
   }
 
   build() {
-    AppShell({ status: this.status, serverName: this.serverName, onToggle: () => {
-      if (this.status === 'Connected' || this.status === 'Connecting') this.disconnect(); else this.connect();
-    }, onServerTap: () => this.syncSelectedServer() });
+    Column() {
+      AppShell({
+        status: this.status,
+        serverName: this.serverName,
+        onToggle: () => {
+          if (this.status === 'Connected' || this.status === 'Connecting') {
+            this.disconnect();
+          } else {
+            this.connect();
+          }
+        }
+      });
+    }.width('100%').height('100%');
   }
 }

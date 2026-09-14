@@ -58,6 +58,14 @@ AGENTS.md
 **/DirectBackend*.local.swift
 **/DirectBackendPrivate*.swift
 
+# Harmony local Direct backend (never GitHub)
+# DirectBackendLocal.ets is TRACKED (empty stub). Real hosts live in *.local.ets only.
+harmony/**/DirectBackendAPI.local.ets
+harmony/**/DirectBackendHooks.local.ets
+harmony/**/DirectBackend*.local.ets
+harmony/**/backend_private/**
+**/direct_backend.local.json
+
 # Google OAuth local plist (never GitHub)
 **/GoogleOAuth.local.plist
 **/client_*.apps.googleusercontent.com.plist
