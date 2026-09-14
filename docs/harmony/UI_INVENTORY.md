@@ -24,8 +24,6 @@ This document is the migration checklist for the complete SwiftUI → ArkTS rewr
 | `DirectAccessViews` | access/subscription flows | loading / active / unavailable / error | planned |
 | `DirectAdvancedViews` | advanced/utility pages | feature-specific states | planned |
 | `DirectAccountUtilityViews` | account utilities | loading / action / error | planned |
-| `DirectAccountUtilityViews` | account utilities | loading / action / error | planned |
-| `DirectAccountUtilityViews` | account utilities | loading / action / error | planned |
 | `AutoSubscriptionImporter` | `SubscriptionImportPage` | parsing / validation / success / error | planned |
 | `AppLockModifier` | Harmony app-lock service/UI | locked / unlocked | platform-specific review |
 | `DialView` | reusable connection visual | idle / active / animated | planned |
