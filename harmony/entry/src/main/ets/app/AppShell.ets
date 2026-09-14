@@ -6,6 +6,7 @@ import { ManagementPage } from '../pages/ManagementPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { DirectFlow, DirectFlowHost } from '../ui/DirectFlows';
 import { DirectNativeFlowHost } from '../ui/DirectNativeFlows';
+import { DirectPlanParityHost } from '../ui/DirectPlanParity';
 import { DirectPrivacyDisclosure } from '../ui/DirectPrivacyDisclosure';
 
 export enum DirectTab { Home = 0, Locations = 1, Management = 2, Profile = 3 }
@@ -30,7 +31,7 @@ export struct AppShell {
   }
 
   private usesNativePort(flow: DirectFlow): boolean {
-    return flow === DirectFlow.Plans || flow === DirectFlow.Constructor || flow === DirectFlow.Payment ||
+    return flow === DirectFlow.Payment ||
       flow === DirectFlow.AuthLogin || flow === DirectFlow.AuthEmail || flow === DirectFlow.AuthCode ||
       flow === DirectFlow.AuthRegister || flow === DirectFlow.AuthRecovery || flow === DirectFlow.AuthBot ||
       flow === DirectFlow.AuthPhone || flow === DirectFlow.AuthPhoneCode || flow === DirectFlow.AuthSuccess ||
@@ -69,7 +70,9 @@ export struct AppShell {
 
       if (this.activeFlow !== DirectFlow.None) {
         Column() {
-          if (this.usesNativePort(this.activeFlow)) {
+          if (this.activeFlow === DirectFlow.Plans || this.activeFlow === DirectFlow.Constructor) {
+            DirectPlanParityHost({ flow: this.activeFlow, onClose: () => this.activeFlow = DirectFlow.None, onFlow: (flow: DirectFlow) => this.activeFlow = flow });
+          } else if (this.usesNativePort(this.activeFlow)) {
             DirectNativeFlowHost({ flow: this.activeFlow, onClose: () => this.activeFlow = DirectFlow.None, onFlow: (flow: DirectFlow) => this.activeFlow = flow });
           } else {
             DirectFlowHost({ flow: this.activeFlow, onClose: () => this.activeFlow = DirectFlow.None, onFlow: (flow: DirectFlow) => this.activeFlow = flow });
