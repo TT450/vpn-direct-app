@@ -1,0 +1,16 @@
+{
+  "modelVersion": "5.0.0",
+  "hvigorVersion": "5.8.9",
+  "dependencies": {
+    "@ohos/hvigor-ohos-plugin": "5.0.9"
+  },
+  "execution": {
+    "analyze": "default"
+  },
+  "logging": {
+    "level": "info"
+  },
+  "nodeOptions": {
+    "maxOldSpaceSize": 4096
+  }
+}
