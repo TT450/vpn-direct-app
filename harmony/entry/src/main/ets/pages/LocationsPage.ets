@@ -1,7 +1,9 @@
 import { DirectTheme, DirectTypography } from '../ui/Theme';
 import { DirectHaptics } from '../ui/Haptics';
+import { VpnServerSelection } from '../vpn/VpnServerSelection';
 
 interface LocationItem {
+  id: string;
   code: string;
   country: string;
   city: string;
@@ -12,15 +14,15 @@ interface LocationItem {
 @Component
 export struct LocationsPage {
   @State private search: string = '';
-  @State private selected: string = 'Авто';
+  @State private selected: string = VpnServerSelection.get().id;
 
   private readonly locations: LocationItem[] = [
-    { code: 'A', country: 'Авто', city: 'Автовыбор маршрута', latency: '— MS', quality: 'ОПТИМАЛЬНО' },
-    { code: 'DE', country: 'Германия', city: 'Frankfurt', latency: '— MS', quality: 'СТАБИЛЬНО' },
-    { code: 'NL', country: 'Нидерланды', city: 'Amsterdam', latency: '— MS', quality: 'СТАБИЛЬНО' },
-    { code: 'FI', country: 'Финляндия', city: 'Helsinki', latency: '— MS', quality: 'СТАБИЛЬНО' },
-    { code: 'SE', country: 'Швеция', city: 'Stockholm', latency: '— MS', quality: 'СТАБИЛЬНО' },
-    { code: 'AM', country: 'Армения', city: 'Yerevan', latency: '— MS', quality: 'СТАБИЛЬНО' }
+    { id: 'auto', code: 'A', country: 'Авто', city: 'Автовыбор маршрута', latency: '— MS', quality: 'ОПТИМАЛЬНО' },
+    { id: 'de-frankfurt', code: 'DE', country: 'Германия', city: 'Frankfurt', latency: '— MS', quality: 'СТАБИЛЬНО' },
+    { id: 'nl-amsterdam', code: 'NL', country: 'Нидерланды', city: 'Amsterdam', latency: '— MS', quality: 'СТАБИЛЬНО' },
+    { id: 'fi-helsinki', code: 'FI', country: 'Финляндия', city: 'Helsinki', latency: '— MS', quality: 'СТАБИЛЬНО' },
+    { id: 'se-stockholm', code: 'SE', country: 'Швеция', city: 'Stockholm', latency: '— MS', quality: 'СТАБИЛЬНО' },
+    { id: 'am-yerevan', code: 'AM', country: 'Армения', city: 'Yerevan', latency: '— MS', quality: 'СТАБИЛЬНО' }
   ];
 
   private filtered(): LocationItem[] {
@@ -29,6 +31,12 @@ export struct LocationsPage {
     return this.locations.filter((item: LocationItem) =>
       item.country.toLowerCase().includes(q) || item.city.toLowerCase().includes(q) || item.code.toLowerCase().includes(q)
     );
+  }
+
+  private select(item: LocationItem): void {
+    this.selected = item.id;
+    VpnServerSelection.set({ id: item.id, displayName: item.id === 'auto' ? 'Авто' : `${item.country} · ${item.city}` });
+    DirectHaptics.selection();
   }
 
   build() {
@@ -56,7 +64,7 @@ export struct LocationsPage {
       }.width('100%').margin({ bottom: 14 });
 
       List() {
-        ForEach(this.filtered(), (item: LocationItem, index: number) => {
+        ForEach(this.filtered(), (item: LocationItem) => {
           ListItem() {
             Row() {
               Text(item.code).fontSize(item.code === 'A' ? 12 : 8).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace')
@@ -75,11 +83,11 @@ export struct LocationsPage {
                   Circle().width(5).height(5).fill(DirectTheme.green).margin({ right: 4 });
                   Text(item.latency).fontSize(DirectTypography.caption).fontColor(DirectTheme.ink).fontFamily('monospace');
                 }
-                Text(this.selected === item.country ? '✓' : '›').fontSize(12).fontColor(DirectTheme.muted);
+                Text(this.selected === item.id ? '✓' : '›').fontSize(12).fontColor(DirectTheme.muted);
               }.alignItems(HorizontalAlign.End);
             }.width('100%').height(58).padding({ left: 0, right: 0 })
               .border({ width: { bottom: 1 }, color: DirectTheme.line })
-              .onClick(() => { this.selected = item.country; DirectHaptics.selection(); });
+              .onClick(() => this.select(item));
           }
         });
       }.width('100%').layoutWeight(1).scrollBar(BarState.Off);
