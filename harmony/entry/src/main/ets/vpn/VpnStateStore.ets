@@ -21,4 +21,11 @@ export class VpnStateStore {
       return null;
     }
   }
+
+  static readFresh(context: common.UIAbilityContext, maxAgeMs: number): VpnRuntimeState | null {
+    const runtime: VpnRuntimeState | null = VpnStateStore.read(context);
+    if (runtime === null || runtime.at === undefined) return null;
+    if (Date.now() - runtime.at > maxAgeMs) return null;
+    return runtime;
+  }
 }
