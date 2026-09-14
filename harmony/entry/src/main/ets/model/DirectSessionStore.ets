@@ -14,72 +14,14 @@ export const SESSION_ERROR: string = 'session_error';
 export const SESSION_LOCATIONS_JSON: string = 'session_locations_json';
 
 export class DirectSessionStore {
-  static init(): void {
-    AppStorage.setOrCreate<boolean>(SESSION_HAS_SUBSCRIPTION, false);
-    AppStorage.setOrCreate<string>(SESSION_DISPLAY_NAME, '');
-    AppStorage.setOrCreate<string>(SESSION_PLAN_NAME, '');
-    AppStorage.setOrCreate<number>(SESSION_REMAINING_DAYS, 0);
-    AppStorage.setOrCreate<number>(SESSION_BALANCE_CENTS, 0);
-    AppStorage.setOrCreate<boolean>(SESSION_LOADED, false);
-    AppStorage.setOrCreate<string>(SESSION_ERROR, '');
-    AppStorage.setOrCreate<string>(SESSION_LOCATIONS_JSON, '[]');
-  }
-
-  static async refresh(): Promise<void> {
-    AppStorage.set<boolean>(SESSION_LOADED, false);
-    AppStorage.set<string>(SESSION_ERROR, '');
-    try {
-      const bootstrap = DirectBackendRuntime.bootstrapSession;
-      if (bootstrap !== null && bootstrap !== undefined) await bootstrap();
-      const fetchMe = DirectBackendRuntime.fetchMe;
-      if (fetchMe !== null && fetchMe !== undefined) {
-        const me: DirectMe = await fetchMe();
-        DirectSessionStore.applyMe(me);
-        await DirectSessionStore.applySubscriptionUrl(me);
-      }
-      const locations: DirectLocationRecord[] = await DirectBackendRuntime.fetchLocations();
-      AppStorage.set<string>(SESSION_LOCATIONS_JSON, JSON.stringify(locations));
-    } catch (err) {
-      const msg: string = err instanceof Error ? err.message : `${err}`;
-      AppStorage.set<string>(SESSION_ERROR, msg.length > 0 ? msg : 'Не удалось загрузить данные');
-    } finally {
-      AppStorage.set<boolean>(SESSION_LOADED, true);
-    }
-  }
-
+  static init(): void { AppStorage.setOrCreate<boolean>(SESSION_HAS_SUBSCRIPTION, false); AppStorage.setOrCreate<string>(SESSION_DISPLAY_NAME, ''); AppStorage.setOrCreate<string>(SESSION_PLAN_NAME, ''); AppStorage.setOrCreate<number>(SESSION_REMAINING_DAYS, 0); AppStorage.setOrCreate<number>(SESSION_BALANCE_CENTS, 0); AppStorage.setOrCreate<boolean>(SESSION_LOADED, false); AppStorage.setOrCreate<string>(SESSION_ERROR, ''); AppStorage.setOrCreate<string>(SESSION_LOCATIONS_JSON, '[]'); }
+  static async refresh(): Promise<void> { AppStorage.set<boolean>(SESSION_LOADED, false); AppStorage.set<string>(SESSION_ERROR, ''); try { const bootstrap = DirectBackendRuntime.bootstrapSession; if (bootstrap !== null && bootstrap !== undefined) await bootstrap(); const fetchMe = DirectBackendRuntime.fetchMe; if (fetchMe !== null && fetchMe !== undefined) { const me: DirectMe = await fetchMe(); DirectSessionStore.applyMe(me); await DirectSessionStore.applySubscriptionUrl(me); } const locations: DirectLocationRecord[] = await DirectBackendRuntime.fetchLocations(); AppStorage.set<string>(SESSION_LOCATIONS_JSON, JSON.stringify(locations)); } catch (err) { const msg: string = err instanceof Error ? err.message : `${err}`; AppStorage.set<string>(SESSION_ERROR, msg.length > 0 ? msg : 'Не удалось загрузить данные'); } finally { AppStorage.set<boolean>(SESSION_LOADED, true); } }
   static hasSubscription(): boolean { return AppStorage.get<boolean>(SESSION_HAS_SUBSCRIPTION) ?? false; }
   static hasPremium(): boolean { return DirectSessionStore.hasSubscription(); }
   static displayName(): string { return AppStorage.get<string>(SESSION_DISPLAY_NAME) ?? ''; }
   static planName(): string { return AppStorage.get<string>(SESSION_PLAN_NAME) ?? ''; }
   static remainingDays(): number { return AppStorage.get<number>(SESSION_REMAINING_DAYS) ?? 0; }
-
-  static getLocations(): DirectLocationRecord[] {
-    const json: string = AppStorage.get<string>(SESSION_LOCATIONS_JSON) ?? '[]';
-    try { return JSON.parse(json) as DirectLocationRecord[]; } catch { return []; }
-  }
-
-  private static applyMe(me: DirectMe): void {
-    AppStorage.set<boolean>(SESSION_HAS_SUBSCRIPTION, me.hasSubscription === true);
-    const name: string = me.username !== undefined && me.username.length > 0
-      ? me.username
-      : (me.email !== undefined ? me.email : '');
-    AppStorage.set<string>(SESSION_DISPLAY_NAME, name);
-    AppStorage.set<string>(SESSION_PLAN_NAME, me.planName ?? '');
-    AppStorage.set<number>(SESSION_REMAINING_DAYS, me.remainingDays ?? 0);
-    AppStorage.set<number>(SESSION_BALANCE_CENTS, me.inAppBalance ?? 0);
-  }
-
-  private static async applySubscriptionUrl(me: DirectMe): Promise<void> {
-    const subUrl = me.subscriptionUrl;
-    if (subUrl === undefined || subUrl.length === 0) return;
-    const subId: string = 'session_subscription';
-    const now: string = new Date().toISOString();
-    const sub: ImportedSubscription = { id: subId, name: 'Direct VPN', url: subUrl, singBoxConfig: '', addedAt: now };
-    ImportedSubscriptionStore.add(sub);
-    ImportedSubscriptionStore.setActive(subId);
-    try { await ImportedSubscriptionStore.fetchAndApplyActiveUrl(); } catch (err) {
-      const msg: string = err instanceof Error ? err.message : `${err}`;
-      console.warn(`DirectSessionStore: failed to fetch subscription config: ${msg}`);
-    }
-  }
+  static getLocations(): DirectLocationRecord[] { const json: string = AppStorage.get<string>(SESSION_LOCATIONS_JSON) ?? '[]'; try { return JSON.parse(json) as DirectLocationRecord[]; } catch { return []; } }
+  private static applyMe(me: DirectMe): void { AppStorage.set<boolean>(SESSION_HAS_SUBSCRIPTION, me.hasSubscription === true); const name: string = me.username !== undefined && me.username.length > 0 ? me.username : (me.email !== undefined ? me.email : ''); AppStorage.set<string>(SESSION_DISPLAY_NAME, name); AppStorage.set<string>(SESSION_PLAN_NAME, me.planName ?? ''); AppStorage.set<number>(SESSION_REMAINING_DAYS, me.remainingDays ?? 0); AppStorage.set<number>(SESSION_BALANCE_CENTS, me.inAppBalance ?? 0); }
+  private static async applySubscriptionUrl(me: DirectMe): Promise<void> { const subUrl = me.subscriptionUrl; if (subUrl === undefined || subUrl.length === 0) return; const subId = 'session_subscription'; const now = new Date().toISOString(); const sub: ImportedSubscription = { id: subId, name: me.planName && me.planName.length > 0 ? me.planName : 'Direct VPN', url: subUrl, singBoxConfig: '', addedAt: now }; ImportedSubscriptionStore.add(sub); ImportedSubscriptionStore.setActive(subId); try { await ImportedSubscriptionStore.fetchAndApplyActiveUrl(); } catch (err) { const msg = err instanceof Error ? err.message : `${err}`; console.warn(`DirectSessionStore: failed to fetch subscription config: ${msg}`); } }
 }
