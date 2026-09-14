@@ -2,18 +2,12 @@ import { DirectTheme } from './Theme';
 import { DirectHaptics } from './Haptics';
 import { DirectBackendRuntime, DirectLocationRecord } from '../backend/DirectBackendRuntime';
 import { VpnServerSelection } from '../vpn/VpnServerSelection';
+import { DirectFlag } from './DirectFlag';
 
 const FAVORITES_KEY: string = 'direct_server_favorites';
 const RECENT_KEY: string = 'direct_server_recent';
 
-function readIds(key: string): string[] {
-  const raw: string = AppStorage.get<string>(key) ?? '[]';
-  try {
-    const value = JSON.parse(raw) as Object;
-    return Array.isArray(value) ? value as string[] : [];
-  } catch { return []; }
-}
-
+function readIds(key: string): string[] { const raw = AppStorage.get<string>(key) ?? '[]'; try { const value = JSON.parse(raw) as Object; return Array.isArray(value) ? value as string[] : []; } catch { return []; } }
 function writeIds(key: string, ids: string[]): void { AppStorage.setOrCreate<string>(key, JSON.stringify(ids.slice(0, 20))); }
 
 @Component
@@ -28,110 +22,27 @@ export struct DirectServerPickerParityV2 {
   @State loading: boolean = false;
   @State errorText: string = '';
   private readonly tabs: string[] = ['Все', 'Избранное', 'Недавние'];
-
   aboutToAppear(): void { void this.load(); }
-
-  private async load(): Promise<void> {
-    this.loading = true;
-    this.errorText = '';
-    try {
-      this.locations = await DirectBackendRuntime.fetchLocations();
-      if (this.locations.length === 0) this.errorText = DirectBackendRuntime.baseURLString.length === 0 ? 'Каталог локаций будет доступен после подключения backend.' : 'Для этой подписки пока нет доступных серверов.';
-    } catch (err) {
-      const message = err instanceof Error ? err.message : `${err}`;
-      this.errorText = message.length > 0 ? message : 'Не удалось загрузить локации';
-    } finally { this.loading = false; }
-  }
-
-  private filtered(): DirectLocationRecord[] {
-    let source: DirectLocationRecord[] = this.locations;
-    if (this.tab === 1) source = source.filter((r: DirectLocationRecord) => this.favorites.indexOf(r.id) >= 0);
-    if (this.tab === 2) source = this.recent.map((id: string): DirectLocationRecord | undefined => source.find((r: DirectLocationRecord) => r.id === id)).filter((r: DirectLocationRecord | undefined): r is DirectLocationRecord => r !== undefined);
-    const q = this.query.trim().toLowerCase();
-    if (q.length > 0) source = source.filter((r: DirectLocationRecord) => r.country.toLowerCase().includes(q) || r.city.toLowerCase().includes(q) || r.countryCode.toLowerCase().includes(q) || r.region.toLowerCase().includes(q));
-    return source;
-  }
-
-  private selectAuto(): void {
-    this.selected = 'auto';
-    VpnServerSelection.set({ id: 'auto', displayName: 'Авто', countryCode: '' });
-    DirectHaptics.selection();
-    this.onClose();
-  }
-
-  private selectServer(item: DirectLocationRecord): void {
-    this.selected = item.id;
-    VpnServerSelection.set({ id: item.id, displayName: `${item.country} · ${item.city}`, countryCode: item.countryCode });
-    const next = [item.id, ...this.recent.filter((id: string) => id !== item.id)].slice(0, 10);
-    this.recent = next;
-    writeIds(RECENT_KEY, next);
-    DirectHaptics.selection();
-    this.onClose();
-  }
-
-  private toggleFavorite(item: DirectLocationRecord): void {
-    const next = this.favorites.indexOf(item.id) >= 0 ? this.favorites.filter((id: string) => id !== item.id) : [item.id, ...this.favorites];
-    this.favorites = next;
-    writeIds(FAVORITES_KEY, next);
-    DirectHaptics.selection();
-  }
-
+  private async load(): Promise<void> { this.loading = true; this.errorText = ''; try { this.locations = await DirectBackendRuntime.fetchLocations(); if (this.locations.length === 0) this.errorText = DirectBackendRuntime.baseURLString.length === 0 ? 'Каталог локаций будет доступен после подключения backend.' : 'Для этой подписки пока нет доступных серверов.'; } catch (err) { const message = err instanceof Error ? err.message : `${err}`; this.errorText = message.length > 0 ? message : 'Не удалось загрузить локации'; } finally { this.loading = false; } }
+  private filtered(): DirectLocationRecord[] { let source: DirectLocationRecord[] = this.locations; if (this.tab === 1) source = source.filter((r: DirectLocationRecord) => this.favorites.indexOf(r.id) >= 0); if (this.tab === 2) source = this.recent.map((id: string): DirectLocationRecord | undefined => this.locations.find((r: DirectLocationRecord) => r.id === id)).filter((r: DirectLocationRecord | undefined): r is DirectLocationRecord => r !== undefined); const q = this.query.trim().toLowerCase(); if (q.length > 0) source = source.filter((r: DirectLocationRecord) => r.country.toLowerCase().includes(q) || r.city.toLowerCase().includes(q) || r.countryCode.toLowerCase().includes(q) || r.region.toLowerCase().includes(q)); return source; }
+  private selectAuto(): void { this.selected = 'auto'; VpnServerSelection.set({ id: 'auto', displayName: 'Авто', countryCode: '' }); DirectHaptics.selection(); this.onClose(); }
+  private selectServer(item: DirectLocationRecord): void { this.selected = item.id; VpnServerSelection.set({ id: item.id, displayName: `${item.country} · ${item.city}`, countryCode: item.countryCode }); const next = [item.id, ...this.recent.filter((id: string) => id !== item.id)].slice(0, 10); this.recent = next; writeIds(RECENT_KEY, next); DirectHaptics.selection(); this.onClose(); }
+  private toggleFavorite(item: DirectLocationRecord): void { const next = this.favorites.indexOf(item.id) >= 0 ? this.favorites.filter((id: string) => id !== item.id) : [item.id, ...this.favorites]; this.favorites = next; writeIds(FAVORITES_KEY, next); DirectHaptics.selection(); }
   build() {
     Column() {
-      Row() {
-        Column() {
-          Row() { Text('01').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); Row().width(14).height(2).backgroundColor(DirectTheme.acid).margin({ left: 7, right: 7 }); Text('SERVER / LOCATIONS').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); }
-          Text('Локации').fontSize(34).fontWeight(600).fontColor(DirectTheme.ink).margin({ top: 5 });
-          Text('Выберите сервер для текущего подключения').fontSize(11).fontWeight(FontWeight.Medium).fontColor(DirectTheme.muted).margin({ top: 5 });
-        }.alignItems(HorizontalAlign.Start).layoutWeight(1);
-        Text('×').fontSize(18).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).width(38).height(38).textAlign(TextAlign.Center).backgroundColor(DirectTheme.ink).onClick(() => { DirectHaptics.navigation(); this.onClose(); });
-      }.width('100%').padding({ left: 20, right: 20, top: 28, bottom: 15 });
-
-      Row() {
-        Text('⌕').fontSize(12).fontColor(DirectTheme.green).margin({ right: 9 });
-        TextInput({ placeholder: 'Страна или город', text: this.query }).layoutWeight(1).height(44).fontSize(13).fontColor(DirectTheme.ink).backgroundColor(Color.Transparent).onChange((v: string) => this.query = v);
-        if (this.query.length > 0) Text('СБРОС').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace').onClick(() => this.query = '');
-      }.width('100%').height(44).padding({ left: 13, right: 13 }).margin({ left: 20, right: 20 }).backgroundColor('#73FFFFFF').border({ width: 1, color: DirectTheme.line });
-
-      Row() { ForEach(this.tabs, (label: string, index: number) => {
-        Row() { Text(label).fontSize(10).fontWeight(this.tab === index ? FontWeight.Bold : FontWeight.Medium).fontColor(DirectTheme.ink); if (index === 1) Text(String(this.favorites.length).padStart(2, '0')).fontSize(7).fontWeight(FontWeight.Bold).fontColor(this.tab === index ? DirectTheme.green : DirectTheme.muted).fontFamily('monospace').margin({ left: 5 }); }
-          .layoutWeight(1).height(40).justifyContent(FlexAlign.Center).border({ width: { bottom: this.tab === index ? 2 : 1 }, color: this.tab === index ? DirectTheme.ink : DirectTheme.line }).onClick(() => { this.tab = index; DirectHaptics.selection(); });
-      }); }.width('100%').padding({ left: 20, right: 20, top: 5 });
-
+      Row() { Column() { Row() { Text('01').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); Row().width(14).height(2).backgroundColor(DirectTheme.acid).margin({ left: 7, right: 7 }); Text('SERVER / LOCATIONS').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); } Text('Локации').fontSize(34).fontWeight(600).fontColor(DirectTheme.ink).margin({ top: 5 }); Text('Выберите сервер для текущего подключения').fontSize(11).fontWeight(FontWeight.Medium).fontColor(DirectTheme.muted).margin({ top: 5 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1); Text('×').fontSize(18).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).width(38).height(38).textAlign(TextAlign.Center).backgroundColor(DirectTheme.ink).onClick(() => { DirectHaptics.navigation(); this.onClose(); }); }.width('100%').padding({ left: 20, right: 20, top: 28, bottom: 15 });
+      Row() { Text('⌕').fontSize(12).fontColor(DirectTheme.green).margin({ right: 9 }); TextInput({ placeholder: 'Страна или город', text: this.query }).layoutWeight(1).height(44).fontSize(13).fontColor(DirectTheme.ink).backgroundColor(Color.Transparent).onChange((v: string) => this.query = v); if (this.query.length > 0) Text('СБРОС').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace').onClick(() => this.query = ''); }.width('100%').height(44).padding({ left: 13, right: 13 }).margin({ left: 20, right: 20 }).backgroundColor('#73FFFFFF').border({ width: 1, color: DirectTheme.line });
+      Row() { ForEach(this.tabs, (label: string, index: number) => { Row() { Text(label).fontSize(10).fontWeight(this.tab === index ? FontWeight.Bold : FontWeight.Medium).fontColor(DirectTheme.ink); if (index === 1) Text(String(this.favorites.length).padStart(2, '0')).fontSize(7).fontWeight(FontWeight.Bold).fontColor(this.tab === index ? DirectTheme.green : DirectTheme.muted).fontFamily('monospace').margin({ left: 5 }); }.layoutWeight(1).height(40).justifyContent(FlexAlign.Center).border({ width: { bottom: this.tab === index ? 2 : 1 }, color: this.tab === index ? DirectTheme.ink : DirectTheme.line }).onClick(() => { this.tab = index; DirectHaptics.selection(); }); }); }.width('100%').padding({ left: 20, right: 20, top: 5 });
       if (this.loading) Text('Загрузка локаций…').fontSize(12).fontColor(DirectTheme.muted).margin({ top: 18, left: 20 });
       if (this.errorText.length > 0) Text(this.errorText).fontSize(11).fontColor(DirectTheme.muted).padding({ left: 20, right: 20, top: 12 });
-
-      Scroll() {
-        Column() {
-          if (this.query.length === 0 && this.tab === 0) {
-            Row() {
-              Text('A').fontSize(16).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace').width(38).height(38).textAlign(TextAlign.Center).backgroundColor(this.selected === 'auto' ? DirectTheme.ink : DirectTheme.panel);
-              Column() { Row() { Text('SMART ROUTE').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); if (this.selected === 'auto') Text('АКТИВНО').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace').margin({ left: 6 }); } Text('Автовыбор').fontSize(15).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).margin({ top: 3 }); Text('Лучший маршрут по задержке и доступности').fontSize(9.5).fontColor(DirectTheme.muted).margin({ top: 3 }).maxLines(1); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 11 });
-              Column() { Text('СЕЙЧАС').fontSize(7).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); Text(this.selected === 'auto' ? 'АВТО' : '—').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.End).margin({ right: 8 });
-              Text(this.selected === 'auto' ? '✓' : '›').fontSize(12).fontColor(this.selected === 'auto' ? DirectTheme.green : DirectTheme.muted);
-            }.width('100%').constraintSize({ minHeight: 76 }).padding({ left: 20, right: 20 }).backgroundColor(this.selected === 'auto' ? DirectTheme.acidSelected : Color.Transparent).border({ width: { bottom: 1 }, color: DirectTheme.line }).onClick(() => this.selectAuto());
-          }
-
-          Row() { Column() { Text('02 / VPN DIRECT').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); Text(this.tab === 0 ? 'Доступные серверы' : this.tabs[this.tab]).fontSize(14).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).margin({ top: 2 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1); Column() { Text(String(this.filtered().length).padStart(2, '0')).fontSize(18).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace'); Text('ЛОКАЦИЙ').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); }.alignItems(HorizontalAlign.End); }.width('100%').padding({ left: 20, right: 20, top: 11, bottom: 11 }).backgroundColor('#0B141714').border({ width: { bottom: 1 }, color: DirectTheme.line });
-
-          if (this.filtered().length === 0) Column() { Text(this.query.length > 0 ? 'Ничего не найдено' : 'Нет доступных серверов').fontSize(15).fontWeight(FontWeight.Medium).fontColor(DirectTheme.ink); Text(this.query.length > 0 ? 'Попробуйте другое название страны или города' : 'Для этой подписки пока нет локаций').fontSize(10).fontColor(DirectTheme.muted).margin({ top: 8 }); }.width('100%').alignItems(HorizontalAlign.Center).padding({ top: 60, bottom: 60 });
-          else ForEach(this.filtered(), (item: DirectLocationRecord, index: number) => this.serverRow(item, index + 1), (item: DirectLocationRecord) => item.id);
-          Blank().height(24);
-        }.width('100%').padding({ top: 10 });
-      }.layoutWeight(1).scrollBar(BarState.Off);
+      Scroll() { Column() {
+        if (this.query.length === 0 && this.tab === 0) Row() { DirectFlag({ code: 'auto', width: 38, height: 38 }); Column() { Row() { Text('SMART ROUTE').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); if (this.selected === 'auto') Text('АКТИВНО').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace').margin({ left: 6 }); } Text('Автовыбор').fontSize(15).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).margin({ top: 3 }); Text('Лучший маршрут по задержке и доступности').fontSize(9.5).fontColor(DirectTheme.muted).margin({ top: 3 }).maxLines(1); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 11 }); Column() { Text('СЕЙЧАС').fontSize(7).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); Text(this.selected === 'auto' ? 'АВТО' : '—').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.End).margin({ right: 8 }); Text(this.selected === 'auto' ? '✓' : '›').fontSize(12).fontColor(this.selected === 'auto' ? DirectTheme.green : DirectTheme.muted); }.width('100%').constraintSize({ minHeight: 76 }).padding({ left: 20, right: 20 }).backgroundColor(this.selected === 'auto' ? DirectTheme.acidSelected : Color.Transparent).border({ width: { bottom: 1 }, color: DirectTheme.line }).onClick(() => this.selectAuto());
+        Row() { Column() { Text('02 / VPN DIRECT').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); Text(this.tab === 0 ? 'Доступные серверы' : this.tabs[this.tab]).fontSize(14).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).margin({ top: 2 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1); Column() { Text(String(this.filtered().length).padStart(2, '0')).fontSize(18).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace'); Text('ЛОКАЦИЙ').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); }.alignItems(HorizontalAlign.End); }.width('100%').padding({ left: 20, right: 20, top: 11, bottom: 11 }).backgroundColor('#0B141714').border({ width: { bottom: 1 }, color: DirectTheme.line });
+        if (this.filtered().length === 0) Column() { Text(this.query.length > 0 ? 'Ничего не найдено' : 'Нет доступных серверов').fontSize(15).fontWeight(FontWeight.Medium).fontColor(DirectTheme.ink); Text(this.query.length > 0 ? 'Попробуйте другое название страны или города' : 'Для этой подписки пока нет локаций').fontSize(10).fontColor(DirectTheme.muted).margin({ top: 8 }); }.width('100%').alignItems(HorizontalAlign.Center).padding({ top: 60, bottom: 60 });
+        else ForEach(this.filtered(), (item: DirectLocationRecord, index: number) => this.serverRow(item, index + 1), (item: DirectLocationRecord) => item.id);
+        Blank().height(24);
+      }.width('100%').padding({ top: 10 }); }.layoutWeight(1).scrollBar(BarState.Off);
     }.width('100%').height('100%').backgroundColor(DirectTheme.paper);
   }
-
-  @Builder private serverRow(item: DirectLocationRecord, index: number) {
-    const selected = this.selected === item.id;
-    const favorite = this.favorites.indexOf(item.id) >= 0;
-    Row() {
-      Text(String(index).padStart(2, '0')).fontSize(8).fontWeight(FontWeight.Bold).fontColor(selected ? DirectTheme.green : DirectTheme.muted).fontFamily('monospace').width(21);
-      Text(item.countryCode.length === 2 ? item.countryCode.toUpperCase() : '—').fontSize(7).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace').width(31).height(21).textAlign(TextAlign.Center).backgroundColor(DirectTheme.ink);
-      Column() { Text(item.city.length > 0 ? item.city.toUpperCase() : item.country.toUpperCase()).fontSize(13).fontWeight(FontWeight.Medium).fontColor(DirectTheme.ink).maxLines(1); Text(item.country.toUpperCase()).fontSize(7).fontWeight(FontWeight.Bold).fontColor(selected ? DirectTheme.green : DirectTheme.muted).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 10 });
-      Column() { Text('●  —').fontSize(8).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); Text('LOAD —').fontSize(7).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.End).width(62);
-      Text(favorite ? '★' : '☆').fontSize(13).fontColor(favorite ? DirectTheme.green : DirectTheme.muted).width(28).height(34).textAlign(TextAlign.Center).onClick(() => this.toggleFavorite(item));
-      Text(selected ? '✓' : '›').fontSize(11).fontWeight(FontWeight.Bold).fontColor(selected ? DirectTheme.green : DirectTheme.muted).width(18).textAlign(TextAlign.Center);
-    }.width('100%').constraintSize({ minHeight: 61 }).padding({ left: 20, right: 20 }).backgroundColor(selected ? DirectTheme.acidSelected : Color.Transparent).border({ width: { bottom: 1 }, color: DirectTheme.line }).onClick(() => this.selectServer(item));
-  }
+  @Builder private serverRow(item: DirectLocationRecord, index: number) { const selected = this.selected === item.id; const favorite = this.favorites.indexOf(item.id) >= 0; Row() { Text(String(index).padStart(2, '0')).fontSize(8).fontWeight(FontWeight.Bold).fontColor(selected ? DirectTheme.green : DirectTheme.muted).fontFamily('monospace').width(21); DirectFlag({ code: item.countryCode, width: 31, height: 21 }); Column() { Text(item.city.length > 0 ? item.city.toUpperCase() : item.country.toUpperCase()).fontSize(13).fontWeight(FontWeight.Medium).fontColor(DirectTheme.ink).maxLines(1); Text(item.country.toUpperCase()).fontSize(7).fontWeight(FontWeight.Bold).fontColor(selected ? DirectTheme.green : DirectTheme.muted).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 10 }); Column() { Text('●  —').fontSize(8).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); Text('LOAD —').fontSize(7).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.End).width(62); Text(favorite ? '★' : '☆').fontSize(13).fontColor(favorite ? DirectTheme.green : DirectTheme.muted).width(28).height(34).textAlign(TextAlign.Center).onClick(() => this.toggleFavorite(item)); Text(selected ? '✓' : '›').fontSize(11).fontWeight(FontWeight.Bold).fontColor(selected ? DirectTheme.green : DirectTheme.muted).width(18).textAlign(TextAlign.Center); }.width('100%').constraintSize({ minHeight: 61 }).padding({ left: 20, right: 20 }).backgroundColor(selected ? DirectTheme.acidSelected : Color.Transparent).border({ width: { bottom: 1 }, color: DirectTheme.line }).onClick(() => this.selectServer(item)); }
 }
