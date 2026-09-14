@@ -9,6 +9,7 @@ import { DirectAccountParityV2 } from './DirectAccountParityV2';
 import { DirectServerPickerParityV2 } from './DirectServerPickerParityV2';
 import { DirectAccessParityV2 } from './DirectAccessParityV2';
 import { DirectSubscriptionsParityV3 } from './DirectSubscriptionsParityV3';
+import { DirectAdvancedParityV2 } from './DirectAdvancedParityV2';
 import { DirectFlow } from './DirectFlowModel';
 export { DirectFlow } from './DirectFlowModel';
 
@@ -25,7 +26,7 @@ export struct DirectFlowHost {
     else if (this.flow === DirectFlow.Account) DirectAccountParityV2({ onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow >= DirectFlow.AuthLogin && this.flow <= DirectFlow.AuthSuccess) DirectAuthParityV2({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.Payment) DirectNativeFlowHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
-    else if (this.flow >= DirectFlow.Security && this.flow <= DirectFlow.OnDemandSettings) DirectFullParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
+    else if (this.flow >= DirectFlow.Security && this.flow <= DirectFlow.OnDemandSettings) DirectAdvancedParityV2({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.BalanceTopUp) DirectBalanceTopUpParityV2({ onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.Balance) DirectBalanceParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow !== DirectFlow.None) DirectFullParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
