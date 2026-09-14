@@ -8,18 +8,10 @@ import { DirectBackendRuntime } from '../backend/DirectBackendRuntime';
 interface UtilityRowData { mark: string; title: string; detail: string; accent: boolean; flow: DirectFlow; }
 interface SettingsRowData { title: string; detail: string; flow: DirectFlow; icon: DirectIconName; }
 interface LegalRowData { title: string; subtitle: string; flow: DirectFlow; }
-
 @Component
 export struct ProfilePage {
   onFlow: (flow: DirectFlow) => void = (_flow: DirectFlow) => {};
-  @StorageProp(SESSION_HAS_SUBSCRIPTION) private hasSubscription: boolean = false;
-  @StorageProp(SESSION_DISPLAY_NAME) private displayName: string = '';
-  @StorageProp(SESSION_REMAINING_DAYS) private remainingDays: number = 0;
-  @StorageProp(SESSION_BALANCE_CENTS) private balanceCents: number = 0;
-  @StorageProp('vpn_status') private vpnStatus: string = 'Disconnected';
-  @StorageProp('vpn_connected_at') private connectedAt: number = 0;
-  @State private deviceCount: number = 0;
-
+  @StorageProp(SESSION_HAS_SUBSCRIPTION) private hasSubscription: boolean = false; @StorageProp(SESSION_DISPLAY_NAME) private displayName: string = ''; @StorageProp(SESSION_REMAINING_DAYS) private remainingDays: number = 0; @StorageProp(SESSION_BALANCE_CENTS) private balanceCents: number = 0; @StorageProp('vpn_status') private vpnStatus: string = 'Disconnected'; @StorageProp('vpn_connected_at') private connectedAt: number = 0; @State private deviceCount: number = 0;
   private readonly settingsRows: SettingsRowData[] = [
     { title: 'Безопасность', detail: 'Автоподключение, DNS и российские сайты', flow: DirectFlow.Security, icon: DirectIconName.Shield },
     { title: 'Подключение', detail: 'Протокол, failover и антиблокировка', flow: DirectFlow.Connection, icon: DirectIconName.Connection },
@@ -28,57 +20,19 @@ export struct ProfilePage {
     { title: 'Системные настройки', detail: 'Ядро, туннель и служебные параметры', flow: DirectFlow.SystemSettings, icon: DirectIconName.SlidersHorizontal }
   ];
   private readonly legalRows: LegalRowData[] = [
-    { title: 'Политика конфиденциальности', subtitle: 'Какие данные обрабатываются, зачем и как удаляются', flow: DirectFlow.Privacy },
-    { title: 'Условия использования', subtitle: 'Правила использования приложения и сервиса', flow: DirectFlow.Legal },
-    { title: 'VPN и обработка данных', subtitle: 'Обработка данных VPN‑соединения', flow: DirectFlow.Privacy },
-    { title: 'О приложении', subtitle: 'VPN Direct · HarmonyOS', flow: DirectFlow.About }
+    { title: 'Политика конфиденциальности', subtitle: 'Какие данные обрабатываются, зачем и как удаляются', flow: DirectFlow.Privacy }, { title: 'Условия использования', subtitle: 'Правила использования приложения и сервиса', flow: DirectFlow.Legal }, { title: 'VPN и обработка данных', subtitle: 'Обработка данных VPN‑соединения', flow: DirectFlow.Privacy }, { title: 'О приложении', subtitle: 'VPN Direct · HarmonyOS', flow: DirectFlow.About }
   ];
-
   aboutToAppear(): void { void this.loadDeviceCount(); }
-  private async loadDeviceCount(): Promise<void> {
-    try { this.deviceCount = (await DirectBackendRuntime.fetchAccountDevices()).length; } catch { this.deviceCount = 0; }
-  }
-  private protectedTime(): string {
-    if (this.vpnStatus !== 'Connected' || this.connectedAt <= 0) return '00:00';
-    const seconds = Math.max(0, Math.floor((Date.now() - this.connectedAt) / 1000));
-    const h = Math.floor(seconds / 3600); const m = Math.floor((seconds % 3600) / 60); const s = seconds % 60;
-    return h > 0 ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
+  private async loadDeviceCount(): Promise<void> { try { this.deviceCount = (await DirectBackendRuntime.fetchAccountDevices()).length; } catch { this.deviceCount = 0; } }
+  private protectedTime(): string { if (this.vpnStatus !== 'Connected' || this.connectedAt <= 0) return '00:00'; const seconds = Math.max(0, Math.floor((Date.now() - this.connectedAt) / 1000)); const h = Math.floor(seconds / 3600); const m = Math.floor((seconds % 3600) / 60); const s = seconds % 60; return h > 0 ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; }
   private balanceLabel(): string { return `$${(Math.max(0, this.balanceCents) / 100).toFixed(2)}`; }
-
-  build() {
-    Scroll() { Column() {
-      Text('АККАУНТ / VPN DIRECT').fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace').width('100%');
-      Text('Профиль').fontSize(DirectTypography.pageTitle).fontWeight(600).fontColor(DirectTheme.ink).width('100%').margin({ top: 7 });
-      Text('Управление приложением и безопасностью').fontSize(13).fontColor(DirectTheme.muted).width('100%').margin({ top: 4 });
-      Row() {
-        Text(this.displayName.length > 0 ? this.displayName.substring(0, 1).toUpperCase() : 'A').fontSize(30).fontWeight(FontWeight.Medium).fontColor(DirectTheme.acid).fontFamily('monospace').width(DirectTheme.profileAvatar).height(DirectTheme.profileAvatar).textAlign(TextAlign.Center).border({ width: 1, color: '#40FFFFFF' });
-        Column() {
-          Text('DIRECT ACCOUNT').fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor('#73FFFFFF').fontFamily('monospace');
-          Text(this.displayName.length > 0 ? this.displayName : 'Войти в Direct').fontSize(19).fontWeight(600).fontColor(DirectTheme.white).maxLines(1).margin({ top: 5 });
-          Text(this.hasSubscription ? `${this.remainingDays} дн. · Активна` : 'Вход и управление подпиской').fontSize(10).fontColor('#80FFFFFF').maxLines(1).margin({ top: 5 });
-        }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 16 });
-        DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 14, color: DirectTheme.acid, weight: 1.6 });
-      }.width('100%').height(DirectTheme.profileHeroHeight).padding({ left: 16, right: 16 }).backgroundColor(DirectTheme.ink).margin({ top: 28 }).onClick(() => { DirectHaptics.selection(); this.onFlow(this.displayName.length > 0 ? DirectFlow.Management : DirectFlow.AuthLogin); });
-
-      Row() { this.profileStat('ПОДПИСОК', this.hasSubscription ? '01' : '00'); this.profileStat('УСТРОЙСТВ', String(Math.min(this.deviceCount, 99)).padStart(2, '0')); this.profileStat('ЗАЩИЩЕНО', this.protectedTime()); }.width('100%').height(DirectTheme.profileStatHeight).border({ width: { bottom: 1 }, color: DirectTheme.line });
-
-      this.sectionHeader('01', 'АККАУНТ');
-      this.utilityRow('BAL', 'Баланс', this.balanceLabel(), true, DirectFlow.Balance);
-      this.utilityRow('DEV', 'Устройства', 'Активные сеансы и лимит тарифа', false, DirectFlow.Devices);
-      this.utilityRow('PAY', 'Платежи', 'История оплат и возвратов', false, DirectFlow.PaymentHistory);
-      this.utilityRow('PROMO', 'Промокод', 'Активировать код от VPN Direct', true, DirectFlow.Account);
-      this.utilityRow('HELP', 'Поддержка', 'Оплата, вход, подписка и подключение', false, DirectFlow.Account);
-      this.utilityRow('LINK', 'Способы входа', 'Apple, email и бот — безопасная склейка', false, DirectFlow.AuthLogin);
-
-      this.sectionHeader('02', 'НАСТРОЙКИ');
-      Column() { ForEach(this.settingsRows, (row: SettingsRowData, index: number) => { this.settingsRow(row, index + 1); }); }.width('100%').margin({ top: 5 });
-      this.sectionHeader('03', 'ЮРИДИЧЕСКАЯ ИНФОРМАЦИЯ');
-      Column() { ForEach(this.legalRows, (row: LegalRowData) => { this.legalRow(row); }); }.width('100%').margin({ top: 5 });
-      Blank().height(28);
-    }.width('100%').padding({ left: DirectTheme.pageHorizontal, right: DirectTheme.pageHorizontal, top: DirectTheme.pageTop, bottom: 24 }); }.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper);
-  }
-
+  build() { Scroll() { Column() {
+    Text('АККАУНТ / VPN DIRECT').fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace').width('100%'); Text('Профиль').fontSize(DirectTypography.pageTitle).fontWeight(600).fontColor(DirectTheme.ink).width('100%').margin({ top: 7 }); Text('Управление приложением и безопасностью').fontSize(13).fontColor(DirectTheme.muted).width('100%').margin({ top: 4 });
+    Row() { Text(this.displayName.length > 0 ? this.displayName.substring(0, 1).toUpperCase() : 'A').fontSize(30).fontWeight(FontWeight.Medium).fontColor(DirectTheme.acid).fontFamily('monospace').width(DirectTheme.profileAvatar).height(DirectTheme.profileAvatar).textAlign(TextAlign.Center).border({ width: 1, color: '#40FFFFFF' }); Column() { Text('DIRECT ACCOUNT').fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor('#73FFFFFF').fontFamily('monospace'); Text(this.displayName.length > 0 ? this.displayName : 'Войти в Direct').fontSize(19).fontWeight(600).fontColor(DirectTheme.white).maxLines(1).margin({ top: 5 }); Text(this.hasSubscription ? `${this.remainingDays} дн. · Активна` : 'Оплата и вход').fontSize(10).fontColor('#80FFFFFF').maxLines(1).margin({ top: 5 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 16 }); DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 14, color: DirectTheme.acid, weight: 1.6 }); }.width('100%').height(DirectTheme.profileHeroHeight).padding({ left: 16, right: 16 }).backgroundColor(DirectTheme.ink).margin({ top: 28 }).onClick(() => { DirectHaptics.selection(); this.onFlow(this.displayName.length > 0 ? DirectFlow.Account : DirectFlow.AuthLogin); });
+    Row() { this.profileStat('ПОДПИСОК', this.hasSubscription ? '01' : '00'); this.profileStat('УСТРОЙСТВ', String(Math.min(this.deviceCount, 99)).padStart(2, '0')); this.profileStat('ЗАЩИЩЕНО', this.protectedTime()); }.width('100%').height(DirectTheme.profileStatHeight).border({ width: { bottom: 1 }, color: DirectTheme.line });
+    this.sectionHeader('01', 'АККАУНТ'); this.utilityRow('BAL', 'Баланс', this.balanceLabel(), true, DirectFlow.Balance); this.utilityRow('DEV', 'Устройства', 'Активные сеансы и лимит тарифа', false, DirectFlow.Devices); this.utilityRow('PAY', 'Платежи', 'История оплат и возвратов', false, DirectFlow.PaymentHistory); this.utilityRow('PROMO', 'Промокод', 'Активировать код от VPN Direct', true, DirectFlow.Account); this.utilityRow('HELP', 'Поддержка', 'Оплата, вход, подписка и подключение', false, DirectFlow.Account); this.utilityRow('LINK', 'Способы входа', 'Apple, email и бот — безопасная склейка', false, DirectFlow.AuthLogin);
+    this.sectionHeader('02', 'НАСТРОЙКИ'); Column() { ForEach(this.settingsRows, (row: SettingsRowData, index: number) => this.settingsRow(row, index + 1)); }.width('100%').margin({ top: 5 }); this.sectionHeader('03', 'ЮРИДИЧЕСКАЯ ИНФОРМАЦИЯ'); Column() { ForEach(this.legalRows, (row: LegalRowData) => this.legalRow(row)); }.width('100%').margin({ top: 5 }); Blank().height(28);
+  }.width('100%').padding({ left: DirectTheme.pageHorizontal, right: DirectTheme.pageHorizontal, top: DirectTheme.pageTop, bottom: 24 }); }.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper); }
   @Builder profileStat(label: string, value: string) { Column() { Text(label).fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); Text(value).fontSize(16).fontWeight(600).fontColor(DirectTheme.ink).fontFamily('monospace').margin({ top: 7 }).maxLines(1); }.layoutWeight(1).height('100%').alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center).padding({ left: 12 }).border({ width: { left: 1 }, color: DirectTheme.line }); }
   @Builder sectionHeader(number: string, title: string) { Row() { Text(number).fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace'); Text(title).fontSize(DirectTypography.caption).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace').margin({ left: 8 }); Blank(); }.width('100%').height(36).margin({ top: 18 }).border({ width: { top: 1 }, color: DirectTheme.ink }); }
   @Builder utilityRow(mark: string, title: string, detail: string, accent: boolean, flow: DirectFlow) { Row() { Text(mark).fontSize(8).fontWeight(FontWeight.Bold).fontColor(accent ? DirectTheme.acid : DirectTheme.ink).fontFamily('monospace').width(42).height(42).textAlign(TextAlign.Center).backgroundColor(accent ? DirectTheme.ink : DirectTheme.fieldFill).border({ width: accent ? 0 : 1, color: DirectTheme.line }); Column() { Text(title).fontSize(13).fontWeight(600).fontColor(DirectTheme.ink); Text(detail).fontSize(10).fontColor(DirectTheme.muted).margin({ top: 4 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 12 }); DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 11, color: DirectTheme.ink, weight: 1.5 }); }.width('100%').constraintSize({ minHeight: DirectTheme.utilityRowMin }).border({ width: { bottom: 1 }, color: DirectTheme.line }).onClick(() => { DirectHaptics.selection(); this.onFlow(flow); }); }
