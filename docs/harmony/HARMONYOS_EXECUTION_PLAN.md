@@ -5,6 +5,15 @@
 
 This is the execution checklist for the HarmonyOS port. Work proceeds from the VPN datapath outward: first a buildable application, then a real TUN, then the native Core, then a verified tunnel, then product features and release qualification.
 
+## Critical API boundary: third-party VPN vs system VPN
+
+HarmonyOS exposes two different VPN API layers and they must not be confused:
+
+- **Third-party VPN:** `vpnExtension` / `VpnExtensionAbility` from `@kit.NetworkKit`. This is the path VPN Direct uses. Huawei's third-party VPN guide states that this capability is intended for building custom VPN clients, that the app implements the tunnel internals itself, and that `ohos.permission.INTERNET` is required. The first connection also goes through the system VPN trust/authorization UI.
+- **System VPN management:** `@ohos.net.vpn` is a system API. Its `setUp`, `protect`, and `destroy` operations require `ohos.permission.MANAGE_VPN` and are restricted to system applications. We therefore **must not add `MANAGE_VPN` to VPN Direct as if it were a normal third-party runtime permission**. If a future distribution target requires a system/privileged VPN integration, that is a separate product/signing track.
+
+This distinction is now part of the implementation gate: use `vpnExtension` for the consumer AppGallery client and verify permission/signing requirements against the target HarmonyOS SDK before release. citeturn2search0turn2search4
+
 ## Non-negotiable architecture
 
 ```text
@@ -13,6 +22,7 @@ ArkUI / ArkTS
       ▼
 VPN Direct application state
       │
+      │ startVpnExtensionAbility(Want)
       ▼
 VpnExtensionAbility
       │
@@ -46,8 +56,8 @@ The HarmonyOS layer is a platform adapter. The existing VPN Direct Core remains 
 - [ ] Configure HarmonyOS SDK/API and native toolchain
 - [ ] Add EntryAbility and initial ArkUI page
 - [ ] Add application resources and icons
-- [ ] Add `ohos.permission.INTERNET`
-- [ ] Register `VpnExtensionAbility`
+- [x] Declare `ohos.permission.INTERNET`
+- [x] Register `VpnExtensionAbility`
 - [ ] Produce a signed/debug HAP locally
 - [ ] Verify installation on a real HarmonyOS NEXT device
 
@@ -55,16 +65,17 @@ The HarmonyOS layer is a platform adapter. The existing VPN Direct Core remains 
 
 **Definition of done:** HarmonyOS creates and destroys a real VPN TUN reliably.
 
-- [ ] Implement `VpnExtensionAbility` lifecycle
-- [ ] Create `VpnConnection`
-- [ ] Create VPN configuration
-- [ ] Obtain the TUN file descriptor
-- [ ] Implement deterministic start/stop lifecycle
-- [ ] Make repeated start/stop idempotent
-- [ ] Handle extension destruction safely
-- [ ] Validate IPv4 routes
-- [ ] Validate IPv6 routes
-- [ ] Validate DNS configuration
+- [x] Implement `VpnExtensionAbility` lifecycle scaffold
+- [x] Create `VpnConnection`
+- [x] Create VPN configuration
+- [x] Request TUN creation through `VpnConnection.create`
+- [x] Generate a VPN ID before creating the connection
+- [x] Implement deterministic start/stop lifecycle
+- [x] Make repeated start/stop idempotent in the adapter
+- [x] Handle extension destruction safely
+- [ ] Validate IPv4 routes on a real device
+- [ ] Validate IPv6 routes on a real device
+- [ ] Validate DNS configuration on a real device
 - [ ] Validate Wi-Fi/cellular transitions
 - [ ] Test screen lock/background lifecycle
 
@@ -73,10 +84,11 @@ The HarmonyOS layer is a platform adapter. The existing VPN Direct Core remains 
 **Definition of done:** `libvpndirect_core.so` is a real HarmonyOS ARM64 native artifact built from the repository's pinned Core.
 
 - [ ] Define the stable Harmony Core ABI
-- [ ] Implement native start/stop entry points
-- [ ] Make native calls non-blocking for ArkTS
-- [ ] Implement thread-safe lifecycle state
-- [ ] Implement error propagation to ArkTS
+- [x] Implement native start/stop entry points
+- [x] Make ArkTS/native status codes explicit
+- [ ] Make native Core calls non-blocking for ArkTS
+- [x] Implement thread-safe bridge lifecycle state
+- [x] Implement error propagation to ArkTS
 - [ ] Build VPN Direct Core for HarmonyOS/OpenHarmony ARM64
 - [ ] Preserve Core version `0.1.0`
 - [ ] Preserve `sing-box-lx` revision `v1.14.0-lx.35`
@@ -89,7 +101,7 @@ The HarmonyOS layer is a platform adapter. The existing VPN Direct Core remains 
 **Definition of done:** pressing CONNECT on a real Huawei device establishes a real tunnel and routes internet traffic through a known-good VPN endpoint.
 
 - [ ] Connect TUN fd to the native Core
-- [ ] Pass a validated profile as data
+- [x] Pass a validated profile as data through the extension launch `Want`
 - [ ] Start Core with one known-good profile
 - [ ] Establish a real VPN session
 - [ ] Verify IPv4 internet traffic
@@ -160,7 +172,7 @@ Every release candidate must have evidence for:
 | Area | Required evidence |
 | --- | --- |
 | Install | HAP installs successfully |
-| Permission | VPN permission flow succeeds |
+| Permission | VPN permission/trust flow succeeds |
 | TUN | TUN is created and destroyed |
 | Connect | Real tunnel established |
 | IPv4 | Internet traffic routed |
