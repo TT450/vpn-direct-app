@@ -14,96 +14,21 @@ export interface DirectLocationRecord {
   city: string;
   region: string;
   host?: string;
+  latencyMs?: number;
+  loadPercent?: number;
 }
 
-export interface DirectBalanceTransaction {
-  id: string;
-  kind: string;
-  amountUsdCents: number;
-  title: string;
-  createdAt: string;
-  debit: boolean;
-}
-
-export interface DirectBalanceSnapshot {
-  usdCents: number;
-  transactions: DirectBalanceTransaction[];
-}
-
-export interface DirectMe {
-  authenticated?: boolean;
-  email?: string;
-  username?: string;
-  phone?: string;
-  planName?: string;
-  inAppBalance?: number;
-  hasSubscription?: boolean;
-  subscriptionUrl?: string;
-  remainingDays?: number;
-}
-
-export interface DirectAppCatalog {
-  currency: string;
-  tariffs: Object[];
-  constructor: Object | null;
-  addons: Object | null;
-  monthMultipliers: Record<string, number>;
-}
-
-export interface DirectCheckoutQuoteRequest {
-  productKind: string;
-  tariffId?: number;
-  days?: number;
-  devices?: number;
-  trafficGb?: number;
-}
-
-export interface DirectCheckoutQuote {
-  productKind?: string;
-  amount?: number;
-  currency?: string;
-  days?: number;
-  devices?: number;
-  trafficGb?: number;
-  title?: string;
-  planName?: string;
-  error?: string;
-}
-
-export interface DirectCheckoutStatus {
-  paymentId?: string;
-  status?: string;
-  fulfilled?: boolean;
-  amount?: number;
-  title?: string;
-  subscriptionUrl?: string;
-  error?: string;
-}
-
-export interface DirectAccountDevice {
-  id: string;
-  label: string;
-  detail: string;
-  isCurrent: boolean;
-}
-
-export interface DirectAccountPayment {
-  id: string;
-  title: string;
-  subtitle: string;
-  amountLabel: string;
-  statusLabel: string;
-  isRefundLike: boolean;
-}
-
-export interface DirectPromoRedeemResult {
-  ok: boolean;
-  message: string;
-}
-
-function notImplemented(name: string): Error {
-  return new Error(`${name} is not available in this build`);
-}
+export interface DirectBalanceTransaction { id: string; kind: string; amountUsdCents: number; title: string; createdAt: string; debit: boolean; }
+export interface DirectBalanceSnapshot { usdCents: number; transactions: DirectBalanceTransaction[]; }
+export interface DirectMe { authenticated?: boolean; email?: string; username?: string; phone?: string; planName?: string; inAppBalance?: number; hasSubscription?: boolean; subscriptionUrl?: string; remainingDays?: number; }
+export interface DirectAppCatalog { currency: string; tariffs: Object[]; constructor: Object | null; addons: Object | null; monthMultipliers: Record<string, number>; }
+export interface DirectCheckoutQuoteRequest { productKind: string; tariffId?: number; days?: number; devices?: number; trafficGb?: number; }
+export interface DirectCheckoutQuote { productKind?: string; amount?: number; currency?: string; days?: number; devices?: number; trafficGb?: number; title?: string; planName?: string; error?: string; }
+export interface DirectCheckoutStatus { paymentId?: string; status?: string; fulfilled?: boolean; amount?: number; title?: string; subscriptionUrl?: string; error?: string; }
+export interface DirectAccountDevice { id: string; label: string; detail: string; isCurrent: boolean; }
+export interface DirectAccountPayment { id: string; title: string; subtitle: string; amountLabel: string; statusLabel: string; isRefundLike: boolean; }
+export interface DirectPromoRedeemResult { ok: boolean; message: string; }
+function notImplemented(name: string): Error { return new Error(`${name} is not available in this build`); }
 
 export class DirectBackendRuntime {
   static appContext: common.UIAbilityContext | null = null;
@@ -130,9 +55,7 @@ export class DirectBackendRuntime {
   static fetchMe: (() => Promise<DirectMe>) | null = null;
   static refreshAccount: (() => Promise<DirectMe | null>) | null = null;
   static bootstrapSession: (() => Promise<void>) | null = null;
-  static fetchAppCatalog: () => Promise<DirectAppCatalog> = async (): Promise<DirectAppCatalog> => {
-    return { currency: 'RUB', tariffs: [], constructor: null, addons: null, monthMultipliers: {} };
-  };
+  static fetchAppCatalog: () => Promise<DirectAppCatalog> = async (): Promise<DirectAppCatalog> => ({ currency: 'RUB', tariffs: [], constructor: null, addons: null, monthMultipliers: {} });
   static quoteCheckout: ((req: DirectCheckoutQuoteRequest) => Promise<DirectCheckoutQuote>) | null = null;
   static checkoutStatus: ((paymentId: string) => Promise<DirectCheckoutStatus>) | null = null;
   static fetchAccountDevices: () => Promise<DirectAccountDevice[]> = async (): Promise<DirectAccountDevice[]> => [];
@@ -148,9 +71,5 @@ export class DirectBackendRuntime {
     for (let i = 0; i < list.length; i++) { const entry = list[i]; if (h === entry || h.endsWith('.' + entry)) return true; }
     return false;
   }
-  static warmUp(context?: common.UIAbilityContext): void {
-    if (context) DirectBackendRuntime.appContext = context;
-    const install = DirectBackendRuntime.localInstaller;
-    if (install) install(context);
-  }
+  static warmUp(context?: common.UIAbilityContext): void { if (context) DirectBackendRuntime.appContext = context; const install = DirectBackendRuntime.localInstaller; if (install) install(context); }
 }
