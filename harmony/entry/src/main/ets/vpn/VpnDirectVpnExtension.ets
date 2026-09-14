@@ -6,25 +6,38 @@ import { HarmonyCoreBridge } from './HarmonyCoreBridge';
 /**
  * VPN Direct HarmonyOS NEXT platform adapter.
  *
- * Platform boundary only: HarmonyOS owns the TUN lifecycle, while the
- * VPN Direct Core owns protocol/session processing. No server address,
- * subscription URL, credential or executable code is accepted from config.
+ * This is a third-party VPN extension. The system starts this ability after
+ * the user grants VPN trust through the system VPN authorization flow.
+ * The application uses vpnExtension, not the system-only @ohos.net.vpn API.
  */
 export default class VpnDirectVpnExtension extends VpnExtensionAbility {
   private vpnConnection?: vpnExtension.VpnConnection;
-  private vpnId?: string;
+  private vpnId: string = '';
   private tunFd: number = -1;
   private core?: HarmonyCoreBridge;
+  private stopping: boolean = false;
 
   onCreate(want: Want): void {
     hilog.info(0xD1, 'VPNDirect', 'VPN extension created');
     this.vpnConnection = vpnExtension.createVpnConnection(this.context);
     this.core = new HarmonyCoreBridge();
+
+    const parameters = want.parameters as Record<string, Object> | undefined;
+    const profileJson = this.stringValue(parameters?.['profileJson'], '');
+    if (profileJson.length > 0) {
+      this.start(profileJson).catch((error: Error) => {
+        hilog.error(0xD1, 'VPNDirect', 'VPN start failed: %{public}s', error.message);
+        this.stop().catch(() => undefined);
+      });
+    }
   }
 
-  async start(profileJson: string): Promise<void> {
+  private async start(profileJson: string): Promise<void> {
     if (!this.vpnConnection || !this.core) {
       throw new Error('VPN extension is not initialized');
+    }
+    if (this.tunFd >= 0) {
+      return;
     }
 
     const profile = JSON.parse(profileJson) as Record<string, Object>;
@@ -33,40 +46,64 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
     const mtu = this.numberValue(profile['mtu'], 1400);
     const ipv6 = this.booleanValue(profile['ipv6'], true);
 
+    // VPN Config is platform routing/TUN state. It does not contain or load
+    // executable code. The actual tunnel protocol is implemented by Core.
     const config = {
       addresses: [{ address, prefixLength: 32 }],
       routes: [{ address: '0.0.0.0', prefixLength: 0 }],
       dnsAddresses: [dns],
       mtu,
-      isIPv6: ipv6,
+      isIPv4Accepted: true,
+      isIPv6Accepted: ipv6,
       isInternal: false,
       isBlocking: false
     };
 
+    this.vpnId = await this.vpnConnection.generateVpnId();
     this.tunFd = await this.vpnConnection.create(config);
     if (this.tunFd < 0) {
+      this.vpnId = '';
       throw new Error('HarmonyOS VPN TUN creation failed');
     }
 
-    await this.core.start(this.tunFd, profileJson);
-    this.vpnId = 'vpndirect-' + Date.now().toString();
-    hilog.info(0xD1, 'VPNDirect', 'VPN started, tunFd=%{public}d', this.tunFd);
-  }
-
-  async stop(): Promise<void> {
     try {
-      await this.core?.stop();
-    } finally {
-      if (this.vpnConnection && this.vpnId) {
-        await this.vpnConnection.destroy(this.vpnId);
-      }
-      this.vpnId = undefined;
-      this.tunFd = -1;
+      await this.core.start(this.tunFd, profileJson);
+      hilog.info(0xD1, 'VPNDirect', 'VPN started, tunFd=%{public}d', this.tunFd);
+    } catch (error) {
+      await this.destroyVpnConnection();
+      throw error;
     }
   }
 
+  private async stop(): Promise<void> {
+    if (this.stopping) {
+      return;
+    }
+    this.stopping = true;
+    try {
+      await this.core?.stop();
+    } finally {
+      await this.destroyVpnConnection();
+      this.stopping = false;
+    }
+  }
+
+  private async destroyVpnConnection(): Promise<void> {
+    if (this.vpnConnection && this.vpnId.length > 0) {
+      try {
+        await this.vpnConnection.destroy(this.vpnId);
+      } catch (error) {
+        hilog.error(0xD1, 'VPNDirect', 'VPN destroy failed: %{public}s', JSON.stringify(error));
+      }
+    }
+    this.vpnId = '';
+    this.tunFd = -1;
+  }
+
   onDestroy(): void {
-    this.stop().catch(() => undefined);
+    this.stop().catch((error: Error) => {
+      hilog.error(0xD1, 'VPNDirect', 'VPN cleanup failed: %{public}s', error.message);
+    });
     hilog.info(0xD1, 'VPNDirect', 'VPN extension destroyed');
   }
 
