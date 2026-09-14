@@ -1,81 +1,120 @@
-# VPN Direct — HarmonyOS NEXT
+<p align="center">
+  <img src="docs/brand/github-hero-harmony.svg" alt="VPN Direct — HarmonyOS NEXT" width="100%" />
+</p>
 
-VPN Direct is a native HarmonyOS NEXT VPN client using **ArkTS/ArkUI**, **VpnExtensionAbility** and the project’s own reproducible **VPN Direct Core** based on the pinned sing-box-lx source.
+<p align="center">
+  <a href="README.md"><b>English</b></a> ·
+  <a href="README_ru.md">Русский</a> ·
+  <a href="README_uz.md">Oʻzbekcha</a> ·
+  <a href="README_zh.md">简体中文</a>
+</p>
 
-> This `harmony-os-app` branch is the HarmonyOS platform branch. Apple-only runtime details such as NetworkExtension, PacketTunnelProvider, StoreKit, App Store and TestFlight are intentionally not used here.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-16A765.svg?style=flat-square" alt="GPLv3" /></a>
+  <img src="https://img.shields.io/badge/platform-HarmonyOS%20NEXT-0B3023.svg?style=flat-square" alt="HarmonyOS NEXT" />
+  <img src="https://img.shields.io/badge/ArkTS-ArkUI-0B3023.svg?style=flat-square" alt="ArkTS / ArkUI" />
+  <img src="https://img.shields.io/badge/ABI-ARM64-0B3023.svg?style=flat-square" alt="ARM64" />
+  <a href="https://github.com/TT450/vpn-direct-app/stargazers"><img src="https://img.shields.io/github/stars/TT450/vpn-direct-app?style=flat-square" alt="GitHub stars" /></a>
+  <a href="https://t.me/vpndirectbot"><img src="https://img.shields.io/badge/Telegram-@vpndirectbot-229ED9?style=flat-square&logo=telegram&logoColor=white" alt="Telegram" /></a>
+</p>
 
-## Architecture
+<p align="center"><b>A native HarmonyOS NEXT VPN client powered by the reproducible VPN Direct Core.</b></p>
+
+<p align="center">
+  <a href="docs/harmony/ARCHITECTURE.md"><b>Architecture</b></a> ·
+  <a href="docs/harmony/BUILDING.md"><b>Build</b></a> ·
+  <a href="docs/harmony/DEVICE_QUALIFICATION.md"><b>Device Qualification</b></a> ·
+  <a href="docs/core/PROTOCOL_MATRIX.md"><b>Protocol Matrix</b></a> ·
+  <a href="docs/compatibility/README.md"><b>Compatibility</b></a> ·
+  <a href="CONTRIBUTING.md"><b>Contribute</b></a>
+</p>
+
+---
+
+## VPN Direct for HarmonyOS NEXT
+
+This branch is the dedicated **HarmonyOS NEXT** platform implementation of VPN Direct. It uses the native HarmonyOS VPN extension model rather than attempting to reuse Apple runtime components.
+
+The platform layer is intentionally thin:
+
+- **ArkUI / ArkTS** for the application UI and platform-facing code;
+- **`VpnExtensionAbility`** for the VPN lifecycle;
+- **HarmonyOS TUN** for the virtual network interface;
+- **N-API** for the ArkTS → native boundary;
+- **VPN Direct Core** for protocol/session processing;
+- the project’s pinned **sing-box-lx `v1.14.0-lx.35`** lineage underneath the Core.
+
+### Platform architecture
 
 ```text
-ArkUI / VPN Direct UI
-        │
-        ▼
-VPN service state / subscription data
-        │
-        ▼
-VpnDirectVpnExtension
-(VpnExtensionAbility)
-        │
-        ├── HarmonyOS VpnConnection
-        │       └── system TUN fd
-        │
-        ▼
-N-API native bridge
-        │
-        ▼
-VPN Direct Core
-        │
-        ▼
-sing-box-lx v1.14.0-lx.35
+┌─────────────────────────────────────────────────────┐
+│                 VPN Direct · HarmonyOS               │
+│                    ArkUI · ArkTS                     │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│               VpnExtensionAbility                   │
+│             VPN lifecycle · permissions             │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│                 HarmonyOS TUN                       │
+│            virtual interface · routes               │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│                  N-API bridge                       │
+│                ArkTS ↔ native ABI                   │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│                VPN Direct Core                      │
+│       capabilities · configuration · runtime        │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│              sing-box-lx v1.14.0-lx.35              │
+└─────────────────────────────────────────────────────┘
 ```
 
-HarmonyOS supplies the virtual network interface and VPN lifecycle; VPN Direct implements the tunnel internals and protocol processing. Huawei’s VPN API explicitly follows this model: the application creates the virtual network and implements the tunnel internals itself. citeturn0search4
+## Adapter decision
 
-## Adapter choice
+The adapter was selected from real HarmonyOS VPN implementations rather than treating any single project as a drop-in library.
 
-The HarmonyOS adapter is based on a comparison of real open-source implementations:
+| Reference | Role | What VPN Direct takes from it |
+| --- | --- | --- |
+| **Hey** | Primary architecture reference | `VpnExtensionAbility` + native N-API boundary + TUN/native data-plane model |
+| **HarmonyOS_VPN** | Reliability reference | VPN lifecycle, dual-stack routing, extension/process separation and real-device qualification approach |
+| **ClashHM** | Secondary native-runtime reference | Native core integration and extension-oriented runtime boundary |
 
-- **Hey** — primary architecture reference. It uses ArkTS, Stage model, `VpnExtensionAbility`, a native N-API bridge and a TUN-to-native-core data plane. Its documented path is `HarmonyOS VPN TUN fd → native TUN adapter → local core inbound → protocol core`. citeturn0search0
-- **HarmonyOS_VPN** — reliability/reference implementation. It demonstrates real-device VPN lifecycle, dual-stack TUN routing, process protection, and a separation between UI state and the VPN extension process. Its embedded sing-box version is **not** used by VPN Direct because this project is pinned to `v1.14.0-lx.35`. citeturn0search2
-- **ClashHM** — secondary reference for keeping the VPN runtime inside `VpnExtensionAbility` and using a native core without requiring a foreground process. citeturn0search5
+The implementation remains **VPN Direct-specific**. We do not copy another project's executable runtime or replace the project’s Core pin with a different sing-box release.
 
-**Decision:** use the `Hey`-style platform boundary and TUN/native bridge, with the stronger lifecycle/reliability rules demonstrated by `HarmonyOS_VPN`, while keeping **VPN Direct Core** and its existing protocol/build pins unchanged.
+## Core
 
-## Core pin
+The HarmonyOS platform uses the same Core lineage tracked by this repository:
 
-The HarmonyOS port uses the same project Core lineage instead of silently substituting another sing-box build:
+| Component | Pin |
+| --- | --- |
+| VPN Direct Core | `0.1.0` |
+| sing-box source | `Leadaxe/sing-box-lx` |
+| sing-box revision | `v1.14.0-lx.35` |
+| upstream version | `1.14.0` |
+| Go toolchain | `go1.26.6` |
 
-- Core: `VPNDirectCore 0.1.0`
-- sing-box source: `Leadaxe/sing-box-lx`
-- revision: `v1.14.0-lx.35`
-- upstream version: `1.14.0`
-- Go: `go1.26.6`
+The authoritative version record is [`core/VERSION`](core/VERSION). No Apple `Libbox.xcframework` is used by the HarmonyOS target.
 
-These pins are authoritative in [`core/VERSION`](core/VERSION). fileciteturn631file0L2-L2
+## Security model
 
-## HarmonyOS application metadata
+The native Core is application executable code and is packaged into the signed HarmonyOS application. Subscription and configuration data are data only: they cannot download, replace or hot-swap native libraries or other executable payloads.
 
-| Apple concept | HarmonyOS implementation |
-|---|---|
-| `Info.plist` | `harmony/AppScope/app.json5` + `entry/src/main/module.json5` |
-| SwiftUI | ArkUI / ArkTS |
-| `NetworkExtension` | `VpnExtensionAbility` |
-| `NEPacketTunnelProvider` | `VpnDirectVpnExtension` |
-| `NETunnelProviderManager` | HarmonyOS `vpnExtension.VpnConnection` |
-| `Libbox.xcframework` | signed ARM64 HarmonyOS native library |
-| App Store / TestFlight | AppGallery Connect |
-| StoreKit / RevenueCat | separate HarmonyOS monetisation layer; not part of the VPN adapter |
-| Apple App Group | HarmonyOS private storage / IPC |
+This public repository intentionally contains no private backend credentials, production server secrets, signing material or real subscription URLs.
 
-Huawei documents `VpnExtensionAbility` as the Stage-model extension used for third-party VPNs and `VpnConnection.create()` as the API that creates the VPN network and returns the virtual-interface file descriptor. citeturn0search1turn0search6
-
-## Security boundary
-
-The native core is executable application code and must be packaged into the signed HAP. Subscription/configuration data can describe a server or protocol, but it cannot download, replace or hot-swap `.so` files or other executable code.
-
-No private backend endpoints, credentials, signing material or real subscription URLs belong in this public repository.
-
-## Current HarmonyOS tree
+## Current implementation
 
 ```text
 harmony/
@@ -90,16 +129,62 @@ harmony/
         └── napi_init.cpp
 ```
 
-## Build status
+The platform boundary is in place. The remaining engineering gate is the native ARM64 HarmonyOS build of the VPN Direct Core ABI, HAP packaging, and real-device qualification.
 
-The platform adapter and HarmonyOS metadata are now on **`harmony-os-app`**. The remaining platform-specific work is the DevEco/NDK implementation of the `VPNDirectCore` native ABI, packaging the ARM64 library into the HAP, and real-device qualification.
+> **Status:** source architecture is implemented; this branch does not claim a compiled HAP or real-device qualification until DevEco build and device evidence are available.
 
-This repository change does **not** claim that a HarmonyOS HAP or `.so` has been compiled in this environment.
+## Documentation
 
-## Existing Core architecture
+| Document | Purpose |
+| --- | --- |
+| [HarmonyOS Architecture](docs/harmony/ARCHITECTURE.md) | Platform boundary, lifecycle and data path |
+| [HarmonyOS Build Guide](docs/harmony/BUILDING.md) | DevEco / native build and packaging |
+| [Device Qualification](docs/harmony/DEVICE_QUALIFICATION.md) | Real-device acceptance checklist |
+| [Core Architecture](docs/core/ARCHITECTURE.md) | Shared VPN Direct Core design |
+| [Core Build Guide](docs/core/BUILDING.md) | Core pins and reproducible builds |
+| [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) | Parser / runtime / qualification status |
+| [Compatibility](docs/compatibility/README.md) | Panels, subscriptions and protocol formats |
+| [Changelog](CHANGELOG.md) | Project history |
+| [Contributing](CONTRIBUTING.md) | Engineering and contribution rules |
+| [Security](SECURITY.md) | Vulnerability reporting |
 
-The project’s Core remains intentionally thin and capability-driven: protocol parsing/building is separated from the native runtime, and unsupported features must fail closed rather than being silently converted. fileciteturn636file0L2-L2
+## Repository map
+
+```text
+vpn-direct-app/
+├── harmony/                 HarmonyOS NEXT application + VPN adapter
+├── ApplicationLibrary/      Shared Apple application sources
+├── Extension/               Apple Packet Tunnel implementation
+├── Library/                 Shared parsers / builders / Core bridge
+├── core/                    VPN Direct Core + version pins
+│   ├── VERSION
+│   ├── protocol-matrix.json
+│   ├── overlays/
+│   └── sing-box/
+├── scripts/                 Reproducible Core build / validation scripts
+├── tests/                   Regression fixtures
+├── interop/                 Interoperability scaffolding
+└── docs/                    Platform and Core engineering documentation
+```
+
+## Development principles
+
+1. Keep the platform adapter thin and the networking logic in VPN Direct Core.
+2. Use capability discovery instead of hardcoding protocol assumptions.
+3. Fail closed when a feature is not proven by the linked Core.
+4. Keep executable Core code inside the signed application package.
+5. Never commit credentials, signing keys, private server material or production subscription URLs.
+6. Do not mark a protocol `tested` without real-device and interoperability evidence.
 
 ## License
 
-VPN Direct is distributed under the GNU General Public License v3 or later. See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE) and [`docs/core/LICENSE_AUDIT.md`](docs/core/LICENSE_AUDIT.md).
+VPN Direct is distributed under the **GNU General Public License v3 or later**.
+
+See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE) and [`docs/core/LICENSE_AUDIT.md`](docs/core/LICENSE_AUDIT.md).
+
+---
+
+<p align="center">
+  <b>VPN Direct · HarmonyOS NEXT</b><br/>
+  Native platform adapter · reproducible Core · explicit capabilities
+</p>
