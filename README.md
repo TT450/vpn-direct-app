@@ -1,263 +1,105 @@
-<p align="center">
-  <img src="docs/brand/github-hero.svg" alt="VPN Direct" width="100%" />
-</p>
+# VPN Direct — HarmonyOS NEXT
 
-<p align="center">
-  <a href="README.md"><b>English</b></a> ·
-  <a href="README_ru.md">Русский</a> ·
-  <a href="README_uz.md">Oʻzbekcha</a> ·
-  <a href="README_zh.md">简体中文</a>
-</p>
+VPN Direct is a native HarmonyOS NEXT VPN client using **ArkTS/ArkUI**, **VpnExtensionAbility** and the project’s own reproducible **VPN Direct Core** based on the pinned sing-box-lx source.
 
-<p align="center">
-  <a href="https://github.com/TT450/vpn-direct-app/actions/workflows/core-baseline.yml"><img src="https://github.com/TT450/vpn-direct-app/actions/workflows/core-baseline.yml/badge.svg" alt="Core baseline" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-2563EB.svg?style=flat-square" alt="GPLv3" /></a>
-  <img src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-111827.svg?style=flat-square" alt="Apple platforms" />
-  <a href="https://github.com/TT450/vpn-direct-app/stargazers"><img src="https://img.shields.io/github/stars/TT450/vpn-direct-app?style=flat-square" alt="GitHub stars" /></a>
-  <a href="https://t.me/vpndirectbot"><img src="https://img.shields.io/badge/Telegram-@vpndirectbot-229ED9?style=flat-square&logo=telegram&logoColor=white" alt="Telegram" /></a>
-</p>
-
-<p align="center"><b>A native Apple VPN client with its own reproducible, capability-driven Core built on sing-box.</b></p>
-
-<p align="center">
-  <a href="https://apps.apple.com/app/id6807402257"><b>App Store</b></a> ·
-  <a href="https://testflight.apple.com/join/yfCEbunt"><b>TestFlight</b></a> ·
-  <a href="docs/compatibility/README.md"><b>Compatibility & Providers</b></a> ·
-  <a href="docs/core/ARCHITECTURE.md"><b>Architecture</b></a> ·
-  <a href="docs/core/PROTOCOL_MATRIX.md"><b>Protocol Matrix</b></a> ·
-  <a href="docs/core/BUILDING.md"><b>Build</b></a> ·
-  <a href="CONTRIBUTING.md"><b>Contribute</b></a>
-</p>
-
----
-
-## VPN Direct
-
-VPN Direct is an open-source VPN client for **iOS, macOS and tvOS**.
-
-The Apple application keeps the proven `NetworkExtension` / `PacketTunnelProvider` architecture, while the networking layer is moving to **VPN Direct Core** — a thin, reproducible Core based on sing-box and selected upstream-compatible extensions.
-
-The project is designed around four principles:
-
-- **Native Apple integration** — system VPN tunnel, Network Extension lifecycle and Apple platform support.
-- **Capability-driven Core** — the application asks the linked Core what it actually supports instead of guessing.
-- **Reproducible builds** — Core version, sing-box pin, Go toolchain, gomobile and build profiles are tracked.
-- **No silent protocol substitution** — unsupported features fail explicitly instead of being converted into another transport.
-
-## Why VPN Direct Core?
-
-VPN Direct Core keeps the Apple application stable while making the networking layer independently maintainable.
-
-```text
-Subscription / Config
-        │
-        ▼
-Content Detector
-        │
-        ▼
-Universal Parser / Format Adapters
-        │
-        ▼
-NormalizedSubscription → Location → Node
-        │
-        ▼
-Capability Resolver + Outbound Builder
-        │
-        ▼
-VPN Direct Core (Libbox / sing-box)
-        │
-        ▼
-NetworkExtension
-```
-
-The Core remains intentionally close to upstream sing-box. Custom functionality should stay isolated behind build tags, overlays or small patches so upstream updates remain realistic.
-
-## Current Core status
-
-Latest published: [`v1.0.11.63`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.63) (marketing **1.0.11**, TestFlight build **63**) · Core pin: see [`core/VERSION`](core/VERSION) (`sing-box-lx` / Go / gomobile).
-
-A feature is not **production / `tested`** merely because a builder exists. Production requires:
-
-`import → Core validation → Packet Tunnel start → handshake → TCP/UDP → DNS → reconnect → iOS memory check`
-
-Authoritative row-level status: [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) · machine-readable [`core/protocol-matrix.json`](core/protocol-matrix.json).
-
-**v1.0.6 is battle-key qualification-ready** (parsers + Core + interop templates). Matrix Interop stays `planned` until live evidence is attached — do not treat `parser+runtime` as `tested`.
-
-| Area | State |
-| --- | --- |
-| Custom Libbox build + Core baseline CI | Implemented (fixtures, ABI, Libbox, SFI) |
-| Core ABI + CapabilityJSON (fail-closed) | Implemented |
-| Remnawave / Happ topology (locations, Auto, detour) | Implemented (harvest P0) |
-| VLESS TCP / TLS / REALITY / WS / gRPC / HTTPUpgrade | Runtime baseline |
-| VLESS XHTTP / encryption (PQ) | Parser + runtime; interop qualification ongoing |
-| Hysteria / Hysteria2 (+ share + Xray) | Parser + runtime; interop ongoing |
-| VMess / Trojan / Shadowsocks / TUIC / AnyTLS / ShadowTLS / Naive | Parser + builder; interop ongoing |
-| WireGuard / AmneziaWG 2–3.1 (URI + `.conf`) | Parser + runtime; device qualification ongoing |
-| MASQUE CONNECT-IP / WARP profile | Parser + runtime; qualification ongoing |
-| Clash / Mihomo YAML (proxies + nested opts) | Implemented |
-| Content detector + production gate | Implemented (`make check-production-ready`) |
-| Mieru | Parser + Core runtime (`with_mieru`); interop planned |
-| Interop lab / iPhone `tested` evidence | Runnable templates + checklist; live evidence pending |
-| CONNECT-UDP / Tailscale / OpenVPN import | Shipped in **1.0.10** (parser + graph); device Libbox rebuild / qualification ongoing |
-| Home / Control Center widgets | Shipped in **1.0.11**; in-place toggle + status polish in **1.0.11.63** |
+> This `harmony-os-app` branch is the HarmonyOS platform branch. Apple-only runtime details such as NetworkExtension, PacketTunnelProvider, StoreKit, App Store and TestFlight are intentionally not used here.
 
 ## Architecture
 
 ```text
-┌───────────────────────────────────────────────┐
-│                 VPN Direct App                │
-│          SwiftUI · iOS · macOS · tvOS         │
-└──────────────────────┬────────────────────────┘
-                       │
-                       ▼
-┌───────────────────────────────────────────────┐
-│              Network Extension                │
-│     PacketTunnelProvider · tunnel lifecycle   │
-└──────────────────────┬────────────────────────┘
-                       │
-                       ▼
-┌───────────────────────────────────────────────┐
-│              VPN Direct Core API              │
-│     ABI · capabilities · builders · errors    │
-└──────────────────────┬────────────────────────┘
-                       │
-                       ▼
-┌───────────────────────────────────────────────┐
-│                    Libbox                     │
-│      sing-box-lx pin + isolated overlays      │
-└──────────────────────┬────────────────────────┘
-                       │
-                       ▼
-┌───────────────────────────────────────────────┐
-│                 sing-box stack                │
-└───────────────────────────────────────────────┘
+ArkUI / VPN Direct UI
+        │
+        ▼
+VPN service state / subscription data
+        │
+        ▼
+VpnDirectVpnExtension
+(VpnExtensionAbility)
+        │
+        ├── HarmonyOS VpnConnection
+        │       └── system TUN fd
+        │
+        ▼
+N-API native bridge
+        │
+        ▼
+VPN Direct Core
+        │
+        ▼
+sing-box-lx v1.14.0-lx.35
 ```
 
-More detail: [`docs/core/ARCHITECTURE.md`](docs/core/ARCHITECTURE.md)
+HarmonyOS supplies the virtual network interface and VPN lifecycle; VPN Direct implements the tunnel internals and protocol processing. Huawei’s VPN API explicitly follows this model: the application creates the virtual network and implements the tunnel internals itself. citeturn0search4
 
-## Build profiles
+## Adapter choice
 
-| Profile | Purpose |
-| --- | --- |
-| `vpn_direct_ios_minimal` | Small Apple/NE-oriented baseline |
-| `vpn_direct_ios` | Default production Apple profile |
-| `vpn_direct_full` | Development / extended protocol surface |
+The HarmonyOS adapter is based on a comparison of real open-source implementations:
 
-Profiles live in [`scripts/tags/`](scripts/tags/).
+- **Hey** — primary architecture reference. It uses ArkTS, Stage model, `VpnExtensionAbility`, a native N-API bridge and a TUN-to-native-core data plane. Its documented path is `HarmonyOS VPN TUN fd → native TUN adapter → local core inbound → protocol core`. citeturn0search0
+- **HarmonyOS_VPN** — reliability/reference implementation. It demonstrates real-device VPN lifecycle, dual-stack TUN routing, process protection, and a separation between UI state and the VPN extension process. Its embedded sing-box version is **not** used by VPN Direct because this project is pinned to `v1.14.0-lx.35`. citeturn0search2
+- **ClashHM** — secondary reference for keeping the VPN runtime inside `VpnExtensionAbility` and using a native core without requiring a foreground process. citeturn0search5
 
-## Build from source
+**Decision:** use the `Hey`-style platform boundary and TUN/native bridge, with the stronger lifecycle/reliability rules demonstrated by `HarmonyOS_VPN`, while keeping **VPN Direct Core** and its existing protocol/build pins unchanged.
 
-**Requirements:** macOS, Xcode, the Go version pinned in [`core/VERSION`](core/VERSION), and an Apple Developer Team with Network Extension/App Group entitlements.
+## Core pin
 
-```bash
-git clone --recurse-submodules https://github.com/TT450/vpn-direct-app.git
-cd vpn-direct-app
+The HarmonyOS port uses the same project Core lineage instead of silently substituting another sing-box build:
 
-./scripts/bootstrap_core.sh
-make libbox
-make check-fixtures
-make check-abi
-make check-production-ready
-```
+- Core: `VPNDirectCore 0.1.0`
+- sing-box source: `Leadaxe/sing-box-lx`
+- revision: `v1.14.0-lx.35`
+- upstream version: `1.14.0`
+- Go: `go1.26.6`
 
-Open `sing-box.xcodeproj` and use:
+These pins are authoritative in [`core/VERSION`](core/VERSION). fileciteturn631file0L2-L2
 
-| Platform | Scheme |
-| --- | --- |
-| iOS | `SFI` |
-| macOS | `SFM` / `SFM.System` |
-| tvOS | `SFT` |
+## HarmonyOS application metadata
 
-Detailed instructions: [`docs/core/BUILDING.md`](docs/core/BUILDING.md)
+| Apple concept | HarmonyOS implementation |
+|---|---|
+| `Info.plist` | `harmony/AppScope/app.json5` + `entry/src/main/module.json5` |
+| SwiftUI | ArkUI / ArkTS |
+| `NetworkExtension` | `VpnExtensionAbility` |
+| `NEPacketTunnelProvider` | `VpnDirectVpnExtension` |
+| `NETunnelProviderManager` | HarmonyOS `vpnExtension.VpnConnection` |
+| `Libbox.xcframework` | signed ARM64 HarmonyOS native library |
+| App Store / TestFlight | AppGallery Connect |
+| StoreKit / RevenueCat | separate HarmonyOS monetisation layer; not part of the VPN adapter |
+| Apple App Group | HarmonyOS private storage / IPC |
 
-## Repository map
+Huawei documents `VpnExtensionAbility` as the Stage-model extension used for third-party VPNs and `VpnConnection.create()` as the API that creates the VPN network and returns the virtual-interface file descriptor. citeturn0search1turn0search6
+
+## Security boundary
+
+The native core is executable application code and must be packaged into the signed HAP. Subscription/configuration data can describe a server or protocol, but it cannot download, replace or hot-swap `.so` files or other executable code.
+
+No private backend endpoints, credentials, signing material or real subscription URLs belong in this public repository.
+
+## Current HarmonyOS tree
 
 ```text
-vpn-direct-app/
-├── ApplicationLibrary/      Apple UI and app-specific components
-├── Extension/               Packet Tunnel / Network Extension
-├── Library/                 Core bridge, subscriptions, VPNDirect parsers/builders
-├── core/
-│   ├── VERSION              Core/toolchain pins
-│   ├── protocol-matrix.json Machine-readable matrix
-│   ├── overlays/            VPN Direct Libbox capability layer
-│   └── sing-box/            pinned Core source submodule
-├── scripts/
-│   ├── build_libbox.sh
-│   ├── check_abi.sh
-│   ├── check_fixtures.sh
-│   ├── check_universal_parsers.sh
-│   ├── check_production_ready.sh
-│   └── tags/                Core build profiles
-├── tests/fixtures/          regression fixtures
-├── interop/                 interoperability scaffolds + evidence/
-├── docs/core/               Core architecture and engineering docs
-└── docs/device/             iPhone qualification checklist
+harmony/
+├── AppScope/
+│   └── app.json5
+└── entry/
+    ├── src/main/module.json5
+    ├── src/main/ets/vpn/
+    │   ├── VpnDirectVpnExtension.ets
+    │   └── HarmonyCoreBridge.ets
+    └── src/main/cpp/
+        └── napi_init.cpp
 ```
 
-## Documentation
+## Build status
 
-| Document | Purpose |
-| --- | --- |
-| [Compatibility & Providers](docs/compatibility/README.md) | Panel / subscription / protocol knowledge base |
-| [Architecture](docs/core/ARCHITECTURE.md) | Core design and Apple import pipeline |
-| [Build Guide](docs/core/BUILDING.md) | Reproduce Libbox and Apple builds |
-| [Protocol Matrix](docs/core/PROTOCOL_MATRIX.md) | What is parsed, compiled, tested and production-ready |
-| [Release Blocker Ledger](docs/core/RELEASE_BLOCKER_LEDGER.md) | Open vs verified release blockers |
-| [Roadmap](ROADMAP.md) | Public product roadmap |
-| [What's New](WHATS_NEW.md) | Latest release notes (`v1.0.11.63`) |
-| [Changelog](CHANGELOG.md) | Full version history |
-| [TestFlight](docs/TESTFLIGHT.md) | Beta install + how to invite testers |
-| [Donors](docs/core/DONORS.md) | Upstream and donor source tracking |
-| [License Audit](docs/core/LICENSE_AUDIT.md) | Dependency/license engineering notes |
-| [iPhone Qualification](docs/device/IPHONE_QUALIFICATION.md) | Device evidence checklist |
+The platform adapter and HarmonyOS metadata are now on **`harmony-os-app`**. The remaining platform-specific work is the DevEco/NDK implementation of the `VPNDirectCore` native ABI, packaging the ARM64 library into the HAP, and real-device qualification.
 
-## Public identifiers
+This repository change does **not** claim that a HarmonyOS HAP or `.so` has been compiled in this environment.
 
-| | |
-| --- | --- |
-| App | VPN Direct |
-| Bundle ID | `com.vpndirect.vpndirectapp` |
-| Packet Tunnel | `com.vpndirect.vpndirectapp.SingBoxPacketTunnel` |
-| App Group | `group.com.vpndirect.vpndirectapp` |
-| URL scheme | `vpndirect://` |
-| App Store ID | `6807402257` |
-| TestFlight | [Join](https://testflight.apple.com/join/yfCEbunt) · [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md) |
+## Existing Core architecture
 
-Secrets and signing credentials are not stored in this repository.
-
-## Contributing
-
-Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a PR.
-
-For protocol changes:
-- add/update regression fixtures;
-- update the Protocol Matrix;
-- do not commit real subscription URLs, private keys, credentials or signing secrets.
-
-Security issues should follow [`SECURITY.md`](SECURITY.md), not public bug reports.
-
-## Upstream & acknowledgements
-
-VPN Direct builds on the work of:
-
-- [SagerNet/sing-box](https://github.com/SagerNet/sing-box)
-- [SagerNet/sing-box-for-apple](https://github.com/SagerNet/sing-box-for-apple)
-- [Leadaxe/sing-box-lx](https://github.com/Leadaxe/sing-box-lx)
-- the wider sing-box / Libbox ecosystem
-
-See [`docs/core/DONORS.md`](docs/core/DONORS.md) for source strategy.
+The project’s Core remains intentionally thin and capability-driven: protocol parsing/building is separated from the native runtime, and unsupported features must fail closed rather than being silently converted. fileciteturn636file0L2-L2
 
 ## License
 
-VPN Direct is distributed under the **GNU General Public License v3 or later**.
-
-See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE) and [`docs/core/LICENSE_AUDIT.md`](docs/core/LICENSE_AUDIT.md).
-
----
-
-<p align="center">
-  <b>VPN Direct</b><br/>
-  Native Apple client · reproducible Core · explicit capabilities
-</p>
+VPN Direct is distributed under the GNU General Public License v3 or later. See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE) and [`docs/core/LICENSE_AUDIT.md`](docs/core/LICENSE_AUDIT.md).
