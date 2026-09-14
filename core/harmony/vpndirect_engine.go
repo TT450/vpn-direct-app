@@ -40,6 +40,8 @@ var (
 	statePath string
 	setupDone bool
 	monitors = make(map[libbox.InterfaceUpdateListener]*interfaceMonitor)
+	heartbeatStop chan struct{}
+	heartbeatDone chan struct{}
 )
 
 type stringIterator struct { items []string; index int }
@@ -90,13 +92,15 @@ func (p *harmonyPlatform) UsePlatformBridge()bool{return false}
 func (p *harmonyPlatform) CreateBridge(options *libbox.BridgeOptions)(libbox.BridgeSession,error){return nil,errors.New("bridge is not supported on HarmonyOS")}
 
 func publishState(path,state,message string){if path==""{return}; payload:=struct{State string `json:"state"`;Message string `json:"message,omitempty"`;At int64 `json:"at"`}{state,message,time.Now().UnixMilli()}; data,err:=json.Marshal(payload);if err!=nil{return};tmp:=path+".tmp";if err=os.WriteFile(tmp,data,0o600);err!=nil{return};_=os.Rename(tmp,path)}
+func startHeartbeat(path string){heartbeatStop=make(chan struct{});heartbeatDone=make(chan struct{});go func(){defer close(heartbeatDone);ticker:=time.NewTicker(2*time.Second);defer ticker.Stop();for{select{case<-ticker.C:publishState(path,stateConnected,"");case<-heartbeatStop:return}}}()}
+func stopHeartbeat(){if heartbeatStop==nil{return};close(heartbeatStop);<-heartbeatDone;heartbeatStop=nil;heartbeatDone=nil}
 func setupLibbox(path string) error { if setupDone{return nil}; base:=filepath.Dir(path); temp:=filepath.Join(base,"vpn-direct-tmp"); if err:=os.MkdirAll(temp,0o700);err!=nil{return err}; err:=libbox.Setup(&libbox.SetupOptions{BasePath:base,WorkingPath:base,TempPath:temp,FixAndroidStack:false,CommandServerListenPort:0,Debug:false,CrashReportSource:"vpn-direct-harmony",AppVersion:"0.1.0",AppMarketingVersion:"0.1.0",OomKillerDisabled:true,PowerReportEnabled:false});if err!=nil{return err};setupDone=true;return nil }
 
 //export vpndirect_harmony_start
 func vpndirect_harmony_start(fd C.int,profile *C.char)C.int{
-	mu.Lock(); if service!=nil{mu.Unlock();return -114}; if fd<0||profile==nil{mu.Unlock();return -22}; var metadata harmonyProfile; if err:=json.Unmarshal([]byte(C.GoString(profile)),&metadata);err!=nil||metadata.StatePath==""||metadata.SingBoxConfig==""{mu.Unlock();return -22}; if !strings.Contains(metadata.SingBoxConfig,`"inbounds"`)||!strings.Contains(metadata.SingBoxConfig,`"outbounds"`){publishState(metadata.StatePath,stateFailed,"sing-box config must contain inbounds and outbounds");mu.Unlock();return -22}; statePath=metadata.StatePath;tunFD=int(fd);publishState(statePath,stateConnecting,""); if err:=setupLibbox(statePath);err!=nil{tunFD=-1;publishState(statePath,stateFailed,err.Error());mu.Unlock();return -5}; if err:=libbox.CheckConfig(metadata.SingBoxConfig);err!=nil{tunFD=-1;publishState(statePath,stateFailed,err.Error());mu.Unlock();return -22}; instance,err:=libbox.NewService(metadata.SingBoxConfig,&harmonyPlatform{});if err!=nil{tunFD=-1;publishState(statePath,stateFailed,err.Error());mu.Unlock();return -22};if err=instance.Start();err!=nil{_=instance.Close();tunFD=-1;publishState(statePath,stateFailed,err.Error());mu.Unlock();return -5};service=instance;publishState(statePath,stateConnected,"");mu.Unlock();return 0
+	mu.Lock(); if service!=nil{mu.Unlock();return -114}; if fd<0||profile==nil{mu.Unlock();return -22}; var metadata harmonyProfile; if err:=json.Unmarshal([]byte(C.GoString(profile)),&metadata);err!=nil||metadata.StatePath==""||metadata.SingBoxConfig==""{mu.Unlock();return -22}; if !strings.Contains(metadata.SingBoxConfig,`"inbounds"`)||!strings.Contains(metadata.SingBoxConfig,`"outbounds"`){publishState(metadata.StatePath,stateFailed,"sing-box config must contain inbounds and outbounds");mu.Unlock();return -22}; statePath=metadata.StatePath;tunFD=int(fd);publishState(statePath,stateConnecting,""); if err:=setupLibbox(statePath);err!=nil{tunFD=-1;publishState(statePath,stateFailed,err.Error());mu.Unlock();return -5}; if err:=libbox.CheckConfig(metadata.SingBoxConfig);err!=nil{tunFD=-1;publishState(statePath,stateFailed,err.Error());mu.Unlock();return -22}; instance,err:=libbox.NewService(metadata.SingBoxConfig,&harmonyPlatform{});if err!=nil{tunFD=-1;publishState(statePath,stateFailed,err.Error());mu.Unlock();return -22};if err=instance.Start();err!=nil{_=instance.Close();tunFD=-1;publishState(statePath,stateFailed,err.Error());mu.Unlock();return -5};service=instance;publishState(statePath,stateConnected,"");startHeartbeat(statePath);mu.Unlock();return 0
 }
 
 //export vpndirect_harmony_stop
-func vpndirect_harmony_stop()C.int{mu.Lock();if service==nil{path:=statePath;tunFD=-1;mu.Unlock();publishState(path,stateDisconnected,"");return 0};instance:=service;path:=statePath;publishState(path,stateDisconnecting,"");service=nil;tunFD=-1;mu.Unlock();err:=instance.Close();publishState(path,stateDisconnected,"");if err!=nil{publishState(path,stateFailed,err.Error());return -5};return 0}
+func vpndirect_harmony_stop()C.int{mu.Lock();if service==nil{path:=statePath;tunFD=-1;mu.Unlock();publishState(path,stateDisconnected,"");return 0};instance:=service;path:=statePath;publishState(path,stateDisconnecting,"");service=nil;tunFD=-1;stopHeartbeat();mu.Unlock();err:=instance.Close();publishState(path,stateDisconnected,"");if err!=nil{publishState(path,stateFailed,err.Error());return -5};return 0}
 func main(){}
