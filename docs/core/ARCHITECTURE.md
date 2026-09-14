@@ -1,86 +1,97 @@
 # VPN Direct Core architecture
 
-App release **v1.0.10** · Core pin: [`core/VERSION`](../../core/VERSION)
+HarmonyOS branch: **`harmony-os-app`** · Core pin: [`core/VERSION`](../../core/VERSION)
 
 ## Strategy
 
-Upstream **sing-box** remains the foundation. VPN Direct Core is a **thin fork** (starting from [sing-box-lx](https://github.com/Leadaxe/sing-box-lx)): extra features live in new files / build tags; upstream files touched only at marked seams.
+Upstream **sing-box** remains the foundation. VPN Direct Core is a **thin fork** starting from `sing-box-lx`; custom features stay isolated behind overlays/build tags so the Core can be rebuilt for more than one mobile platform without silently changing protocol behavior.
 
 ```text
 SagerNet/sing-box
         │
         ▼
-core/sing-box (submodule: sing-box-lx + VPN Direct overlays)
+core/sing-box (sing-box-lx + VPN Direct overlays)
         │
-        ▼
-Libbox.xcframework  (profile: vpn_direct_ios / Darwin tags)
-        │
-        ▼
-Library (VPNDirect parsers/builders) → ExtensionProvider → NEPacketTunnel
+        ├───────────────┐
+        ▼               ▼
+Apple native Core   HarmonyOS native Core
+Libbox / Darwin     signed ARM64 .so
+        │               │
+NetworkExtension   VpnExtensionAbility
+        │               │
+        └────── VPN Direct platform APIs ──────┘
 ```
 
-## Apple targets
+## HarmonyOS platform adapter
 
-| Component | Path |
-|-----------|------|
-| iOS app | `SFI/` |
-| macOS app | `SFM/`, `SFM.System/` |
-| tvOS app | `SFT/` |
-| Shared UI | `ApplicationLibrary/` |
-| Shared networking / DB | `Library/` |
-| Packet tunnel | `Extension/` → `Library/Network/ExtensionProvider.swift` |
+The HarmonyOS adapter is deliberately a thin platform layer. HarmonyOS owns creation/destruction of the system TUN interface through `VpnExtensionAbility` / `vpnExtension.VpnConnection`; VPN Direct Core owns protocol/session processing.
 
-Apps embed Network Extension; **Libbox** is linked into Library and used by the extension process.
+```text
+ArkUI / application process
+        │
+        ▼
+VpnDirectVpnExtension
+        │
+        ├── VpnConnection.create()
+        │        └── TUN fd
+        │
+        ▼
+N-API native bridge
+        │
+        ▼
+VPN Direct Core
+        │
+        ▼
+sing-box-lx v1.14.0-lx.35
+```
 
-## Subscription / import pipeline (Swift)
+The adapter follows the proven HarmonyOS pattern used by Hey (ArkTS + VPN Extension + native bridge + TUN data plane) while taking lifecycle/reliability practices from other real-device HarmonyOS VPN implementations. The project does not copy their Xray runtime or their older sing-box pins.
+
+## Subscription / import pipeline
+
+The normalized data model remains platform-neutral:
 
 ```text
 raw bytes / file / paste / QR / URL
   → VPNDirectContentDetector
-       (sing-box JSON · Xray · Clash YAML · WG/AWG conf · Mieru ·
-        OpenVPN · OpenConnect · Tailscale · MASQUE CONNECT-UDP ·
-        URI list · base64)
   → format adapters / VPNDirectParserRegistry
   → NormalizedSubscription → NormalizedLocation[] → NormalizedNode[]
   → UniversalOutboundBuilder (+ capability gates)
   → SingBoxGraphBuilder
-       (proxy leaves → outbounds; WG/AWG/OpenVPN/OpenConnect/Tailscale → endpoints)
-  → VPNDirectConfigValidator / LibboxCheckConfig
+  → platform-native Core ABI
 ```
 
-Remnawave/Happ XRAY_JSON topology (country locations, global Auto, per-profile dedupe, `dialerProxy`→`detour`) is implemented in the production graph builder.
-
-## Extension rules
-
-- Prefer new packages over editing upstream files
-- Feature flags via build tags (`with_xhttp`, `with_awg`, `with_mieru`, `with_openvpn`, `with_openconnect`, `with_tailscale`, `with_quic`, …)
-- Rebase onto upstream tags; never long-lived merge drift
-- Document every imported feature in [`DONORS.md`](DONORS.md)
-- Capabilities must match registered outbounds/endpoints (fail-closed)
+The HarmonyOS adapter receives configuration **data**. It never receives executable code, native libraries, credentials or private backend endpoints from a subscription.
 
 ## Capability Registry
 
-Core reports what the **current binary** supports. Swift builders and UI must query capabilities instead of hardcoding stock-Libbox limitations.
+The Core must report capabilities from the actual linked native binary. Platform adapters must not assume that the Apple Libbox capability set is available on HarmonyOS.
 
-- Go: `core/overlays/libbox/vpndirect_*.go` (applied at Libbox build)
-- Sidecar stamp: `Libbox.xcframework/VPNDirectCore.version` from `scripts/build_libbox.sh`
-- Swift: `Library/Shared/VPNDirectCoreCapabilities.swift`
-- Fail-closed: unsupported features throw `unsupportedFeature` (no silent XHTTP→HTTPUpgrade, no silent CONNECT-UDP without capability)
+- Go capability definitions remain under `core/overlays/`.
+- Apple capability exposure remains under `Library/Shared/VPNDirectCoreCapabilities.swift`.
+- HarmonyOS will expose the equivalent capability JSON/ABI through the native bridge.
+- Unsupported features must fail closed; no silent transport substitution.
 
-## Parser / builder layer
+## Platform metadata
 
-- Under `Library/Service/VPNDirect/`
-- Protocol / transport / security as extensible string IDs
-- Prefer attributes + `UniversalOutboundBuilder`; pre-built `outbound`/`endpoint` dicts remain for tunnel imports (OpenVPN, Tailscale, CONNECT-UDP)
-- Versioned strings for AWG (`"3.1"`), not closed enums
+Apple metadata stays in the existing Apple targets. HarmonyOS metadata is separate:
 
-## Platform
+| Concern | HarmonyOS |
+|---|---|
+| App metadata | `harmony/AppScope/app.json5` |
+| Module metadata | `harmony/entry/src/main/module.json5` |
+| VPN extension | `harmony/entry/src/main/ets/vpn/VpnDirectVpnExtension.ets` |
+| ArkTS/native bridge | `HarmonyCoreBridge.ets` + `napi_init.cpp` |
+| Native Core | signed ARM64 `.so` built from the pinned Core |
+| Distribution | AppGallery Connect |
 
-Apple NetworkExtension integration stays in this repository. Do not fork ExtensionProvider unless Libbox API requires it.
+## Build rule
+
+The Apple `Libbox.xcframework` is not reusable on HarmonyOS. HarmonyOS requires a separately compiled native ARM64 library and a HarmonyOS-compatible Go/NDK toolchain. The Core version and sing-box revision remain pinned to [`core/VERSION`](../../core/VERSION).
 
 ## Status vocabulary
 
-See [`PROTOCOL_MATRIX.md`](PROTOCOL_MATRIX.md). `parser+runtime` ≠ `tested`. Device tunnel/handshake remains EXTERNAL until interactive VPN permission + battle keys.
+`parser+runtime` ≠ `tested`. HarmonyOS production status requires real-device evidence for VPN authorization, TUN creation, IPv4/IPv6 TCP and UDP, DNS, real egress, reconnect, Wi-Fi/cellular switching, background/lock-screen stability and clean network restoration after disconnect.
 
 ## Update / rebase
 
@@ -90,4 +101,4 @@ git fetch upstream
 git rebase upstream/<tag>   # then re-apply // lx seams if needed
 ```
 
-See [`BUILDING.md`](BUILDING.md) and [`DONORS.md`](DONORS.md).
+See [`BUILDING.md`](BUILDING.md), [`DONORS.md`](DONORS.md) and [`../../harmony/README.md`](../../harmony/README.md).
