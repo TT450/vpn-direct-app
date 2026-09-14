@@ -37,8 +37,8 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
     let profile: ProfileData = {};
     try {
       profile = JSON.parse(profileJson) as ProfileData;
-    } catch (_) {
-      hilog.error(0xD1, 'VPNDirect', 'Invalid profile JSON');
+    } catch (error) {
+      hilog.error(0xD1, 'VPNDirect', 'Invalid profile JSON: %{public}s', JSON.stringify(error));
       return;
     }
 
@@ -47,22 +47,12 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
     const mtu: number = profile.mtu ?? 1400;
     const ipv6: boolean = profile.ipv6 ?? true;
 
-    // API 24 VpnConfig uses LinkAddress/RouteInfo objects, not flat strings.
     const config: vpnExtension.VpnConfig = {
-      addresses: [{
-        address: { address, family: 1 },
-        prefixLength: 32
-      }],
+      addresses: [{ address: { address, family: 1 }, prefixLength: 32 }],
       routes: [{
         interface: 'vpn-tun',
-        destination: {
-          address: { address: '0.0.0.0', family: 1, port: 0 },
-          prefixLength: 0
-        },
-        gateway: {
-          address: { address: '0.0.0.0', family: 1, port: 0 },
-          port: 0
-        },
+        destination: { address: { address: '0.0.0.0', family: 1, port: 0 }, prefixLength: 0 },
+        gateway: { address: { address: '0.0.0.0', family: 1, port: 0 }, port: 0 },
         hasGateway: false,
         isDefaultRoute: true
       }],
@@ -85,7 +75,12 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
         hilog.error(0xD1, 'VPNDirect', 'VPN TUN creation returned invalid fd');
         return;
       }
-      await this.core.start(this.tunFd, profileJson);
+
+      const started: boolean = this.core.start(this.tunFd, profileJson);
+      if (!started) {
+        await this.destroyVpnConnection();
+        return;
+      }
       hilog.info(0xD1, 'VPNDirect', 'VPN started, tunFd=%{public}d', this.tunFd);
     } catch (error) {
       await this.destroyVpnConnection();
@@ -97,9 +92,7 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
     if (this.stopping) return;
     this.stopping = true;
     try {
-      await this.core?.stop();
-    } catch (error) {
-      hilog.error(0xD1, 'VPNDirect', 'Core stop failed: %{public}s', JSON.stringify(error));
+      this.core?.stop();
     } finally {
       await this.destroyVpnConnection();
       this.stopping = false;
