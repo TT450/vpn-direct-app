@@ -5,6 +5,7 @@ import { HarmonyCoreBridge } from './HarmonyCoreBridge';
 
 interface VpnProfileEnvelope {
   address?: string;
+  ipv6Address?: string;
   dns?: string;
   mtu?: number;
   ipv6?: boolean;
@@ -52,19 +53,36 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
     }
 
     const address: string = profile.address ?? '172.19.0.2';
+    const ipv6Address: string = profile.ipv6Address ?? 'fd00:1:1::2';
     const dns: string = profile.dns ?? '1.1.1.1';
     const mtu: number = profile.mtu ?? 1400;
     const ipv6: boolean = profile.ipv6 ?? true;
 
-    const config: vpnExtension.VpnConfig = {
-      addresses: [{ address: { address, family: 1 }, prefixLength: 32 }],
-      routes: [{
+    const addresses: Array<vpnExtension.VpnAddress> = [
+      { address: { address, family: 1 }, prefixLength: 32 }
+    ];
+    const routes: Array<vpnExtension.VpnRoute> = [{
+      interface: 'vpn-tun',
+      destination: { address: { address: '0.0.0.0', family: 1, port: 0 }, prefixLength: 0 },
+      gateway: { address: { address: '0.0.0.0', family: 1, port: 0 }, port: 0 },
+      hasGateway: false,
+      isDefaultRoute: true
+    }];
+
+    if (ipv6) {
+      addresses.push({ address: { address: ipv6Address, family: 2 }, prefixLength: 128 });
+      routes.push({
         interface: 'vpn-tun',
-        destination: { address: { address: '0.0.0.0', family: 1, port: 0 }, prefixLength: 0 },
-        gateway: { address: { address: '0.0.0.0', family: 1, port: 0 }, port: 0 },
+        destination: { address: { address: '::', family: 2, port: 0 }, prefixLength: 0 },
+        gateway: { address: { address: '::', family: 2, port: 0 }, port: 0 },
         hasGateway: false,
         isDefaultRoute: true
-      }],
+      });
+    }
+
+    const config: vpnExtension.VpnConfig = {
+      addresses,
+      routes,
       dnsAddresses: [dns],
       mtu,
       isIPv4Accepted: true,
@@ -85,8 +103,6 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
         return;
       }
 
-      // Protect the extension process before sing-box opens any outbound socket.
-      // This keeps the core's control-plane traffic outside the TUN it owns.
       try {
         await this.vpnConnection.protectProcessNet();
       } catch (error) {
@@ -99,6 +115,7 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
         statePath,
         singBoxConfig,
         address,
+        ipv6Address,
         dns,
         mtu,
         ipv6
