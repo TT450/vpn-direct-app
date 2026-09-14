@@ -1,7 +1,8 @@
 import { DirectTheme } from './Theme';
 import { DirectBalanceParityHost } from './DirectBalanceParity';
-import { DirectPlanParityHost } from './DirectPlanParity';
+import { DirectPlanParityV2Host } from './DirectPlanParityV2';
 import { DirectFullParityHost } from './DirectFullParity';
+import { DirectNativeFlowHost } from './DirectNativeFlows';
 import { DirectServerPickerParityV2 } from './DirectServerPickerParityV2';
 import { DirectAccessParityV2 } from './DirectAccessParityV2';
 import { DirectSubscriptionsParityV2 } from './DirectSubscriptionsParityV2';
@@ -22,7 +23,9 @@ export struct DirectFlowHost {
     } else if (this.flow === DirectFlow.Subscription) {
       DirectSubscriptionsParityV2({ onClose: this.onClose, onFlow: this.onFlow });
     } else if (this.flow === DirectFlow.Plans || this.flow === DirectFlow.Constructor) {
-      DirectPlanParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
+      DirectPlanParityV2Host({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
+    } else if (this.flow === DirectFlow.Payment) {
+      DirectNativeFlowHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     } else if (this.flow === DirectFlow.Balance || this.flow === DirectFlow.BalanceTopUp) {
       DirectBalanceParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     } else if (this.flow !== DirectFlow.None) {
