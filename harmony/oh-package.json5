@@ -1,0 +1,9 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "vpn-direct-harmony",
+  "version": "1.0.0",
+  "description": "VPN Direct for HarmonyOS NEXT",
+  "main": "",
+  "author": "VPN Direct",
+  "license": "GPL-3.0-or-later"
+}
