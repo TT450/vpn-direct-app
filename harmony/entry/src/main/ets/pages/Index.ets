@@ -6,6 +6,8 @@ import { DirectVpnProfile, VpnProfileRepository } from '../vpn/VpnProfileReposit
 import { ImportedSubscriptionStore } from '../vpn/ImportedSubscriptionStore';
 import { VpnServerSelection, SelectedVpnServer } from '../vpn/VpnServerSelection';
 import { VpnStateStore, VpnRuntimeState } from '../vpn/VpnStateStore';
+import { DirectPrivacyDisclosure } from '../ui/DirectPrivacyDisclosure';
+import { DirectPrivacyConsentStore } from '../model/DirectPrivacyConsentStore';
 
 @Entry
 @Component
@@ -13,6 +15,7 @@ struct Index {
   @State private status: string = 'Disconnected';
   @State private connecting: boolean = false;
   @State private serverName: string = 'Авто';
+  @State private showPrivacyDisclosure: boolean = false;
   private desiredServerId: string = 'auto';
   private activeServerId: string = '';
   private stateTimer: number = -1;
@@ -23,6 +26,7 @@ struct Index {
 
   aboutToAppear(): void {
     this.appContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.showPrivacyDisclosure = !DirectPrivacyConsentStore.accepted();
     AppStorage.setOrCreate<string>('vpn_status', this.status);
     AppStorage.setOrCreate<string>('vpn_server_name', this.serverName);
     AppStorage.setOrCreate<string>('vpn_server_country_code', '');
@@ -107,6 +111,10 @@ struct Index {
 
   private async connect(): Promise<void> {
     if (this.connecting || this.status === 'Connected' || this.status === 'Connecting') return;
+    if (!DirectPrivacyConsentStore.accepted()) {
+      this.showPrivacyDisclosure = true;
+      return;
+    }
     this.connecting = true;
     this.status = 'Connecting';
     try {
@@ -155,16 +163,28 @@ struct Index {
     this.switchInProgress = false;
   }
 
+  private acceptPrivacyAndConnect(): void {
+    DirectPrivacyConsentStore.accept();
+    this.showPrivacyDisclosure = false;
+    void this.connect();
+  }
+
   build() {
-    Column() {
+    Stack() {
       AppShell({
         status: this.status,
         serverName: this.serverName,
         onToggle: () => {
-          if (this.status === 'Connected' || this.status === 'Connecting') this.disconnect();
-          else this.connect();
+          if (this.status === 'Connected' || this.status === 'Connecting') void this.disconnect();
+          else void this.connect();
         }
       });
+      if (this.showPrivacyDisclosure) {
+        DirectPrivacyDisclosure({
+          onAccept: () => this.acceptPrivacyAndConnect(),
+          onDecline: () => { this.showPrivacyDisclosure = false; }
+        });
+      }
     }.width('100%').height('100%');
   }
 }
