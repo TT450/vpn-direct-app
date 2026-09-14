@@ -30,7 +30,8 @@ const (
 )
 
 type harmonyProfile struct {
-	StatePath string `json:"statePath"`
+	StatePath     string `json:"statePath"`
+	SingBoxConfig string `json:"singBoxConfig"`
 }
 
 var (
@@ -185,12 +186,12 @@ func vpndirect_harmony_start(fd C.int, profile *C.char) C.int {
 		return -22
 	}
 
-	config := C.GoString(profile)
+	envelope := C.GoString(profile)
 	var metadata harmonyProfile
-	if err := json.Unmarshal([]byte(config), &metadata); err != nil || metadata.StatePath == "" {
+	if err := json.Unmarshal([]byte(envelope), &metadata); err != nil || metadata.StatePath == "" || metadata.SingBoxConfig == "" {
 		return -22
 	}
-	if !strings.Contains(config, `"inbounds"`) {
+	if !strings.Contains(metadata.SingBoxConfig, `"inbounds"`) {
 		publishState(metadata.StatePath, stateFailed, "sing-box config has no inbounds")
 		return -22
 	}
@@ -199,7 +200,7 @@ func vpndirect_harmony_start(fd C.int, profile *C.char) C.int {
 	tunFD = int(fd)
 	publishState(statePath, stateConnecting, "")
 
-	instance, err := libbox.NewService(config, &harmonyPlatform{})
+	instance, err := libbox.NewService(metadata.SingBoxConfig, &harmonyPlatform{})
 	if err != nil {
 		tunFD = -1
 		publishState(statePath, stateFailed, err.Error())
