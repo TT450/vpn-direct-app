@@ -11,6 +11,7 @@ import { DirectAccessParityV2 } from './DirectAccessParityV2';
 import { DirectSubscriptionsParityV3 } from './DirectSubscriptionsParityV3';
 import { DirectAdvancedParityV2 } from './DirectAdvancedParityV2';
 import { DirectPaymentParityV2 } from './DirectPaymentParityV2';
+import { DirectLegalAboutParityV2 } from './DirectLegalAboutParityV2';
 import { DirectFlow } from './DirectFlowModel';
 export { DirectFlow } from './DirectFlowModel';
 
@@ -30,6 +31,7 @@ export struct DirectFlowHost {
     else if (this.flow >= DirectFlow.Security && this.flow <= DirectFlow.OnDemandSettings) DirectAdvancedParityV2({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.BalanceTopUp) DirectBalanceTopUpParityV2({ onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.Balance) DirectBalanceParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
+    else if (this.flow === DirectFlow.Legal || this.flow === DirectFlow.Privacy || this.flow === DirectFlow.About) DirectLegalAboutParityV2({ flow: this.flow, onClose: this.onClose });
     else if (this.flow !== DirectFlow.None) DirectFullParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     else Blank().backgroundColor(DirectTheme.paper);
   }
