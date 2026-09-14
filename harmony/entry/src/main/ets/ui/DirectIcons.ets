@@ -14,7 +14,7 @@ export struct DirectIcon {
   @Builder private svgIcon(res: Resource) { Image(res).width(this.iconSize).height(this.iconSize).objectFit(ImageFit.Contain).interpolation(ImageInterpolation.High); }
   build() {
     if (this.name === DirectIconName.Menu) this.svgIcon($r('app.media.ic_menu'));
-    else if (this.name === DirectIconName.ArrowUpRight) this.svgIcon($r('app.media.ic_arrow_up_right'));
+    else if (this.name === DirectIconName.ArrowUpRight) this.svgIcon(this.color === DirectTheme.acid ? $r('app.media.ic_arrow_up_right_acid') : $r('app.media.ic_arrow_up_right'));
     else if (this.name === DirectIconName.ArrowLeft) this.svgIcon(this.color === DirectTheme.muted ? $r('app.media.ic_arrow_left_muted') : $r('app.media.ic_arrow_left'));
     else if (this.name === DirectIconName.Magnifyingglass) this.svgIcon($r('app.media.ic_magnifyingglass'));
     else if (this.name === DirectIconName.ChevronRight) this.svgIcon(this.color === DirectTheme.green ? $r('app.media.ic_chevron_right_green') : $r('app.media.ic_chevron_right'));
