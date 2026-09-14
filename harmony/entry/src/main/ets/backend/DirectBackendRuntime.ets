@@ -13,7 +13,6 @@ export interface DirectLocationRecord {
   country: string;
   city: string;
   region: string;
-  /** Optional server host for latency probing. Empty-string default (safe for GitHub). */
   host?: string;
 }
 
@@ -36,6 +35,7 @@ export interface DirectMe {
   email?: string;
   username?: string;
   phone?: string;
+  planName?: string;
   inAppBalance?: number;
   hasSubscription?: boolean;
   subscriptionUrl?: string;
@@ -106,15 +106,8 @@ function notImplemented(name: string): Error {
 }
 
 export class DirectBackendRuntime {
-  /** Set by EntryAbility before warmUp so local Preferences can open. */
   static appContext: common.UIAbilityContext | null = null;
-
-  /**
-   * Optional local-only installer. Public stub leaves this null.
-   * Private DirectBackendLocal.ets (skip-worktree) assigns a hook that wires *.local.ets.
-   */
   static localInstaller: LocalInstaller | null = null;
-
   static host: string = '';
   static baseURLString: string = '';
   static legacyIP: string = '';
@@ -122,76 +115,42 @@ export class DirectBackendRuntime {
   static subscriptionBaseURLString: string = '';
   static googleClientID: string = '';
   static googleRedirectURI: string = 'vpndirect:/oauth2redirect/google';
-  /** Allowed hosts for external-checkout return signal only. Empty on public GitHub. */
   static checkoutSuccessHostSuffixes: string[] = [];
-
   static ownedHosts: () => string[] = (): string[] => [];
-
   static isAuthenticated: () => boolean = (): boolean => false;
-
   static fetchLocations: () => Promise<DirectLocationRecord[]> = async (): Promise<DirectLocationRecord[]> => [];
-
   static fetchBalanceSnapshot: (() => Promise<DirectBalanceSnapshot>) | null = null;
-
   static loginWithPassword: ((email: string, password: string) => Promise<DirectMe>) | null = null;
-  static registerWithPassword:
-    ((name: string, email: string, password: string, confirmation: string) => Promise<DirectMe>) | null = null;
+  static registerWithPassword: ((name: string, email: string, password: string, confirmation: string) => Promise<DirectMe>) | null = null;
   static sendEmailCode: ((email: string) => Promise<void>) | null = null;
   static verifyEmailCode: ((email: string, code: string) => Promise<DirectMe>) | null = null;
   static requestPasswordReset: ((email: string) => Promise<boolean>) | null = null;
-
   static logout: (() => Promise<void>) | null = null;
   static deleteAccount: (() => Promise<void>) | null = null;
   static fetchMe: (() => Promise<DirectMe>) | null = null;
   static refreshAccount: (() => Promise<DirectMe | null>) | null = null;
   static bootstrapSession: (() => Promise<void>) | null = null;
-
   static fetchAppCatalog: () => Promise<DirectAppCatalog> = async (): Promise<DirectAppCatalog> => {
     return { currency: 'RUB', tariffs: [], constructor: null, addons: null, monthMultipliers: {} };
   };
   static quoteCheckout: ((req: DirectCheckoutQuoteRequest) => Promise<DirectCheckoutQuote>) | null = null;
   static checkoutStatus: ((paymentId: string) => Promise<DirectCheckoutStatus>) | null = null;
-
   static fetchAccountDevices: () => Promise<DirectAccountDevice[]> = async (): Promise<DirectAccountDevice[]> => [];
-  static revokeAccountDevice: (deviceId: string) => Promise<void> = async (_deviceId: string): Promise<void> => {
-    throw notImplemented('revokeAccountDevice');
-  };
+  static revokeAccountDevice: (deviceId: string) => Promise<void> = async (_deviceId: string): Promise<void> => { throw notImplemented('revokeAccountDevice'); };
   static fetchAccountPayments: () => Promise<DirectAccountPayment[]> = async (): Promise<DirectAccountPayment[]> => [];
-  static redeemPromo: (code: string) => Promise<DirectPromoRedeemResult> = async (_code: string): Promise<DirectPromoRedeemResult> => {
-    return { ok: false, message: 'Сервис промокодов недоступен' };
-  };
-  static submitSupport: (category: string, body: string) => Promise<void> = async (_c: string, _b: string): Promise<void> => {
-    throw notImplemented('submitSupport');
-  };
-  static prepareAccountLink: (method: string) => Promise<string> = async (method: string): Promise<string> => {
-    return `Подтвердите владение способом входа «${method}» — подписки не объединяются автоматически.`;
-  };
-
+  static redeemPromo: (code: string) => Promise<DirectPromoRedeemResult> = async (_code: string): Promise<DirectPromoRedeemResult> => ({ ok: false, message: 'Сервис промокодов недоступен' });
+  static submitSupport: (category: string, body: string) => Promise<void> = async (_c: string, _b: string): Promise<void> => { throw notImplemented('submitSupport'); };
+  static prepareAccountLink: (method: string) => Promise<string> = async (method: string): Promise<string> => `Подтвердите владение способом входа «${method}» — подписки не объединяются автоматически.`;
   static checkoutReturnHostAllowed(host: string, allowlist?: string[]): boolean {
     const h = host.trim().toLowerCase();
-    if (h.length === 0) {
-      return false;
-    }
-    const list = (allowlist ?? DirectBackendRuntime.checkoutSuccessHostSuffixes)
-      .map((entry: string) => entry.trim().toLowerCase())
-      .filter((entry: string) => entry.length > 0);
-    for (let i = 0; i < list.length; i++) {
-      const entry = list[i];
-      if (h === entry || h.endsWith('.' + entry)) {
-        return true;
-      }
-    }
+    if (h.length === 0) return false;
+    const list = (allowlist ?? DirectBackendRuntime.checkoutSuccessHostSuffixes).map((entry: string) => entry.trim().toLowerCase()).filter((entry: string) => entry.length > 0);
+    for (let i = 0; i < list.length; i++) { const entry = list[i]; if (h === entry || h.endsWith('.' + entry)) return true; }
     return false;
   }
-
-  /** Invokes localInstaller when a private DirectBackendLocal override registered one. */
   static warmUp(context?: common.UIAbilityContext): void {
-    if (context) {
-      DirectBackendRuntime.appContext = context;
-    }
+    if (context) DirectBackendRuntime.appContext = context;
     const install = DirectBackendRuntime.localInstaller;
-    if (install) {
-      install(context);
-    }
+    if (install) install(context);
   }
 }
