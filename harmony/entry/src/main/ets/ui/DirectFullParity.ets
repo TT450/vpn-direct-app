@@ -1,0 +1,92 @@
+import { DirectTheme } from './Theme';
+import { DirectHaptics } from './Haptics';
+import { DirectFlow } from './DirectFlows';
+
+@Component
+export struct DirectFullParityHost {
+  @Prop flow: DirectFlow = DirectFlow.None;
+  @Prop onClose: () => void = () => {};
+  @Prop onFlow: (flow: DirectFlow) => void = (_flow: DirectFlow) => {};
+
+  build() {
+    if (this.flow === DirectFlow.ServerPicker) DirectServerPickerParity({ onClose: this.onClose });
+    else if (this.flow === DirectFlow.ConnectionReport) DirectReportParity({ onClose: this.onClose });
+    else if (this.flow === DirectFlow.Profiles) DirectProfilesParity({ onClose: this.onClose });
+    else if (this.flow === DirectFlow.Access) DirectAccessParity({ onClose: this.onClose, onFlow: this.onFlow });
+    else if (this.flow >= DirectFlow.AuthLogin && this.flow <= DirectFlow.AuthSuccess) DirectAuthParity({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
+    else if (this.flow === DirectFlow.Management || this.flow === DirectFlow.Subscription || this.flow === DirectFlow.Devices || this.flow === DirectFlow.PaymentHistory) DirectManagementParity({ flow: this.flow, onClose: this.onClose });
+    else if (this.flow === DirectFlow.ImportFile || this.flow === DirectFlow.ImportText) DirectImportParity({ flow: this.flow, onClose: this.onClose });
+    else if (this.flow === DirectFlow.Legal || this.flow === DirectFlow.Privacy) DirectLegalParity({ flow: this.flow, onClose: this.onClose });
+    else if (this.flow === DirectFlow.Account) DirectAccountParity({ onClose: this.onClose, onFlow: this.onFlow });
+    else if (this.flow === DirectFlow.Security || this.flow === DirectFlow.Connection || this.flow === DirectFlow.Diagnostics || this.flow === DirectFlow.Activity || this.flow === DirectFlow.SystemSettings || this.flow === DirectFlow.ApplicationSettings || this.flow === DirectFlow.CoreSettings || this.flow === DirectFlow.TunnelSettings || this.flow === DirectFlow.OnDemandSettings || this.flow === DirectFlow.About || this.flow === DirectFlow.ServiceLog) DirectSettingsParity({ flow: this.flow, onClose: this.onClose });
+    else DirectOperationParity({ flow: this.flow, onClose: this.onClose });
+  }
+}
+
+@Component
+struct DirectParityPage {
+  @Prop kicker: string = '';
+  @Prop title: string = '';
+  @Prop subtitle: string = '';
+  @Prop onClose: () => void = () => {};
+  build() {
+    Scroll() { Column() {
+      Row() { Button('‹').fontSize(30).fontColor(DirectTheme.muted).backgroundColor(Color.Transparent).width(38).height(38).onClick(() => { DirectHaptics.navigation(); this.onClose(); }); Column() { Text(this.kicker).fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); Text(this.title).fontSize(24).fontWeight(FontWeight.Medium).fontColor(DirectTheme.ink).margin({ top: 5 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1); }.height(64).width('100%');
+      Text(this.subtitle).fontSize(12).fontColor(DirectTheme.muted).width('100%').margin({ bottom: 20 });
+      Blank().height(1);
+    }.padding({ left: 20, right: 20, top: 18, bottom: 28 }); }.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper);
+  }
+}
+
+@Component
+struct DirectSection {
+  @Prop label: string = ''; @Prop value: string = '';
+  build() { Row() { Text(this.label).fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); Blank(); Text(this.value).fontSize(10).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); }.height(40).width('100%').border({ width: { top: 1 }, color: DirectTheme.ink }); }
+}
+
+@Component
+struct DirectParityRow {
+  @Prop mark: string = ''; @Prop title: string = ''; @Prop subtitle: string = ''; @Prop onTap: () => void = () => {};
+  build() { Row() { Text(this.mark).fontSize(8).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace').textAlign(TextAlign.Center).width(45).height(40).backgroundColor(DirectTheme.ink); Column() { Text(this.title).fontSize(13).fontWeight(FontWeight.Medium).fontColor(DirectTheme.ink); Text(this.subtitle).fontSize(10).fontColor(DirectTheme.muted).margin({ top: 3 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 12 }); Text('›').fontSize(20).fontColor(DirectTheme.muted); }.minHeight(64).width('100%').border({ width: { bottom: 1 }, color: DirectTheme.line }).onClick(() => { DirectHaptics.selection(); this.onTap(); }); }
+}
+
+@Component
+struct DirectServerPickerParity {
+  @Prop onClose: () => void = () => {};
+  @State selected: string = 'Автоматический';
+  private servers: string[] = ['Автоматический', 'Нидерланды', 'Германия', 'Испания', 'Франкфурт', 'Мадрид', 'Армения'];
+  build() { Scroll() { Column() { DirectParityPage({ kicker:'DIRECT / SERVER', title:'Сервер', subtitle:'Выберите локацию для текущего подключения.', onClose:this.onClose }); DirectSection({ label:'ДОСТУПНЫЕ ЛОКАЦИИ', value:'07' }); ForEach(this.servers,(s:string,i:number)=>{ Row(){ Text(('0'+(i+1)).slice(-2)).fontSize(9).fontFamily('monospace').fontColor(DirectTheme.muted).width(34); Text(s).fontSize(14).fontColor(DirectTheme.ink).layoutWeight(1); Text(this.selected===s?'●':'○').fontSize(12).fontColor(this.selected===s?DirectTheme.green:DirectTheme.muted); }.height(58).border({width:{bottom:1},color:DirectTheme.line}).onClick(()=>{this.selected=s;DirectHaptics.selection();}); }); }.padding({left:20,right:20,bottom:30}); }.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper); }
+}
+
+@Component
+struct DirectReportParity { @Prop onClose:()=>void=()=>{}; build(){ Scroll(){ Column(){ DirectParityPage({kicker:'DIRECT / REPORT',title:'Состояние соединения',subtitle:'Текущая телеметрия VPN-сессии.',onClose:this.onClose}); DirectSection({label:'СОСТОЯНИЕ',value:'ПОДКЛЮЧЕНО'}); this.metric('СЕРВЕР','—'); this.metric('ПРОТОКОЛ','—'); this.metric('АДРЕС','—'); this.metric('ЗАДЕРЖКА','—'); this.metric('ПОЛУЧЕНО','—'); this.metric('ОТПРАВЛЕНО','—'); }.padding({left:20,right:20}); }.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper); } @Builder metric(a:string,b:string){Row(){Text(a).fontSize(9).fontFamily('monospace').fontColor(DirectTheme.muted);Blank();Text(b).fontSize(11).fontFamily('monospace').fontColor(DirectTheme.ink)}.height(48).border({width:{bottom:1},color:DirectTheme.line});}}
+
+@Component
+struct DirectProfilesParity { @Prop onClose:()=>void=()=>{}; build(){Column(){DirectParityPage({kicker:'DIRECT / PROFILES',title:'Профили',subtitle:'Сохранённые конфигурации подключения.',onClose:this.onClose}); DirectParityRow({mark:'01',title:'Основной профиль',subtitle:'VPN Direct · по умолчанию'}); DirectParityRow({mark:'02',title:'Импортированный',subtitle:'Внешняя подписка · неактивен'});}.padding({left:20,right:20}).backgroundColor(DirectTheme.paper).width('100%').height('100%')}}
+
+@Component
+struct DirectAccessParity { @Prop onClose:()=>void=()=>{}; @Prop onFlow:(f:DirectFlow)=>void=(_f)=>{}; build(){Scroll(){Column(){DirectParityPage({kicker:'ПОДКЛЮЧЕНИЕ / НАЧАЛО',title:'Выберите доступ',subtitle:'Сначала VPN Direct, затем другие провайдеры',onClose:this.onClose}); Column(){Text('СЕЙЧАС НЕ ЗАЩИЩЕНО').fontSize(9).fontFamily('monospace').fontColor(Color.White.opacity(0.42));Text('У вас пока нет активного подключения').fontSize(20).fontWeight(FontWeight.Medium).fontColor(Color.White).margin({top:7});Text('Оформите тариф VPN Direct или подключите внешнюю подписку.').fontSize(10).fontColor(Color.White.opacity(0.5)).margin({top:5});}.padding(17).width('100%').backgroundColor(DirectTheme.panel).margin({bottom:22}); DirectSection({label:'VPN DIRECT',value:'01'}); DirectParityRow({mark:'PLUS',title:'Тарифы VPN Direct',subtitle:'Пресеты и конструктор · Plus рекомендуем',onTap:()=>this.onFlow(DirectFlow.Plans)}); DirectSection({label:'ДРУГИЕ ПРОВАЙДЕРЫ',value:'01'}); DirectParityRow({mark:'URL',title:'Добавить внешнюю подписку',subtitle:'QR, ссылка, файл или конфиг',onTap:()=>this.onFlow(DirectFlow.ImportText)});}.padding({left:20,right:20,bottom:30});}.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper)}}
+
+@Component
+struct DirectAuthParity { @Prop flow:DirectFlow=DirectFlow.AuthLogin; @Prop onClose:()=>void=()=>{}; @Prop onFlow:(f:DirectFlow)=>void=(_f)=>{}; @State email:string=''; @State password:string=''; @State code:string=''; @State phone:string=''; @State reveal:boolean=false; build(){Scroll(){Column(){DirectParityPage({kicker:'ACCOUNT / AUTH',title:this.title(),subtitle:'Безопасный вход и синхронизация состояния сервиса.',onClose:this.onClose}); if(this.flow===DirectFlow.AuthLogin||this.flow===DirectFlow.AuthEmail){Text('EMAIL').fontSize(9).fontFamily('monospace').fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink);TextInput({placeholder:'email@example.com',text:this.email}).height(50).margin({top:7,bottom:14}).onChange(v=>this.email=v);Text('ПАРОЛЬ').fontSize(9).fontFamily('monospace').fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink);TextInput({placeholder:'Пароль',text:this.password}).type(this.reveal?InputType.Normal:InputType.Password).height(50).margin({top:7,bottom:14}).onChange(v=>this.password=v);DirectParityAction({title:'ВОЙТИ',onTap:()=>this.onFlow(DirectFlow.AuthSuccess)});DirectParityRow({mark:'CODE',title:'Войти по коду',subtitle:'Без постоянного пароля',onTap:()=>this.onFlow(DirectFlow.AuthCode)});DirectParityRow({mark:'NEW',title:'Создать аккаунт',subtitle:'Регистрация нового пользователя',onTap:()=>this.onFlow(DirectFlow.AuthRegister)});}else if(this.flow===DirectFlow.AuthCode||this.flow===DirectFlow.AuthPhoneCode){Text('КОД ПОДТВЕРЖДЕНИЯ').fontSize(9).fontFamily('monospace').fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink);TextInput({placeholder:'000000',text:this.code}).type(InputType.Number).height(50).margin({top:7,bottom:14}).onChange(v=>this.code=v);DirectParityAction({title:'ПОДТВЕРДИТЬ',onTap:()=>this.onFlow(DirectFlow.AuthSuccess)});}else if(this.flow===DirectFlow.AuthRegister){Text('EMAIL').fontSize(9).fontFamily('monospace').fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink);TextInput({placeholder:'email@example.com',text:this.email}).height(50).margin({top:7,bottom:14}).onChange(v=>this.email=v);DirectParityAction({title:'СОЗДАТЬ АККАУНТ',onTap:()=>this.onFlow(DirectFlow.AuthSuccess)});}else{Text('ВОССТАНОВЛЕНИЕ').fontSize(9).fontFamily('monospace').fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink);TextInput({placeholder:'Введите email',text:this.email}).height(50).margin({top:7,bottom:14}).onChange(v=>this.email=v);DirectParityAction({title:'ПРОДОЛЖИТЬ',onTap:()=>this.onFlow(DirectFlow.AuthCode)});}Blank().height(28);}.padding({left:20,right:20,bottom:30});}.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper)} private title(){if(this.flow===DirectFlow.AuthRegister)return'Регистрация';if(this.flow===DirectFlow.AuthRecovery)return'Восстановление';if(this.flow===DirectFlow.AuthCode||this.flow===DirectFlow.AuthPhoneCode)return'Подтверждение';if(this.flow===DirectFlow.AuthSuccess)return'Готово';return'Вход'}}
+
+@Component
+struct DirectParityAction { @Prop title:string=''; @Prop onTap:()=>void=()=>{}; build(){Row(){Text(this.title).fontSize(10).fontWeight(FontWeight.Bold).fontFamily('monospace').fontColor(DirectTheme.ink);Blank();Text('→').fontSize(14).fontColor(DirectTheme.ink)}.width('100%').height(56).padding({left:15,right:15}).backgroundColor(DirectTheme.acid).border({width:1.5,color:DirectTheme.ink}).onClick(()=>{DirectHaptics.selection();this.onTap();}).margin({bottom:12})}}
+
+@Component
+struct DirectManagementParity { @Prop flow:DirectFlow=DirectFlow.Management; @Prop onClose:()=>void=()=>{}; build(){Scroll(){Column(){DirectParityPage({kicker:'DIRECT / MANAGEMENT',title:this.title(),subtitle:'Подписка, устройства и история операций.',onClose:this.onClose}); DirectSection({label:'СЕРВИС',value:'—'}); DirectParityRow({mark:'PLAN',title:'Текущий тариф',subtitle:'Состояние и параметры доступа'}); DirectParityRow({mark:'DEV',title:'Устройства',subtitle:'Управление подключёнными устройствами'}); DirectParityRow({mark:'HIST',title:'История операций',subtitle:'Покупки, пополнения и возвраты'}); }.padding({left:20,right:20});}.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper)} private title(){if(this.flow===DirectFlow.Subscription)return'Подписка';if(this.flow===DirectFlow.Devices)return'Устройства';if(this.flow===DirectFlow.PaymentHistory)return'История операций';return'Управление'}}
+
+@Component
+struct DirectImportParity { @Prop flow:DirectFlow=DirectFlow.ImportFile; @Prop onClose:()=>void=()=>{}; @State value:string=''; build(){Column(){DirectParityPage({kicker:'DIRECT / IMPORT',title:'Импорт подписки',subtitle:'QR, ссылка, файл или конфигурация.',onClose:this.onClose});Text(this.flow===DirectFlow.ImportFile?'ФАЙЛ':'ССЫЛКА / КОНФИГ').fontSize(9).fontFamily('monospace').fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink); if(this.flow===DirectFlow.ImportFile){DirectParityRow({mark:'FILE',title:'Выбрать файл',subtitle:'Поддерживаемая конфигурация подключения'});}else{TextInput({placeholder:'https://…',text:this.value}).height(52).margin({top:8,bottom:14}).onChange(v=>this.value=v);DirectParityAction({title:'ИМПОРТИРОВАТЬ',onTap:()=>this.onClose()});} }.padding({left:20,right:20}).backgroundColor(DirectTheme.paper).width('100%').height('100%')}}
+
+@Component
+struct DirectLegalParity { @Prop flow:DirectFlow=DirectFlow.Legal; @Prop onClose:()=>void=()=>{}; build(){Scroll(){Column(){DirectParityPage({kicker:'DIRECT / LEGAL',title:this.flow===DirectFlow.Privacy?'Конфиденциальность':'Правовая информация',subtitle:'Документы и сведения о приложении.',onClose:this.onClose}); DirectSection({label:'ДОКУМЕНТ',value:'01'}); Text(this.flow===DirectFlow.Privacy?'VPN Direct обрабатывает только данные, необходимые для работы сервиса. Сетевой туннель и конфигурация управляются приложением и системным VPN API.':'Информация о сервисе, условиях использования и обработке данных.').fontSize(12).fontColor(DirectTheme.ink).lineSpacing(5).margin({top:14}); }.padding({left:20,right:20});}.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper)}}
+
+@Component
+struct DirectAccountParity { @Prop onClose:()=>void=()=>{}; @Prop onFlow:(f:DirectFlow)=>void=(_f)=>{}; build(){Column(){DirectParityPage({kicker:'ACCOUNT',title:'Аккаунт',subtitle:'Профиль и состояние учётной записи.',onClose:this.onClose});DirectParityRow({mark:'AUTH',title:'Войти',subtitle:'Синхронизация аккаунта',onTap:()=>this.onFlow(DirectFlow.AuthLogin)});DirectParityRow({mark:'BAL',title:'Баланс',subtitle:'Средства для быстрых покупок VPN Direct',onTap:()=>this.onFlow(DirectFlow.Balance)});DirectParityRow({mark:'LEGAL',title:'Конфиденциальность',subtitle:'Правовые документы',onTap:()=>this.onFlow(DirectFlow.Privacy)});}.padding({left:20,right:20}).backgroundColor(DirectTheme.paper).width('100%').height('100%')}}
+
+@Component
+struct DirectSettingsParity { @Prop flow:DirectFlow=DirectFlow.Security; @Prop onClose:()=>void=()=>{}; build(){Scroll(){Column(){DirectParityPage({kicker:'DIRECT / SETTINGS',title:this.title(),subtitle:'Параметры подключения и приложения.',onClose:this.onClose}); DirectParityRow({mark:'01',title:'Статус',subtitle:'Текущее состояние VPN Direct'}); DirectParityRow({mark:'02',title:'Системные настройки',subtitle:'Параметры HarmonyOS и разрешения'}); DirectParityRow({mark:'03',title:'Диагностика',subtitle:'Сведения для проверки соединения'}); DirectParityRow({mark:'04',title:'О приложении',subtitle:'VPN Direct · HarmonyOS'}); }.padding({left:20,right:20});}.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper)} private title(){if(this.flow===DirectFlow.About)return'О приложении';if(this.flow===DirectFlow.Diagnostics)return'Диагностика';if(this.flow===DirectFlow.Security)return'Безопасность';if(this.flow===DirectFlow.Connection)return'Соединение';if(this.flow===DirectFlow.Activity)return'Активность';return'Настройки'}}
+
+@Component
+struct DirectOperationParity { @Prop flow:DirectFlow=DirectFlow.PaymentProcessing; @Prop onClose:()=>void=()=>{}; build(){Column(){DirectParityPage({kicker:'DIRECT / STATE',title:this.title(),subtitle:'Операция выполняется или ожидает результата.',onClose:this.onClose});Column(){Text(this.status()).fontSize(10).fontWeight(FontWeight.Bold).fontFamily('monospace').fontColor(DirectTheme.muted);Text('Состояние синхронизируется с сервисом.').fontSize(13).fontColor(DirectTheme.ink).margin({top:10});}.padding(18).width('100%').backgroundColor(Color.White.opacity(0.35)).border({width:1,color:DirectTheme.line});}.padding({left:20,right:20}).backgroundColor(DirectTheme.paper).width('100%').height('100%')} private title(){if(this.flow===DirectFlow.PaymentSuccess)return'Готово';if(this.flow===DirectFlow.PaymentError)return'Ошибка';if(this.flow===DirectFlow.PaymentCancelled)return'Отменено';if(this.flow===DirectFlow.PaymentWaiting)return'Ожидание';return'Обработка'} private status(){if(this.flow===DirectFlow.PaymentSuccess)return'ОПЕРАЦИЯ ЗАВЕРШЕНА';if(this.flow===DirectFlow.PaymentError)return'НЕ УДАЛОСЬ ЗАВЕРШИТЬ';if(this.flow===DirectFlow.PaymentCancelled)return'ОПЕРАЦИЯ ОТМЕНЕНА';return'ОБРАБОТКА'}}
