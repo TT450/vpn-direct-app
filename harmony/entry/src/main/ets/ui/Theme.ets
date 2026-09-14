@@ -47,8 +47,14 @@ export class DirectTheme {
   static readonly authBrandH: number = 42;
   static readonly authPrimaryHeight: number = 52;
 
+  // iOS DirectUI motion tokens: easeOut 280ms, spring response 280ms / 0.78,
+  // compact value settling 220ms, dial needle 550ms.
+  static readonly entranceDuration: number = 280;
+  static readonly valueDuration: number = 220;
+  static readonly dialDuration: number = 550;
+
   // ArkUI exposes Normal/Regular/Medium/Bold enum weights. iOS Semibold is
-  // represented by the numeric 600 weight for closer typographic parity.
+  // represented by numeric 600 for closer typographic parity.
   static readonly weightRegular: FontWeight = FontWeight.Normal;
   static readonly weightMedium: FontWeight = FontWeight.Medium;
   static readonly weightSemibold: number = 600;
