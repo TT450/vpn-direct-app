@@ -1,4 +1,4 @@
-import { vpnExtension, VpnExtensionAbility } from '@kit.NetworkKit';
+import { vpnExtension } from '@kit.NetworkKit';
 import { Want } from '@kit.AbilityKit';
 import { AppShell } from '../app/AppShell';
 
