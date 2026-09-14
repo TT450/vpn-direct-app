@@ -1,8 +1,8 @@
 import { vpnExtension } from '@kit.NetworkKit';
-import { Want } from '@kit.AbilityKit';
-import { common } from '@kit.AbilityKit';
+import { Want, common } from '@kit.AbilityKit';
 import { AppShell } from '../app/AppShell';
-import { VpnProfileRepository, DirectVpnProfile } from '../vpn/VpnProfileRepository';
+import { DirectVpnProfile, VpnProfileRepository } from '../vpn/VpnProfileRepository';
+import { VpnServerSelection, SelectedVpnServer } from '../vpn/VpnServerSelection';
 import { VpnStateStore, VpnRuntimeState } from '../vpn/VpnStateStore';
 
 @Entry
@@ -19,8 +19,12 @@ struct Index {
 
   aboutToAppear(): void {
     this.appContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.syncSelectedServer();
     this.syncRuntimeState();
-    this.stateTimer = setInterval(() => this.syncRuntimeState(), 250);
+    this.stateTimer = setInterval(() => {
+      this.syncSelectedServer();
+      this.syncRuntimeState();
+    }, 250);
   }
 
   aboutToDisappear(): void {
@@ -30,39 +34,28 @@ struct Index {
     }
   }
 
+  private syncSelectedServer(): void {
+    const selected: SelectedVpnServer = VpnServerSelection.get();
+    this.serverId = selected.id;
+    this.serverName = selected.displayName;
+  }
+
   private syncRuntimeState(): void {
     if (this.appContext === undefined) return;
     const runtime: VpnRuntimeState | null = VpnStateStore.read(this.appContext);
     if (runtime === null) return;
-
     switch (runtime.state) {
-      case 'Connecting':
-        this.status = 'Connecting';
-        break;
-      case 'Connected':
-        this.status = 'Connected';
-        this.connecting = false;
-        break;
-      case 'Disconnecting':
-        this.status = 'Disconnecting';
-        break;
-      case 'Disconnected':
-        this.status = 'Disconnected';
-        this.connecting = false;
-        break;
-      case 'Failed':
-        this.status = 'Connection failed';
-        this.connecting = false;
-        break;
-      default:
-        break;
+      case 'Connecting': this.status = 'Connecting'; break;
+      case 'Connected': this.status = 'Connected'; this.connecting = false; break;
+      case 'Disconnecting': this.status = 'Disconnecting'; break;
+      case 'Disconnected': this.status = 'Disconnected'; this.connecting = false; break;
+      case 'Failed': this.status = 'Connection failed'; this.connecting = false; break;
+      default: break;
     }
   }
 
   private vpnWant(profile: DirectVpnProfile): Want {
-    const statePath: string = this.appContext === undefined
-      ? ''
-      : VpnStateStore.path(this.appContext);
+    const statePath: string = this.appContext === undefined ? '' : VpnStateStore.path(this.appContext);
     return {
       deviceId: '',
       bundleName: this.bundleName,
@@ -72,6 +65,7 @@ struct Index {
           statePath,
           singBoxConfig: profile.singBoxConfig,
           address: profile.address,
+          ipv6Address: profile.ipv6Address,
           dns: profile.dns,
           mtu: profile.mtu,
           ipv6: profile.ipv6
@@ -84,7 +78,6 @@ struct Index {
     if (this.connecting || this.status === 'Connected' || this.status === 'Connecting') return;
     this.connecting = true;
     this.status = 'Connecting';
-
     try {
       const profile: DirectVpnProfile | null = await VpnProfileRepository.getProfile(this.serverId);
       if (profile === null || profile.singBoxConfig.length === 0) {
@@ -108,11 +101,7 @@ struct Index {
     this.connecting = true;
     this.status = 'Disconnecting';
     try {
-      await vpnExtension.stopVpnExtensionAbility({
-        deviceId: '',
-        bundleName: this.bundleName,
-        abilityName: this.extensionName
-      });
+      await vpnExtension.stopVpnExtensionAbility({ deviceId: '', bundleName: this.bundleName, abilityName: this.extensionName });
     } catch (error) {
       this.status = 'Disconnect failed';
       console.error(`VPN Direct: stop failed ${JSON.stringify(error)}`);
@@ -122,24 +111,12 @@ struct Index {
     }
   }
 
-  private selectServer(): void {
-    if (this.status === 'Connected' || this.status === 'Connecting' || this.status === 'Disconnecting') return;
-    if (this.serverId === 'auto') {
-      this.serverId = 'de-frankfurt';
-      this.serverName = 'Германия · Frankfurt';
-    } else {
-      this.serverId = 'auto';
-      this.serverName = 'Авто';
-    }
-  }
-
   build() {
     AppShell({ status: this.status, serverName: this.serverName, onToggle: () => {
-      if (this.status === 'Connected' || this.status === 'Connecting') {
-        this.disconnect();
-      } else {
-        this.connect();
-      }
-    }, onServerTap: () => this.selectServer() });
+      if (this.status === 'Connected' || this.status === 'Connecting') this.disconnect();
+      else this.connect();
+    }, onServerTap: () => {
+      if (this.status === 'Disconnected' || this.status === 'Connection failed' || this.status === 'Disconnect failed') this.syncSelectedServer();
+    } });
   }
 }
