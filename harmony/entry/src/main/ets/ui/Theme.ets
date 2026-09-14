@@ -1,34 +1,21 @@
 /**
  * VPN Direct visual source of truth for HarmonyOS NEXT.
- *
- * Values intentionally mirror the iOS DirectUI DesignSystem.swift / DialView.
- * Do not introduce a Harmony-only palette.
+ * Values mirror the iOS DirectUI DesignSystem.swift / DialView.
  */
 export class DirectTheme {
-  /** iOS DS.paper rgb(0.93, 0.94, 0.91) */
   static readonly paper: string = '#EDF0E8';
-  /** iOS DS.ink rgb(0.08, 0.09, 0.08) */
   static readonly ink: string = '#141714';
-  /** iOS DS.panel rgb(0.19, 0.21, 0.18) */
   static readonly panel: string = '#30362E';
-  /** iOS DS.muted rgb(0.48, 0.50, 0.46) */
   static readonly muted: string = '#7A8075';
-  /** iOS DS.line = Color.black.opacity(0.14) — pure black, not ink-tinted */
   static readonly line: string = '#24000000';
-  /** iOS DS.acid rgb(0.66, 0.94, 0.41) */
   static readonly acid: string = '#A8F069';
-  /** Tab selected fill: acid @ 14% (VPNHomeView bottomNavigation) */
   static readonly acidSelected: string = '#24A8F069';
   static readonly green: string = '#2E8C4F';
   static readonly danger: string = '#D13D33';
   static readonly white: string = '#FFFFFF';
-  /** DialView dialBlue rgb(0.28, 0.55, 0.98) */
   static readonly dialBlue: string = '#478CFA';
-  /** OFF label / dial glyph white@0.82 */
   static readonly dialOff: string = '#D1FFFFFF';
-  /** AuthField / search white@0.45 */
   static readonly fieldFill: string = '#73FFFFFF';
-  /** Panel wash ~22% for home controls row */
   static readonly panelWash: string = '#3830362E';
 
   static readonly pageTop: number = 24;
@@ -59,6 +46,14 @@ export class DirectTheme {
   static readonly authBrandW: number = 52;
   static readonly authBrandH: number = 42;
   static readonly authPrimaryHeight: number = 52;
+
+  // iOS uses explicit weights; keeping them centralized prevents accidental
+  // Bold substitutions where the source uses Semibold/Medium.
+  static readonly weightRegular: FontWeight = FontWeight.Normal;
+  static readonly weightMedium: FontWeight = FontWeight.Medium;
+  static readonly weightSemibold: FontWeight = FontWeight.SemiBold;
+  static readonly weightBold: FontWeight = FontWeight.Bold;
+
   static readonly radiusSmall: number = 0;
   static readonly radiusMedium: number = 0;
   static readonly radiusLarge: number = 0;
@@ -66,21 +61,22 @@ export class DirectTheme {
 
 export class DirectTypography {
   static readonly display: number = 40;
-  /** iOS PageHeading title / VPNHomeView — semibold → Bold */
   static readonly pageTitle: number = 22;
-  /** iOS status title 27 semibold → Bold */
   static readonly statusTitle: number = 27;
   static readonly headline: number = 18;
   static readonly body: number = 13;
   static readonly secondary: number = 12;
   static readonly caption: number = 9;
-  /** iOS telemetryCell value 10.5 */
   static readonly telemetry: number = 10.5;
-  /** iOS telemetryCell label 6.5 */
   static readonly telemetryLabel: number = 6.5;
+  static readonly statusSubtitle: number = 10;
+  static readonly serverTitle: number = 14;
+  static readonly cardTitle: number = 19;
+  static readonly search: number = 13;
 }
 
 export class DirectSpacing {
+  static readonly hairline: number = 1;
   static readonly xs: number = 4;
   static readonly sm: number = 7;
   static readonly md: number = 10;
