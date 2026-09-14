@@ -8,9 +8,10 @@ struct DirectPrivacyDisclosureView: View {
     let onAccept: () -> Void
     let onDecline: () -> Void
 
-    private let privacyURL = URL(string: "https://vpn-direct.com/privacy")!
-    private let eulaURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    private let serviceURL = URL(string: "https://vpn-direct.com/pricing")!
+    private let privacyURL = URL(string: "https://vpn-direct.com/privacy.html")!
+    private let termsURL = URL(string: "https://vpn-direct.com/terms.html")!
+    private let eulaURL = URL(string: "https://vpn-direct.com/eula.html")!
+    private let pricingTermsURL = URL(string: "https://vpn-direct.com/pricing-terms.html")!
 
     var body: some View {
         GeometryReader { proxy in
@@ -69,8 +70,9 @@ struct DirectPrivacyDisclosureView: View {
                             .microLabel(color: .white.opacity(0.42))
 
                         documentLink("Политика конфиденциальности", url: privacyURL)
-                        documentLink("Условия использования / EULA", url: eulaURL)
-                        documentLink("Тарифы и условия сервиса", url: serviceURL)
+                        documentLink("Условия использования", url: termsURL)
+                        documentLink("EULA", url: eulaURL)
+                        documentLink("Тарифы и условия сервиса", url: pricingTermsURL)
                     }
                     .padding(.top, 2)
 

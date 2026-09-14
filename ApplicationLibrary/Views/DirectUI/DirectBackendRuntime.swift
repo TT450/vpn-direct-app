@@ -27,6 +27,10 @@ public enum DirectBackendRuntime {
     public static var quoteCheckout: ((DirectCheckoutQuoteRequest) async throws -> DirectCheckoutQuote)?
     public static var registerPushToken: ((String, String) async throws -> Void)?
     public static var logout: ((VPNConnectionModel) async -> Void)?
+    /// Permanently deletes the authenticated Direct account and its server-side data.
+    /// The real implementation is injected by the private backend hooks.
+    /// Public GitHub builds intentionally fail closed instead of silently pretending deletion succeeded.
+    public static var deleteAccount: ((VPNConnectionModel) async throws -> Void)?
     public static var refreshAccount: ((VPNConnectionModel) async -> Void)?
     public static var bootstrapSession: ((VPNConnectionModel) async -> Void)?
     public static var sendEmailCode: ((VPNConnectionModel, String) async -> Void)?

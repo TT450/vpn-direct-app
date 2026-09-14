@@ -134,6 +134,11 @@ struct DirectProfilePage: View {
                     }
                 }
                 .padding(.top, 5)
+
+                sectionHeader("ЮРИДИЧЕСКАЯ ИНФОРМАЦИЯ", "03")
+                    .padding(.top, 18)
+                DirectLegalInformationSection(model: model)
+                    .padding(.top, 5)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, DS.pageTop)

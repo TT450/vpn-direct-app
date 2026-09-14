@@ -2585,6 +2585,7 @@ public final class VPNConnectionModel: ObservableObject {
 
         if isConnected, !wasConnected {
             HapticManager.shared.play(.vpnConnected)
+            DirectAppReviewPrompt.scheduleAfterSuccessfulConnect()
             // Fresh egress IP after tunnel is up (not the cached pre-connect WAN IP).
             Task {
                 try? await Task.sleep(nanoseconds: 800_000_000)
