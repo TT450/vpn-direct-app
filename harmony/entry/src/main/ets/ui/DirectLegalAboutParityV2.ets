@@ -19,14 +19,8 @@ export struct DirectLegalAboutParityV2 {
   ];
 
   build() {
-    Scroll() {
-      Column() {
-        this.header();
-        if (this.flow === DirectFlow.Privacy) this.privacy();
-        else if (this.flow === DirectFlow.About) this.about();
-        else this.legal();
-      }.width('100%').padding({ left: 20, right: 20, bottom: 28 });
-    }.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper);
+    Scroll() { Column() { this.header(); if (this.flow === DirectFlow.Privacy) this.privacy(); else if (this.flow === DirectFlow.About) this.about(); else this.legal(); }.width('100%').padding({ left: 20, right: 20, bottom: 28 }); }
+      .scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper);
   }
 
   @Builder private header() {
@@ -43,11 +37,7 @@ export struct DirectLegalAboutParityV2 {
   @Builder private legal() {
     Row() { Text('ДОКУМЕНТЫ').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace'); Blank(); Text('08').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); }.width('100%').height(36).border({ width: { top: 1 }, color: DirectTheme.ink }).margin({ top: 18 });
     ForEach(this.docs, (doc: string[], index: number) => {
-      Row() {
-        Text(String(index + 1).padStart(2, '0')).fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace').width(25);
-        Column() { Text(doc[0]).fontSize(14).fontWeight(600).fontColor(DirectTheme.ink); Text(doc[1]).fontSize(10).fontColor(DirectTheme.muted).margin({ top: 4 }).maxLines(2); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 13 });
-        Text('↗').fontSize(10).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted);
-      }.width('100%').constraintSize({ minHeight: 67 }).border({ width: { bottom: 1 }, color: DirectTheme.line });
+      Row() { Text(String(index + 1).padStart(2, '0')).fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace').width(25); Column() { Text(doc[0]).fontSize(14).fontWeight(600).fontColor(DirectTheme.ink); Text(doc[1]).fontSize(10).fontColor(DirectTheme.muted).margin({ top: 4 }).maxLines(2); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 13 }); Text('↗').fontSize(10).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted); }.width('100%').constraintSize({ minHeight: 67 }).border({ width: { bottom: 1 }, color: DirectTheme.line });
     });
   }
 
@@ -69,5 +59,5 @@ export struct DirectLegalAboutParityV2 {
   }
 
   @Builder private section(label: string, meta: string) { Row() { Text(label).fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace'); Blank(); Text(meta).fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); }.width('100%').height(38).border({ width: { top: 1 }, color: DirectTheme.ink }).margin({ top: 20 }); }
-  @Builder private info(label: string, value: string) { Row() { Text(label).fontSize(9).fontWeight(FontWeight.Bold).fontColor('#6BFFFFFF').fontFamily('monospace').width(84); Text(value).fontSize(11).fontWeight(500).fontColor(DirectTheme.white).fontFamily('monospace').layoutWeight(1); }.width('100%').minHeight(44).padding({ left: 12, right: 12 }).backgroundColor(DirectTheme.panel).border({ width: { bottom: 1 }, color: '#1AFFFFFF' }); }
+  @Builder private info(label: string, value: string) { Row() { Text(label).fontSize(9).fontWeight(FontWeight.Bold).fontColor('#6BFFFFFF').fontFamily('monospace').width(84); Text(value).fontSize(11).fontWeight(500).fontColor(DirectTheme.white).fontFamily('monospace').layoutWeight(1); }.width('100%').constraintSize({ minHeight: 44 }).padding({ left: 12, right: 12 }).backgroundColor(DirectTheme.panel).border({ width: { bottom: 1 }, color: '#1AFFFFFF' }); }
 }
