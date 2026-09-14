@@ -12,7 +12,7 @@ HarmonyOS exposes two different VPN API layers and they must not be confused:
 - **Third-party VPN:** `vpnExtension` / `VpnExtensionAbility` from `@kit.NetworkKit`. This is the path VPN Direct uses. Huawei's third-party VPN guide states that this capability is intended for building custom VPN clients, that the app implements the tunnel internals itself, and that `ohos.permission.INTERNET` is required. The first connection also goes through the system VPN trust/authorization UI.
 - **System VPN management:** `@ohos.net.vpn` is a system API. Its `setUp`, `protect`, and `destroy` operations require `ohos.permission.MANAGE_VPN` and are restricted to system applications. We therefore **must not add `MANAGE_VPN` to VPN Direct as if it were a normal third-party runtime permission**. If a future distribution target requires a system/privileged VPN integration, that is a separate product/signing track.
 
-This distinction is now part of the implementation gate: use `vpnExtension` for the consumer AppGallery client and verify permission/signing requirements against the target HarmonyOS SDK before release. citeturn2search0turn2search4
+This distinction is now part of the implementation gate: use `vpnExtension` for the consumer AppGallery client and verify permission/signing requirements against the target HarmonyOS SDK before release.
 
 ## Non-negotiable architecture
 
@@ -30,7 +30,7 @@ VpnExtensionAbility
 VpnConnection → HarmonyOS TUN fd
       │
       ▼
-N-API bridge
+N-API bridge → libvpndirect_engine.so
       │
       ▼
 VPNDirectCore 0.1.0
@@ -50,12 +50,15 @@ The HarmonyOS layer is a platform adapter. The existing VPN Direct Core remains 
 
 **Definition of done:** a clean DevEco build produces a valid HAP.
 
-- [ ] Complete HarmonyOS Stage-model project structure
-- [ ] Configure AppScope and entry module
-- [ ] Configure phone/tablet device targets
-- [ ] Configure HarmonyOS SDK/API and native toolchain
-- [ ] Add EntryAbility and initial ArkUI page
-- [ ] Add application resources and icons
+- [x] Complete HarmonyOS Stage-model project structure
+- [x] Configure AppScope and entry module
+- [x] Configure phone/tablet device targets
+- [x] Configure HarmonyOS SDK/API 6.1.1(24)
+- [x] Configure canonical `hvigor/hvigor-config.json5`
+- [x] Configure entry `hvigorfile.ts` with `hapTasks`
+- [x] Configure `startWindowIcon` / `startWindowBackground`
+- [x] Normalize string/color resources to Harmony resource-object format
+- [x] Add application resources and icons
 - [x] Declare `ohos.permission.INTERNET`
 - [x] Register `VpnExtensionAbility`
 - [ ] Produce a signed/debug HAP locally
@@ -67,7 +70,7 @@ The HarmonyOS layer is a platform adapter. The existing VPN Direct Core remains 
 
 - [x] Implement `VpnExtensionAbility` lifecycle scaffold
 - [x] Create `VpnConnection`
-- [x] Create VPN configuration
+- [x] Use API 24 `VpnConfig` / `LinkAddress` / `RouteInfo` structures
 - [x] Request TUN creation through `VpnConnection.create`
 - [x] Generate a VPN ID before creating the connection
 - [x] Implement deterministic start/stop lifecycle
@@ -81,20 +84,22 @@ The HarmonyOS layer is a platform adapter. The existing VPN Direct Core remains 
 
 ## M3 — Native VPN Direct Core
 
-**Definition of done:** `libvpndirect_core.so` is a real HarmonyOS ARM64 native artifact built from the repository's pinned Core.
+**Definition of done:** `libvpndirect_engine.so` is a real HarmonyOS ARM64 native artifact built from the repository's pinned Core and loaded by the N-API bridge.
 
-- [ ] Define the stable Harmony Core ABI
+- [x] Define the stable Harmony Core ABI
 - [x] Implement native start/stop entry points
 - [x] Make ArkTS/native status codes explicit
-- [ ] Make native Core calls non-blocking for ArkTS
+- [x] Keep native Core loading lazy so M1 can build without the engine artifact
 - [x] Implement thread-safe bridge lifecycle state
 - [x] Implement error propagation to ArkTS
-- [ ] Build VPN Direct Core for HarmonyOS/OpenHarmony ARM64
-- [ ] Preserve Core version `0.1.0`
-- [ ] Preserve `sing-box-lx` revision `v1.14.0-lx.35`
-- [ ] Apply the repository's public Core overlays
-- [ ] Verify capabilities are fail-closed
-- [ ] Package `libvpndirect_core.so` into the HAP
+- [x] Add OpenHarmony ARM64 build pipeline
+- [x] Preserve Core version `0.1.0` in build gate
+- [x] Preserve `sing-box-lx` revision `v1.14.0-lx.35` in build gate
+- [x] Apply the repository's public Core overlays through `prepare_core.sh`
+- [ ] Run the Core build on a machine with the pinned OpenHarmony Go toolchain
+- [ ] Verify capabilities are fail-closed in the produced artifact
+- [ ] Package `libvpndirect_engine.so` into the HAP
+- [ ] Real-device smoke test of Core start/stop
 
 ## M4 — First Working VPN
 
@@ -102,7 +107,7 @@ The HarmonyOS layer is a platform adapter. The existing VPN Direct Core remains 
 
 - [ ] Connect TUN fd to the native Core
 - [x] Pass a validated profile as data through the extension launch `Want`
-- [ ] Start Core with one known-good profile
+- [ ] Start Core with one known-good full sing-box profile
 - [ ] Establish a real VPN session
 - [ ] Verify IPv4 internet traffic
 - [ ] Verify DNS resolution
@@ -216,7 +221,7 @@ Do not mark a protocol `tested` from parser/build evidence alone.
 
 1. **M1 — buildable DevEco project**
 2. **M2 — real HarmonyOS TUN**
-3. **M3 — real `libvpndirect_core.so`**
+3. **M3 — real `libvpndirect_engine.so`**
 4. **M4 — first working VPN**
 5. **M5 — network qualification**
 6. **M6 — product layer**
