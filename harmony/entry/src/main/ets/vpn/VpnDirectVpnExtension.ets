@@ -3,11 +3,13 @@ import { Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { HarmonyCoreBridge } from './HarmonyCoreBridge';
 
-interface ProfileData {
+interface VpnProfileEnvelope {
   address?: string;
   dns?: string;
   mtu?: number;
   ipv6?: boolean;
+  statePath?: string;
+  singBoxConfig?: string;
 }
 
 export default class VpnDirectVpnExtension extends VpnExtensionAbility {
@@ -31,14 +33,21 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
     }
   }
 
-  private async start(profileJson: string): Promise<void> {
+  private async start(rawProfileJson: string): Promise<void> {
     if (this.vpnConnection === undefined || this.core === undefined || this.tunFd >= 0) return;
 
-    let profile: ProfileData = {};
+    let profile: VpnProfileEnvelope = {};
     try {
-      profile = JSON.parse(profileJson) as ProfileData;
+      profile = JSON.parse(rawProfileJson) as VpnProfileEnvelope;
     } catch (error) {
-      hilog.error(0xD1, 'VPNDirect', 'Invalid profile JSON: %{public}s', JSON.stringify(error));
+      hilog.error(0xD1, 'VPNDirect', 'Invalid profile envelope: %{public}s', JSON.stringify(error));
+      return;
+    }
+
+    const singBoxConfig: string = profile.singBoxConfig ?? '';
+    const statePath: string = profile.statePath ?? `${this.context.filesDir}/vpn-state.json`;
+    if (singBoxConfig.length === 0 || !singBoxConfig.includes('"inbounds"')) {
+      hilog.error(0xD1, 'VPNDirect', 'A real sing-box config is required before starting the VPN');
       return;
     }
 
@@ -76,7 +85,25 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
         return;
       }
 
-      const started: boolean = this.core.start(this.tunFd, profileJson);
+      // Protect the extension process before sing-box opens any outbound socket.
+      // This keeps the core's control-plane traffic outside the TUN it owns.
+      try {
+        await this.vpnConnection.protectProcessNet();
+      } catch (error) {
+        hilog.error(0xD1, 'VPNDirect', 'protectProcessNet failed: %{public}s', JSON.stringify(error));
+        await this.destroyVpnConnection();
+        return;
+      }
+
+      const envelope: string = JSON.stringify({
+        statePath,
+        singBoxConfig,
+        address,
+        dns,
+        mtu,
+        ipv6
+      });
+      const started: boolean = this.core.start(this.tunFd, envelope);
       if (!started) {
         await this.destroyVpnConnection();
         return;
