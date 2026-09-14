@@ -1,5 +1,6 @@
 import { DirectTheme } from './Theme';
 import { DirectHaptics } from './Haptics';
+import { DirectIcon, DirectIconName } from './DirectIcons';
 
 @Component
 export struct DirectPrivacyDisclosure {
@@ -39,7 +40,10 @@ export struct DirectPrivacyDisclosure {
         Row() {
           Text('ОТКАЗАТЬСЯ').fontSize(10).fontWeight(FontWeight.Bold).fontColor('#AEFFFFFF').fontFamily('monospace').layoutWeight(1).height(54).textAlign(TextAlign.Center)
             .onClick(() => { DirectHaptics.error(); this.onDecline(); });
-          Text('СОГЛАСИТЬСЯ  ✓').fontSize(10).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace').layoutWeight(1).height(54).textAlign(TextAlign.Center).backgroundColor(DirectTheme.acid)
+          Row({ space: 7 }) {
+            Text('СОГЛАСИТЬСЯ').fontSize(10).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace');
+            DirectIcon({ name: DirectIconName.Checkmark, iconSize: 11, color: DirectTheme.ink, weight: 1.8 });
+          }.layoutWeight(1).height(54).justifyContent(FlexAlign.Center).backgroundColor(DirectTheme.acid)
             .onClick(() => { DirectHaptics.success(); this.onAccept(); });
         }.width('100%').border({ width: { top: 1 }, color: '#24FFFFFF' });
       }.width('100%').height('100%').backgroundColor(DirectTheme.ink).border({ width: 1, color: '#B5F069' });
@@ -62,12 +66,11 @@ export struct DirectPrivacyDisclosure {
   private document(title: string, url: string) {
     Row() {
       Text(title).fontSize(11).fontWeight(FontWeight.Medium).fontColor(DirectTheme.acid).layoutWeight(1);
-      Text('↗').fontSize(10).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid);
+      DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 10, color: DirectTheme.acid, weight: 1.5 });
     }.width('100%').constraintSize({ minHeight: 36 }).padding({ left: 12, right: 12 }).border({ width: 1, color: '#24141714' }).onClick(() => { DirectHaptics.navigation(); this.open(url); });
   }
 
-  private open(url: string) {
+  private open(_url: string): void {
     // URL opening is delegated to the host when the real application adapter is connected.
-    // Keeping the URL visible here preserves the SwiftUI disclosure's document contract without embedding web code.
   }
 }
