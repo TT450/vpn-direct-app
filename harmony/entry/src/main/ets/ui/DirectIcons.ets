@@ -19,7 +19,7 @@ export struct DirectIcon {
     else if (this.name === DirectIconName.Magnifyingglass) this.svgIcon($r('app.media.ic_magnifyingglass'));
     else if (this.name === DirectIconName.ChevronRight) this.svgIcon(this.color === DirectTheme.green ? $r('app.media.ic_chevron_right_green') : $r('app.media.ic_chevron_right'));
     else if (this.name === DirectIconName.Xmark) this.svgIcon(this.color === DirectTheme.acid ? $r('app.media.ic_xmark_acid') : $r('app.media.ic_xmark'));
-    else if (this.name === DirectIconName.Star) this.svgIcon($r('app.media.ic_star'));
+    else if (this.name === DirectIconName.Star) this.svgIcon(this.color === DirectTheme.green ? $r('app.media.ic_star_green') : $r('app.media.ic_star'));
     else if (this.name === DirectIconName.Minus) Row().width(this.iconSize).height(this.bar()).backgroundColor(this.color).alignSelf(ItemAlign.Center);
     else if (this.name === DirectIconName.Plus) Stack({ alignContent: Alignment.Center }) { Row().width(this.iconSize).height(this.bar()).backgroundColor(this.color); Column().width(this.bar()).height(this.iconSize).backgroundColor(this.color); }.width(this.iconSize).height(this.iconSize);
     else if (this.name === DirectIconName.ArrowRight) Stack({ alignContent: Alignment.Center }) { Row().width(this.iconSize).height(this.bar()).backgroundColor(this.color); Row().width(this.iconSize * 0.45).height(this.bar()).backgroundColor(this.color).rotate({ angle: 40 }).offset({ x: this.iconSize * 0.22, y: -this.iconSize * 0.14 }); Row().width(this.iconSize * 0.45).height(this.bar()).backgroundColor(this.color).rotate({ angle: -40 }).offset({ x: this.iconSize * 0.22, y: this.iconSize * 0.14 }); }.width(this.iconSize).height(this.iconSize);
