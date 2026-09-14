@@ -17,7 +17,12 @@ export struct DirectFlag {
     else if (c === 'ES') Column() { Row().width('100%').height(this.height * 0.25).backgroundColor('#AA151B'); Row().width('100%').height(this.height * 0.5).backgroundColor('#F1BF00'); Row().width('100%').height(this.height * 0.25).backgroundColor('#AA151B'); }.width('100%').height('100%');
     else if (c === 'GB') Stack() { Row().width('100%').height('100%').backgroundColor('#012169'); Row().width('100%').height(3).backgroundColor('#FFFFFF').rotate({ angle: 45 }); Row().width('100%').height(3).backgroundColor('#FFFFFF').rotate({ angle: -45 }); Row().width('100%').height(5).backgroundColor('#C8102E'); Column().width(5).height('100%').backgroundColor('#C8102E'); }.width('100%').height('100%');
     else if (c === 'US') Stack() { Column() { ForEach(this.us, (stripe: string) => Row().width('100%').height(this.height / 13).backgroundColor(stripe)); }.width('100%').height('100%'); Row().width(this.width * 0.45).height(this.height * 0.54).backgroundColor('#3C3B6E'); }.width('100%').height('100%');
-    else if (c === 'TR') Row().width('100%').height('100%').backgroundColor('#E30A17');
+    else if (c === 'TR') Stack() {
+      Row().width('100%').height('100%').backgroundColor('#E30A17');
+      Circle().width(this.height * 0.52).height(this.height * 0.52).fill('#FFFFFF').offset({ x: -this.width * 0.04, y: 0 });
+      Circle().width(this.height * 0.42).height(this.height * 0.42).fill('#E30A17').offset({ x: this.width * 0.04, y: 0 });
+      Image($r('app.media.ic_tr_star')).width(this.height * 0.28).height(this.height * 0.28).objectFit(ImageFit.Contain).offset({ x: this.width * 0.18, y: 0 });
+    }.width('100%').height('100%');
     else if (c === 'AZ') this.stripes(['#00B5E2','#EF3340','#509E2F']); else if (c === 'AM') this.stripes(['#D90012','#0033A0','#F2A800']); else if (c === 'RU') this.stripes(['#FFFFFF','#0039A6','#D52B1E']); else if (c === 'PL') this.stripes(['#FFFFFF','#DC143C']);
     else if (c === 'FI') Stack() { Row().width('100%').height('100%').backgroundColor('#FFFFFF'); Row().width('100%').height(5).backgroundColor('#003580').offset({ y: -2 }); Column().width(5).height('100%').backgroundColor('#003580').offset({ x: -this.width * 0.12 }); }.width('100%').height('100%');
     else if (c === 'SE') Stack() { Row().width('100%').height('100%').backgroundColor('#006AA7'); Row().width('100%').height(4).backgroundColor('#FECC00').offset({ y: -2 }); Column().width(4).height('100%').backgroundColor('#FECC00').offset({ x: -this.width * 0.12 }); }.width('100%').height('100%');
