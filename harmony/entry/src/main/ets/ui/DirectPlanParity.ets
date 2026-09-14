@@ -1,6 +1,6 @@
 import { DirectTheme } from './Theme';
 import { DirectHaptics } from './Haptics';
-import { DirectFlow } from './DirectFlows';
+import { DirectFlow } from './DirectFlowModel';
 
 interface DirectPlanPresetData {
   id: string;
