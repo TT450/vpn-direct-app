@@ -58,10 +58,10 @@ export default class VpnDirectVpnExtension extends VpnExtensionAbility {
     const mtu: number = profile.mtu ?? 1400;
     const ipv6: boolean = profile.ipv6 ?? true;
 
-    const addresses: Array<vpnExtension.VpnAddress> = [
+    const addresses = [
       { address: { address, family: 1 }, prefixLength: 32 }
     ];
-    const routes: Array<vpnExtension.VpnRoute> = [{
+    const routes = [{
       interface: 'vpn-tun',
       destination: { address: { address: '0.0.0.0', family: 1, port: 0 }, prefixLength: 0 },
       gateway: { address: { address: '0.0.0.0', family: 1, port: 0 }, port: 0 },
