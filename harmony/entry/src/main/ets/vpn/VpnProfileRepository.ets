@@ -3,6 +3,7 @@ export interface DirectVpnProfile {
   serverName: string;
   singBoxConfig: string;
   address: string;
+  ipv6Address: string;
   dns: string;
   mtu: number;
   ipv6: boolean;
