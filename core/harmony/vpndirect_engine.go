@@ -29,165 +29,71 @@ const (
 	stateFailed        = "Failed"
 )
 
-type harmonyProfile struct {
-	StatePath     string `json:"statePath"`
-	SingBoxConfig string `json:"singBoxConfig"`
-}
-
+type harmonyProfile struct { StatePath string `json:"statePath"`; SingBoxConfig string `json:"singBoxConfig"` }
 type interfaceMonitor struct { stop chan struct{}; done chan struct{} }
 
 var (
-	mu        sync.Mutex
-	service   *libbox.BoxService
-	tunFD     = -1
+	mu sync.Mutex
+	service *libbox.BoxService
+	tunFD = -1
 	statePath string
-	monitors  = make(map[libbox.InterfaceUpdateListener]*interfaceMonitor)
+	monitors = make(map[libbox.InterfaceUpdateListener]*interfaceMonitor)
 )
 
 type stringIterator struct { items []string; index int }
 func (it *stringIterator) HasNext() bool { return it.index < len(it.items) }
-func (it *stringIterator) Next() string {
-	if !it.HasNext() { return "" }
-	value := it.items[it.index]; it.index++; return value
-}
-
+func (it *stringIterator) Next() string { if !it.HasNext() { return "" }; value := it.items[it.index]; it.index++; return value }
 type networkIterator struct { items []*libbox.NetworkInterface; index int }
 func (it *networkIterator) HasNext() bool { return it.index < len(it.items) }
-func (it *networkIterator) Next() *libbox.NetworkInterface {
-	if !it.HasNext() { return nil }
-	value := it.items[it.index]; it.index++; return value
-}
+func (it *networkIterator) Next() *libbox.NetworkInterface { if !it.HasNext() { return nil }; value := it.items[it.index]; it.index++; return value }
 
 type harmonyPlatform struct{}
 var _ libbox.PlatformInterface = (*harmonyPlatform)(nil)
-
 func (p *harmonyPlatform) LocalDNSTransport() libbox.LocalDNSTransport { return nil }
 func (p *harmonyPlatform) UsePlatformAutoDetectInterfaceControl() bool { return false }
 func (p *harmonyPlatform) AutoDetectInterfaceControl(fd int32) error { return nil }
-func (p *harmonyPlatform) OpenTun(options libbox.TunOptions) (int32, error) {
-	mu.Lock(); defer mu.Unlock()
-	if tunFD < 0 { return -1, errors.New("VPN Direct: TUN fd is not set") }
-	return int32(tunFD), nil
-}
+func (p *harmonyPlatform) OpenTun(options libbox.TunOptions) (int32, error) { mu.Lock(); defer mu.Unlock(); if tunFD < 0 { return -1, errors.New("VPN Direct: TUN fd is not set") }; return int32(tunFD), nil }
 func (p *harmonyPlatform) UseProcFS() bool { return false }
-func (p *harmonyPlatform) FindConnectionOwner(ipProtocol int32, sourceAddress string, sourcePort int32, destinationAddress string, destinationPort int32) (*libbox.ConnectionOwner, error) {
-	return nil, errors.New("connection owner lookup is not supported on HarmonyOS")
-}
+func (p *harmonyPlatform) FindConnectionOwner(ipProtocol int32, sourceAddress string, sourcePort int32, destinationAddress string, destinationPort int32) (*libbox.ConnectionOwner, error) { return nil, errors.New("connection owner lookup is not supported on HarmonyOS") }
 func (p *harmonyPlatform) StartDefaultInterfaceMonitor(listener libbox.InterfaceUpdateListener) error {
 	if listener == nil { return errors.New("nil interface listener") }
-	mu.Lock()
-	if _, exists := monitors[listener]; exists { mu.Unlock(); return nil }
-	monitor := &interfaceMonitor{stop: make(chan struct{}), done: make(chan struct{})}
-	monitors[listener] = monitor
-	mu.Unlock()
-	go func() {
-		defer close(monitor.done)
-		ticker := time.NewTicker(2 * time.Second); defer ticker.Stop()
-		lastName := ""
-		for {
-			name, index := defaultInterface()
-			if name != "" && (name != lastName || lastName == "") {
-				listener.UpdateDefaultInterface(name, int32(index), false, false); lastName = name
-			}
-			select { case <-ticker.C: case <-monitor.stop: return }
-		}
-	}()
+	mu.Lock(); if _, exists := monitors[listener]; exists { mu.Unlock(); return nil }; monitor := &interfaceMonitor{stop:make(chan struct{}), done:make(chan struct{})}; monitors[listener] = monitor; mu.Unlock()
+	go func() { defer close(monitor.done); ticker := time.NewTicker(2*time.Second); defer ticker.Stop(); lastName := ""; for { name,index := defaultInterface(); if name != "" && (name != lastName || lastName == "") { listener.UpdateDefaultInterface(name,int32(index),false,false); lastName=name }; select { case <-ticker.C: case <-monitor.stop: return } } }()
 	return nil
 }
-func (p *harmonyPlatform) CloseDefaultInterfaceMonitor(listener libbox.InterfaceUpdateListener) error {
-	mu.Lock(); monitor, exists := monitors[listener]
-	if exists { delete(monitors, listener) }
-	mu.Unlock()
-	if !exists { return nil }
-	close(monitor.stop); <-monitor.done; return nil
-}
-func defaultInterface() (string, int) {
-	interfaces, err := net.Interfaces(); if err != nil { return "", 0 }
-	for _, iface := range interfaces {
-		name := strings.ToLower(iface.Name)
-		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 || strings.Contains(name, "vpn") || strings.Contains(name, "tun") { continue }
-		return iface.Name, iface.Index
-	}
-	return "", 0
-}
-func (p *harmonyPlatform) GetInterfaces() (libbox.NetworkInterfaceIterator, error) {
-	interfaces, err := net.Interfaces(); if err != nil { return nil, err }
-	result := make([]*libbox.NetworkInterface, 0, len(interfaces))
-	for _, iface := range interfaces {
-		name := strings.ToLower(iface.Name)
-		if name == "lo" || strings.Contains(name, "vpn") || strings.Contains(name, "tun") { continue }
-		addresses := make([]string, 0)
-		for _, address := range iface.Addrs() {
-			prefix, parseErr := netip.ParsePrefix(address.String())
-			if parseErr != nil || prefix.Addr().IsLinkLocalUnicast() { continue }
-			addresses = append(addresses, prefix.String())
-		}
-		result = append(result, &libbox.NetworkInterface{Index:int32(iface.Index), MTU:int32(iface.MTU), Name:iface.Name, Addresses:&stringIterator{items:addresses}, Flags:int32(iface.Flags), Type:libbox.InterfaceTypeOther, DNSServer:&stringIterator{}, Metered:false})
-	}
-	return &networkIterator{items:result}, nil
+func (p *harmonyPlatform) CloseDefaultInterfaceMonitor(listener libbox.InterfaceUpdateListener) error { mu.Lock(); monitor,exists := monitors[listener]; if exists { delete(monitors,listener) }; mu.Unlock(); if !exists { return nil }; close(monitor.stop); <-monitor.done; return nil }
+func defaultInterface() (string,int) { interfaces,err:=net.Interfaces(); if err!=nil{return "",0}; for _,iface:=range interfaces { name:=strings.ToLower(iface.Name); if iface.Flags&net.FlagUp==0 || iface.Flags&net.FlagLoopback!=0 || strings.Contains(name,"vpn") || strings.Contains(name,"tun"){continue}; return iface.Name,iface.Index }; return "",0 }
+func (p *harmonyPlatform) GetInterfaces() (libbox.NetworkInterfaceIterator,error) {
+	interfaces,err:=net.Interfaces(); if err!=nil{return nil,err}; result:=make([]*libbox.NetworkInterface,0,len(interfaces))
+	for _,iface:=range interfaces { name:=strings.ToLower(iface.Name); if name=="lo" || strings.Contains(name,"vpn") || strings.Contains(name,"tun"){continue}; addresses:=make([]string,0); for _,address:=range iface.Addrs(){prefix,parseErr:=netip.ParsePrefix(address.String()); if parseErr!=nil || prefix.Addr().IsLinkLocalUnicast(){continue}; addresses=append(addresses,prefix.String())}; result=append(result,&libbox.NetworkInterface{Index:int32(iface.Index),MTU:int32(iface.MTU),Name:iface.Name,Addresses:&stringIterator{items:addresses},Flags:int32(iface.Flags),Type:libbox.InterfaceTypeOther,DNSServer:&stringIterator{},Gateway:&stringIterator{},Metered:false}) }
+	return &networkIterator{items:result},nil
 }
 func (p *harmonyPlatform) UnderNetworkExtension() bool { return false }
 func (p *harmonyPlatform) IncludeAllNetworks() bool { return false }
 func (p *harmonyPlatform) ReadWIFIState() *libbox.WIFIState { return nil }
 func (p *harmonyPlatform) ClearDNSCache() {}
 func (p *harmonyPlatform) SendNotification(notification *libbox.Notification) error { return nil }
+func (p *harmonyPlatform) CancelNotification(identifier string,typeID int32) error { return nil }
 func (p *harmonyPlatform) StartNeighborMonitor(listener libbox.NeighborUpdateListener) error { return nil }
 func (p *harmonyPlatform) CloseNeighborMonitor(listener libbox.NeighborUpdateListener) error { return nil }
 func (p *harmonyPlatform) RegisterMyInterface(name string) {}
 func (p *harmonyPlatform) UsePlatformShell() bool { return false }
 func (p *harmonyPlatform) CheckPlatformShell() error { return nil }
-func (p *harmonyPlatform) OpenShellSession(user *libbox.PlatformUser, command string, environ libbox.StringIterator, term string, rows int32, cols int32) (libbox.ShellSession, error) {
-	return nil, errors.New("shell is not supported on HarmonyOS")
-}
-func (p *harmonyPlatform) LookupUser(username string) (*libbox.PlatformUser, error) { return nil, os.ErrNotExist }
-func (p *harmonyPlatform) LookupSFTPServer() (string, error) { return "", os.ErrNotExist }
-func (p *harmonyPlatform) ReadSystemSSHHostKey() (string, error) { return "", os.ErrNotExist }
-func (p *harmonyPlatform) TailscaleHostname() string { return "" }
-func (p *harmonyPlatform) UsePlatformBridge() bool { return false }
-func (p *harmonyPlatform) CreateBridge(options *libbox.BridgeOptions) (libbox.BridgeSession, error) { return nil, errors.New("bridge is not supported on HarmonyOS") }
+func (p *harmonyPlatform) OpenShellSession(user *libbox.PlatformUser,command string,environ libbox.StringIterator,term string,rows int32,cols int32)(libbox.ShellSession,error){return nil,errors.New("shell is not supported on HarmonyOS")}
+func (p *harmonyPlatform) LookupUser(username string)(*libbox.PlatformUser,error){return nil,os.ErrNotExist}
+func (p *harmonyPlatform) LookupSFTPServer()(string,error){return "",os.ErrNotExist}
+func (p *harmonyPlatform) ReadSystemSSHHostKey()(string,error){return "",os.ErrNotExist}
+func (p *harmonyPlatform) TailscaleHostname()string{return ""}
+func (p *harmonyPlatform) UsePlatformBridge()bool{return false}
+func (p *harmonyPlatform) CreateBridge(options *libbox.BridgeOptions)(libbox.BridgeSession,error){return nil,errors.New("bridge is not supported on HarmonyOS")}
 
-func publishState(path string, state string, message string) {
-	if path == "" { return }
-	payload := struct { State string `json:"state"`; Message string `json:"message,omitempty"`; At int64 `json:"at"` }{State:state, Message:message, At:time.Now().UnixMilli()}
-	data, err := json.Marshal(payload); if err != nil { return }
-	tmp := path + ".tmp"; if err = os.WriteFile(tmp, data, 0o600); err != nil { return }; _ = os.Rename(tmp, path)
-}
+func publishState(path,state,message string){if path==""{return}; payload:=struct{State string `json:"state"`;Message string `json:"message,omitempty"`;At int64 `json:"at"`}{state,message,time.Now().UnixMilli()}; data,err:=json.Marshal(payload);if err!=nil{return};tmp:=path+".tmp";if err=os.WriteFile(tmp,data,0o600);err!=nil{return};_=os.Rename(tmp,path)}
 
 //export vpndirect_harmony_start
-func vpndirect_harmony_start(fd C.int, profile *C.char) C.int {
-	mu.Lock()
-	if service != nil { mu.Unlock(); return -114 }
-	if fd < 0 || profile == nil { mu.Unlock(); return -22 }
-	var metadata harmonyProfile
-	if err := json.Unmarshal([]byte(C.GoString(profile)), &metadata); err != nil || metadata.StatePath == "" || metadata.SingBoxConfig == "" { mu.Unlock(); return -22 }
-	if !strings.Contains(metadata.SingBoxConfig, `"inbounds"`) || !strings.Contains(metadata.SingBoxConfig, `"outbounds"`) {
-		publishState(metadata.StatePath, stateFailed, "sing-box config must contain inbounds and outbounds"); mu.Unlock(); return -22
-	}
-	statePath = metadata.StatePath; tunFD = int(fd); publishState(statePath, stateConnecting, "")
-	instance, err := libbox.NewService(metadata.SingBoxConfig, &harmonyPlatform{})
-	if err != nil { tunFD = -1; publishState(statePath, stateFailed, err.Error()); mu.Unlock(); return -22 }
-	if err = instance.Start(); err != nil { _ = instance.Close(); tunFD = -1; publishState(statePath, stateFailed, err.Error()); mu.Unlock(); return -5 }
-	service = instance
-	publishState(statePath, stateConnected, "")
-	mu.Unlock()
-	return 0
+func vpndirect_harmony_start(fd C.int,profile *C.char)C.int{
+	mu.Lock(); if service!=nil{mu.Unlock();return -114}; if fd<0||profile==nil{mu.Unlock();return -22}; var metadata harmonyProfile; if err:=json.Unmarshal([]byte(C.GoString(profile)),&metadata);err!=nil||metadata.StatePath==""||metadata.SingBoxConfig==""{mu.Unlock();return -22}; if !strings.Contains(metadata.SingBoxConfig,`"inbounds"`)||!strings.Contains(metadata.SingBoxConfig,`"outbounds"`){publishState(metadata.StatePath,stateFailed,"sing-box config must contain inbounds and outbounds");mu.Unlock();return -22}; statePath=metadata.StatePath;tunFD=int(fd);publishState(statePath,stateConnecting,""); instance,err:=libbox.NewService(metadata.SingBoxConfig,&harmonyPlatform{});if err!=nil{tunFD=-1;publishState(statePath,stateFailed,err.Error());mu.Unlock();return -22};if err=instance.Start();err!=nil{_=instance.Close();tunFD=-1;publishState(statePath,stateFailed,err.Error());mu.Unlock();return -5};service=instance;publishState(statePath,stateConnected,"");mu.Unlock();return 0
 }
 
 //export vpndirect_harmony_stop
-func vpndirect_harmony_stop() C.int {
-	mu.Lock()
-	if service == nil {
-		path := statePath; tunFD = -1; mu.Unlock(); publishState(path, stateDisconnected, ""); return 0
-	}
-	instance := service; path := statePath
-	publishState(path, stateDisconnecting, "")
-	service = nil; tunFD = -1
-	mu.Unlock()
-
-	err := instance.Close()
-	publishState(path, stateDisconnected, "")
-	if err != nil { publishState(path, stateFailed, err.Error()); return -5 }
-	return 0
-}
-
-func main() {}
+func vpndirect_harmony_stop()C.int{mu.Lock();if service==nil{path:=statePath;tunFD=-1;mu.Unlock();publishState(path,stateDisconnected,"");return 0};instance:=service;path:=statePath;publishState(path,stateDisconnecting,"");service=nil;tunFD=-1;mu.Unlock();err:=instance.Close();publishState(path,stateDisconnected,"");if err!=nil{publishState(path,stateFailed,err.Error());return -5};return 0}
+func main(){}
