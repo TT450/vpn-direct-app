@@ -190,14 +190,6 @@ func publishState(path string, state string, message string) {
 	_ = os.Rename(tmp, path)
 }
 
-func stopMonitors() {
-	for listener, monitor := range monitors {
-		delete(monitors, listener)
-		close(monitor.stop)
-		<-monitor.done
-	}
-}
-
 //export vpndirect_harmony_start
 func vpndirect_harmony_start(fd C.int, profile *C.char) C.int {
 	mu.Lock()
@@ -243,8 +235,8 @@ func vpndirect_harmony_stop() C.int {
 		tunFD = -1
 		return 0
 	}
+
 	publishState(statePath, stateDisconnecting, "")
-	stopMonitors()
 	err := service.Close()
 	service = nil
 	tunFD = -1
