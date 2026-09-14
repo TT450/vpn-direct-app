@@ -1,0 +1,41 @@
+import { DirectTheme, DirectTypography } from './Theme';
+import { DirectHaptics } from './Haptics';
+import { DirectFlow } from './DirectFlowModel';
+import { ImportedSubscriptionStore, ImportedSubscription } from '../vpn/ImportedSubscriptionStore';
+
+@Component
+export struct DirectSubscriptionsParityV3 {
+  onClose: () => void = () => {};
+  onFlow: (flow: DirectFlow) => void = (_flow: DirectFlow) => {};
+  @State items: ImportedSubscription[] = [];
+  @State activeId: string = '';
+  @StorageProp('session_has_subscription') private hasDirect: boolean = false;
+  @StorageProp('session_remaining_days') private remainingDays: number = 0;
+
+  aboutToAppear(): void { this.reload(); }
+  private reload(): void { this.items = ImportedSubscriptionStore.list(); this.activeId = ImportedSubscriptionStore.activeId(); }
+  private choose(item: ImportedSubscription): void { ImportedSubscriptionStore.setActive(item.id); this.reload(); DirectHaptics.selection(); this.onClose(); }
+  private activateDirect(): void { DirectHaptics.selection(); this.onFlow(DirectFlow.Access); }
+
+  build() {
+    Scroll() { Column() {
+      Row() { Column() { Text('01').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); Row().width(14).height(2).backgroundColor(DirectTheme.acid).margin({ top: 3, bottom: 4 }); Text('ПОДКЛЮЧЕНИЕ / ПОДПИСКИ').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.muted).fontFamily('monospace'); Text('Подписки').fontSize(DirectTheme.pickerTitleSize).fontWeight(600).fontColor(DirectTheme.ink).margin({ top: 5 }); Text('VPN Direct — первым, добавленные — ниже').fontSize(11).fontWeight(FontWeight.Medium).fontColor(DirectTheme.muted).margin({ top: 3 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1); Text('×').fontSize(18).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).width(38).height(38).textAlign(TextAlign.Center).backgroundColor(DirectTheme.ink).onClick(() => { DirectHaptics.navigation(); this.onClose(); }); }.width('100%').padding({ left: 20, right: 20, top: 28, bottom: 15 }).border({ width: { bottom: 1 }, color: DirectTheme.line });
+      if (this.hasDirect) {
+        Column() { Row() { Column() { Text('VPN DIRECT · ОСНОВНАЯ').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace'); Text('VPN Direct').fontSize(20).fontWeight(600).fontColor(DirectTheme.white).margin({ top: 4 }); Text(this.remainingDays > 0 ? `${this.remainingDays} дн · основной доступ аккаунта` : 'Основной доступ аккаунта').fontSize(10).fontColor('#85FFFFFF').margin({ top: 4 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1); Text('ОСНОВНАЯ').fontSize(8).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace').padding({ left: 8, right: 8, top: 7, bottom: 7 }).border({ width: 1, color: '#B3A8F069' }); }.width('100%'); Row() { Text('АКТИВИРОВАТЬ VPN DIRECT').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace'); Blank(); Text('→').fontSize(12).fontColor(DirectTheme.acid); }.width('100%').height(44).padding({ left: 13, right: 13 }).backgroundColor('#141714').margin({ top: 12 }); }.width('100%').padding(16).backgroundColor(DirectTheme.ink).border({ width: 1, color: '#B3A8F069' }).margin({ left: 20, right: 20, top: 18 }).onClick(() => this.activateDirect());
+      } else {
+        Column() { Text('VPN DIRECT').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace'); Text('Основной доступ не активирован').fontSize(17).fontWeight(600).fontColor(DirectTheme.white).margin({ top: 6 }); Text('Оформите тариф VPN Direct или добавьте внешнюю подписку.').fontSize(10).fontColor('#85FFFFFF').margin({ top: 5 }); }.width('100%').padding(16).backgroundColor(DirectTheme.ink).margin({ left: 20, right: 20, top: 18 }).onClick(() => this.onFlow(DirectFlow.Plans));
+      }
+      if (this.items.length > 0) {
+        Row() { Text('ДОБАВЛЕННЫЕ ПОДПИСКИ').fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.ink).fontFamily('monospace'); Blank(); Text(String(this.items.length).padStart(2, '0')).fontSize(9).fontWeight(FontWeight.Bold).fontColor(DirectTheme.green).fontFamily('monospace'); }.width('100%').height(36).padding({ left: 20, right: 20 }).margin({ top: 22 }).border({ width: { top: 1 }, color: DirectTheme.ink });
+        ForEach(this.items, (item: ImportedSubscription) => this.row(item), (item: ImportedSubscription) => item.id);
+      }
+      Row() { Text('+ ДОБАВИТЬ ПОДПИСКУ').fontSize(10).fontWeight(FontWeight.Bold).fontColor(DirectTheme.acid).fontFamily('monospace'); Blank(); Text('→').fontSize(13).fontColor(DirectTheme.acid); }.width('100%').height(52).padding({ left: 15, right: 15 }).backgroundColor(DirectTheme.ink).margin({ left: 20, right: 20, top: 16 }).onClick(() => { DirectHaptics.navigation(); this.onFlow(DirectFlow.ImportText); });
+      Blank().height(24);
+    }.width('100%').padding({ bottom: 24 }); }.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper);
+  }
+
+  @Builder private row(item: ImportedSubscription) {
+    const active = this.activeId === item.id;
+    Row() { Text('URL').fontSize(10).fontWeight(FontWeight.Bold).fontColor(active ? DirectTheme.acid : DirectTheme.ink).fontFamily('monospace').textAlign(TextAlign.Center).width(48).height(42).backgroundColor(active ? DirectTheme.ink : '#B8FFFFFF'); Column() { Text(item.name.length > 0 ? item.name : 'Подписка').fontSize(13).fontWeight(600).fontColor(DirectTheme.ink).maxLines(1); Text(item.url.length > 0 ? item.url : 'sing-box JSON').fontSize(9).fontColor(DirectTheme.muted).fontFamily('monospace').maxLines(1).margin({ top: 4 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 12 }); Text(active ? 'АКТИВНА' : '→').fontSize(9).fontWeight(FontWeight.Bold).fontColor(active ? DirectTheme.green : DirectTheme.muted).fontFamily('monospace'); }.width('100%').constraintSize({ minHeight: 68 }).padding({ left: 20, right: 20 }).backgroundColor(active ? DirectTheme.acidSelected : Color.Transparent).border({ width: { bottom: 1 }, color: DirectTheme.line }).onClick(() => this.choose(item));
+  }
+}
