@@ -26,6 +26,9 @@ export struct DirectFlowHost {
       DirectPlanParityV2Host({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     } else if (this.flow === DirectFlow.Payment) {
       DirectNativeFlowHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
+    } else if ((this.flow >= DirectFlow.AuthLogin && this.flow <= DirectFlow.AuthSuccess) ||
+      (this.flow >= DirectFlow.Security && this.flow <= DirectFlow.OnDemandSettings)) {
+      DirectNativeFlowHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     } else if (this.flow === DirectFlow.Balance || this.flow === DirectFlow.BalanceTopUp) {
       DirectBalanceParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     } else if (this.flow !== DirectFlow.None) {
