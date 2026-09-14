@@ -1,0 +1,10 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "VPN Direct HarmonyOS NEXT application module",
+  "main": "",
+  "author": "VPN Direct",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {}
+}
