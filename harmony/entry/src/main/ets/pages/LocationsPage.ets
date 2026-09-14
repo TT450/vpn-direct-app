@@ -1,6 +1,7 @@
 import { DirectTheme, DirectTypography } from '../ui/Theme';
-import { DirectHaptics, DirectHapticEvent } from '../ui/Haptics';
+import { DirectHaptics } from '../ui/Haptics';
 import { DirectIcon, DirectIconName } from '../ui/DirectIcons';
+import { DirectFlag } from '../ui/DirectFlag';
 import { VpnServerSelection } from '../vpn/VpnServerSelection';
 import { DirectBackendRuntime, DirectLocationRecord } from '../backend/DirectBackendRuntime';
 import { DirectFlow } from '../ui/DirectFlows';
@@ -17,153 +18,26 @@ export struct LocationsPage {
   @State private loading: boolean = false;
   @State private errorText: string = '';
   onFlow: (flow: DirectFlow) => void = (_flow: DirectFlow) => {};
-
   aboutToAppear(): void { void this.reload(); }
-
-  private sanitizeDisplay(value: string): string {
-    return value.replace(/\{\{[^}]*\}\}/g, '').replace(/\s+/g, ' ').trim();
-  }
-
-  private mapRecord(record: DirectLocationRecord): LocationItem {
-    let country = this.sanitizeDisplay(record.country);
-    let city = this.sanitizeDisplay(record.city);
-    if (country.length === 0) country = record.id;
-    if (city.length === 0 || city.toLowerCase() === country.toLowerCase()) city = record.region.length > 0 ? record.region : '—';
-    const code = this.sanitizeDisplay(record.countryCode).toUpperCase();
-    return { id: record.id, code: code.length > 0 ? code : '—', country, city, latency: '— MS', quality: 'СТАБИЛЬНО' };
-  }
-
-  private async probeLatencies(records: DirectLocationRecord[]): Promise<void> {
-    for (let i = 0; i < records.length; i++) {
-      const host = records[i].host ?? '';
-      if (host.length === 0) continue;
-      const client = http.createHttp();
-      const started = Date.now();
-      try {
-        const url = host.startsWith('http') ? host : `https://${host}`;
-        await client.request(url, { method: http.RequestMethod.HEAD, connectTimeout: 4000, readTimeout: 4000 });
-        const ms = Date.now() - started;
-        const idx = this.locations.findIndex((item: LocationItem) => item.id === records[i].id);
-        if (idx >= 0) {
-          const old = this.locations[idx];
-          const quality = ms < 100 ? 'ОТЛИЧНО' : ms < 250 ? 'ХОРОШО' : 'СТАБИЛЬНО';
-          this.locations = [...this.locations.slice(0, idx), { id: old.id, code: old.code, country: old.country, city: old.city, latency: `${ms} MS`, quality }, ...this.locations.slice(idx + 1)];
-        }
-      } catch { } finally { client.destroy(); }
-    }
-  }
-
-  private async reload(): Promise<void> {
-    this.loading = true; this.errorText = '';
-    let records: DirectLocationRecord[] = [];
-    try {
-      if (DirectBackendRuntime.baseURLString.length > 0) {
-        records = await DirectBackendRuntime.fetchLocations();
-        if (records.length > 0) AppStorage.setOrCreate<string>(SESSION_LOCATIONS_JSON, JSON.stringify(records));
-      }
-      if (records.length === 0) records = DirectSessionStore.getLocations();
-      this.locations = records.map((record: DirectLocationRecord) => this.mapRecord(record));
-    } catch (err) {
-      this.locations = [];
-      const message = err instanceof Error ? err.message : `${err}`;
-      this.errorText = message.length > 0 ? message : 'Не удалось загрузить локации';
-    } finally { this.loading = false; }
-    if (records.length > 0) void this.probeLatencies(records);
-  }
-
-  private filtered(): LocationItem[] {
-    const q = this.search.trim().toLowerCase();
-    if (q.length === 0) return this.locations;
-    return this.locations.filter((item: LocationItem) => item.country.toLowerCase().includes(q) || item.city.toLowerCase().includes(q) || item.code.toLowerCase().includes(q));
-  }
-
-  private select(item: LocationItem): void {
-    this.selected = item.id;
-    VpnServerSelection.set({ id: item.id, displayName: `${item.country} · ${item.city}`, countryCode: item.code });
-    DirectHaptics.play(DirectHapticEvent.ServerSelected);
-  }
-
+  private sanitizeDisplay(value: string): string { return value.replace(/\{\{[^}]*\}\}/g, '').replace(/\s+/g, ' ').trim(); }
+  private mapRecord(record: DirectLocationRecord): LocationItem { let country = this.sanitizeDisplay(record.country); let city = this.sanitizeDisplay(record.city); if (country.length === 0) country = record.id; if (city.length === 0 || city.toLowerCase() === country.toLowerCase()) city = record.region.length > 0 ? record.region : '—'; const code = this.sanitizeDisplay(record.countryCode).toUpperCase(); return { id: record.id, code: code.length > 0 ? code : '—', country, city, latency: '— MS', quality: 'СТАБИЛЬНО' }; }
+  private async probeLatencies(records: DirectLocationRecord[]): Promise<void> { for (let i = 0; i < records.length; i++) { const host = records[i].host ?? ''; if (host.length === 0) continue; const client = http.createHttp(); const started = Date.now(); try { const url = host.startsWith('http') ? host : `https://${host}`; await client.request(url, { method: http.RequestMethod.HEAD, connectTimeout: 4000, readTimeout: 4000 }); const ms = Date.now() - started; const idx = this.locations.findIndex((item: LocationItem) => item.id === records[i].id); if (idx >= 0) { const old = this.locations[idx]; const quality = ms < 100 ? 'ОТЛИЧНО' : ms < 250 ? 'ХОРОШО' : 'СТАБИЛЬНО'; this.locations = [...this.locations.slice(0, idx), { id: old.id, code: old.code, country: old.country, city: old.city, latency: `${ms} MS`, quality }, ...this.locations.slice(idx + 1)]; } } catch { } finally { client.destroy(); } } }
+  private async reload(): Promise<void> { this.loading = true; this.errorText = ''; let records: DirectLocationRecord[] = []; try { if (DirectBackendRuntime.baseURLString.length > 0) { records = await DirectBackendRuntime.fetchLocations(); if (records.length > 0) AppStorage.setOrCreate<string>(SESSION_LOCATIONS_JSON, JSON.stringify(records)); } if (records.length === 0) records = DirectSessionStore.getLocations(); this.locations = records.map((record: DirectLocationRecord) => this.mapRecord(record)); } catch (err) { this.locations = []; const message = err instanceof Error ? err.message : `${err}`; this.errorText = message.length > 0 ? message : 'Не удалось загрузить локации'; } finally { this.loading = false; } if (records.length > 0) void this.probeLatencies(records); }
+  private filtered(): LocationItem[] { const q = this.search.trim().toLowerCase(); if (q.length === 0) return this.locations; return this.locations.filter((item: LocationItem) => item.country.toLowerCase().includes(q) || item.city.toLowerCase().includes(q) || item.code.toLowerCase().includes(q)); }
+  private select(item: LocationItem): void { this.selected = item.id; VpnServerSelection.set({ id: item.id, displayName: `${item.country} · ${item.city}`, countryCode: item.code }); DirectHaptics.play(DirectHapticEvent.ServerSelected); }
   build() {
-    Scroll() {
-      Column() {
-        Row() {
-          Column() {
-            Text('DIRECT / LOCATIONS').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.muted).fontFamily('monospace');
-            Text('Локации').fontSize(DirectTypography.pageTitle).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink).margin({ top: 7 });
-            Text(this.loading ? 'Загрузка…' : `${this.locations.length} локаций · можно сменить сервер`).fontSize(13).fontColor(DirectTheme.muted).margin({ top: 4 });
-          }.alignItems(HorizontalAlign.Start).layoutWeight(1);
-          Column() { DirectIcon({ name: DirectIconName.ArrowClockwise, iconSize: 14, color: DirectTheme.ink, weight: 1.5 }); }
-            .width(36).height(36).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center).border({ width: 1, color: DirectTheme.line })
-            .onClick(() => { DirectHaptics.navigation(); void this.reload(); });
-        }.width('100%').margin({ bottom: 16 });
-
-        Row() {
-          this.accessCard('ТАРИФЫ', 'Готовые планы', 'START · PLUS · PRO · MAX · ULTRA', false, DirectFlow.Plans);
-          this.accessCard('КОНСТРУКТОР', 'Собрать свой', 'ДНИ · УСТРОЙСТВА · ТРАФИК', true, DirectFlow.Constructor);
-        }.width('100%');
-
-        if (this.errorText.length > 0) Text(this.errorText).fontSize(12).fontColor(DirectTheme.muted).width('100%').padding(12).border({ width: 1, color: DirectTheme.line }).margin({ top: 14 });
-
-        Row() {
-          DirectIcon({ name: DirectIconName.Magnifyingglass, iconSize: 13, color: DirectTheme.muted, weight: 1.5 }); Blank().width(10);
-          Search({ placeholder: 'Страна или город', value: this.search }).onChange((value: string) => this.search = value).layoutWeight(1).height(43);
-        }.width('100%').height(43).padding({ left: 12, right: 12 }).border({ width: 1, color: DirectTheme.line }).margin({ top: 14 });
-
-        const list = this.filtered();
-        if (!this.loading && list.length === 0) this.emptyLocations();
-        else {
-          const current = list.find((item: LocationItem) => item.id === this.selected);
-          if (current !== undefined) this.currentCard(current);
-          Row() {
-            Text('ДРУГИЕ ЛОКАЦИИ').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.ink).fontFamily('monospace'); Blank();
-            Text(String(Math.max(0, list.length - (current === undefined ? 0 : 1)))).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.muted).fontFamily('monospace');
-          }.width('100%').height(38).margin({ top: 22 }).border({ width: { top: 1 }, color: DirectTheme.ink });
-          Column() {
-            ForEach(list.filter((item: LocationItem) => current === undefined || item.id !== current.id), (item: LocationItem) => this.serverRow(item), (item: LocationItem) => item.id);
-          }.width('100%').border({ width: 1, color: DirectTheme.line });
-          Text('Нажмите на локацию, чтобы выбрать сервер.').fontSize(9).fontColor(DirectTheme.muted).width('100%').margin({ top: 10, bottom: 24 });
-        }
-        Blank().height(12);
-      }.width('100%').padding({ left: DirectTheme.pageHorizontal, right: DirectTheme.pageHorizontal, top: DirectTheme.pageTop, bottom: 0 });
-    }.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper);
+    Scroll() { Column() {
+      Row() { Column() { Text('DIRECT / LOCATIONS').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.muted).fontFamily('monospace'); Text('Локации').fontSize(DirectTypography.pageTitle).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink).margin({ top: 7 }); Text(this.loading ? 'Загрузка…' : `${this.locations.length} локаций · можно сменить сервер`).fontSize(13).fontColor(DirectTheme.muted).margin({ top: 4 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1); Column() { DirectIcon({ name: DirectIconName.ArrowClockwise, iconSize: 14, color: DirectTheme.ink, weight: 1.5 }); }.width(36).height(36).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center).border({ width: 1, color: DirectTheme.line }).onClick(() => { DirectHaptics.navigation(); void this.reload(); }); }.width('100%').margin({ bottom: 16 });
+      Row() { this.accessCard('ТАРИФЫ', 'Готовые планы', 'START · PLUS · PRO · MAX · ULTRA', false, DirectFlow.Plans); this.accessCard('КОНСТРУКТОР', 'Собрать свой', 'ДНИ · УСТРОЙСТВА · ТРАФИК', true, DirectFlow.Constructor); }.width('100%');
+      if (this.errorText.length > 0) Text(this.errorText).fontSize(12).fontColor(DirectTheme.muted).width('100%').padding(12).border({ width: 1, color: DirectTheme.line }).margin({ top: 14 });
+      Row() { DirectIcon({ name: DirectIconName.Magnifyingglass, iconSize: 13, color: DirectTheme.muted, weight: 1.5 }); Blank().width(10); Search({ placeholder: 'Страна или город', value: this.search }).onChange((value: string) => this.search = value).layoutWeight(1).height(43); }.width('100%').height(43).padding({ left: 12, right: 12 }).border({ width: 1, color: DirectTheme.line }).margin({ top: 14 });
+      const list = this.filtered();
+      if (!this.loading && list.length === 0) this.emptyLocations(); else { const current = list.find((item: LocationItem) => item.id === this.selected); if (current !== undefined) this.currentCard(current); Row() { Text('ДРУГИЕ ЛОКАЦИИ').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.ink).fontFamily('monospace'); Blank(); Text(String(Math.max(0, list.length - (current === undefined ? 0 : 1)))).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.muted).fontFamily('monospace'); }.width('100%').height(38).margin({ top: 22 }).border({ width: { top: 1 }, color: DirectTheme.ink }); Column() { ForEach(list.filter((item: LocationItem) => current === undefined || item.id !== current.id), (item: LocationItem) => this.serverRow(item), (item: LocationItem) => item.id); }.width('100%').border({ width: 1, color: DirectTheme.line }); Text('Нажмите на локацию, чтобы выбрать сервер.').fontSize(9).fontColor(DirectTheme.muted).width('100%').margin({ top: 10, bottom: 24 }); }
+      Blank().height(12);
+    }.width('100%').padding({ left: DirectTheme.pageHorizontal, right: DirectTheme.pageHorizontal, top: DirectTheme.pageTop, bottom: 0 }); }.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper);
   }
-
-  @Builder private accessCard(kicker: string, title: string, detail: string, primary: boolean, flow: DirectFlow) {
-    Column() {
-      Row() { Text(kicker).fontSize(8).fontWeight(DirectTheme.weightBold).fontColor(primary ? DirectTheme.acid : DirectTheme.ink).fontFamily('monospace'); Blank(); DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 8, color: primary ? DirectTheme.acid : DirectTheme.muted, weight: 1.4 }); }
-      Text(title).fontSize(13).fontWeight(DirectTheme.weightSemibold).fontColor(primary ? DirectTheme.paper : DirectTheme.ink).margin({ top: 5 }).maxLines(1);
-      Text(detail).fontSize(8).fontWeight(DirectTheme.weightMedium).fontColor(primary ? '#94FFFFFF' : DirectTheme.muted).fontFamily('monospace').margin({ top: 5 }).maxLines(1);
-    }.layoutWeight(1).constraintSize({ minHeight: 70 }).padding({ left: 11, right: 11, top: 10, bottom: 10 }).margin({ right: primary ? 0 : 8 }).backgroundColor(primary ? DirectTheme.ink : DirectTheme.paper).border({ width: primary ? 1.5 : 1, color: primary ? DirectTheme.ink : DirectTheme.line }).onClick(() => { DirectHaptics.navigation(); this.onFlow(flow); });
-  }
-
-  @Builder private currentCard(server: LocationItem) {
-    Column() {
-      Row() { Text('ЛОКАЦИЯ').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.muted).fontFamily('monospace'); Blank(); Text('● ВЫБРАНА').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace'); }
-      Row() {
-        Text(server.code).fontSize(10).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.acid).fontFamily('monospace').width(36).height(24).textAlign(TextAlign.Center).backgroundColor(DirectTheme.ink);
-        Column() { Text(server.country).fontSize(19).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink); Text(server.city).fontSize(10).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 12 });
-        Column() { Text(server.latency.toLowerCase().replace(' MS', ' ms')).fontSize(14).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.ink).fontFamily('monospace'); Text(server.quality).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.End);
-      }.width('100%').padding({ top: 14, bottom: 14 });
-      Row() { Text('ВЫБРАННЫЙ СЕРВЕР').fontSize(10).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.acid).fontFamily('monospace'); Blank(); DirectIcon({ name: DirectIconName.Checkmark, iconSize: 12, color: DirectTheme.acid, weight: 1.5 }); }
-        .width('100%').height(46).padding({ left: 13, right: 13 }).backgroundColor(DirectTheme.ink);
-    }.width('100%').padding(14).margin({ top: 14 }).backgroundColor(DirectTheme.paper).border({ width: 1.5, color: DirectTheme.ink });
-  }
-
-  @Builder private emptyLocations() {
-    Column() {
-      Text('Нет локаций').fontSize(15).fontWeight(DirectTheme.weightMedium).fontColor(DirectTheme.ink);
-      Text('Каталог ещё не загружен. Обновите список или подключите backend.').fontSize(12).fontColor(DirectTheme.muted).margin({ top: 8 });
-      Row() { Text('Открыть тарифы').fontSize(13).fontWeight(DirectTheme.weightMedium).fontColor(DirectTheme.acid); Blank(); DirectIcon({ name: DirectIconName.ArrowRight, iconSize: 12, color: DirectTheme.acid, weight: 1.5 }); }
-        .width('100%').height(48).padding({ left: 14, right: 14 }).backgroundColor(DirectTheme.ink).margin({ top: 14 }).onClick(() => { DirectHaptics.navigation(); this.onFlow(DirectFlow.Plans); });
-    }.width('100%').alignItems(HorizontalAlign.Start).margin({ top: 14 });
-  }
-
-  @Builder private serverRow(item: LocationItem) {
-    Row() {
-      Text(item.code).fontSize(8).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.acid).fontFamily('monospace').width(30).height(20).textAlign(TextAlign.Center).backgroundColor(DirectTheme.ink);
-      Column() { Text(item.country).fontSize(13).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink); Text(item.city).fontSize(9).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 11 });
-      Column() { Text(item.latency.toLowerCase().replace(' MS', ' ms')).fontSize(10).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.ink).fontFamily('monospace'); Text(item.quality).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.End);
-      DirectIcon({ name: DirectIconName.ChevronRight, iconSize: 10, color: DirectTheme.ink, weight: 1.6 });
-    }.width('100%').height(58).padding({ left: 12, right: 12 }).border({ width: { bottom: 1 }, color: DirectTheme.line }).backgroundColor(this.selected === item.id ? DirectTheme.acidSelected : Color.Transparent).onClick(() => this.select(item));
-  }
+  @Builder private accessCard(kicker: string, title: string, detail: string, primary: boolean, flow: DirectFlow) { Column() { Row() { Text(kicker).fontSize(8).fontWeight(DirectTheme.weightBold).fontColor(primary ? DirectTheme.acid : DirectTheme.ink).fontFamily('monospace'); Blank(); DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 8, color: primary ? DirectTheme.acid : DirectTheme.muted, weight: 1.4 }); } Text(title).fontSize(13).fontWeight(DirectTheme.weightSemibold).fontColor(primary ? DirectTheme.paper : DirectTheme.ink).margin({ top: 5 }).maxLines(1); Text(detail).fontSize(8).fontWeight(DirectTheme.weightMedium).fontColor(primary ? '#94FFFFFF' : DirectTheme.muted).fontFamily('monospace').margin({ top: 5 }).maxLines(1); }.layoutWeight(1).constraintSize({ minHeight: 70 }).padding({ left: 11, right: 11, top: 10, bottom: 10 }).margin({ right: primary ? 0 : 8 }).backgroundColor(primary ? DirectTheme.ink : DirectTheme.paper).border({ width: primary ? 1.5 : 1, color: primary ? DirectTheme.ink : DirectTheme.line }).onClick(() => { DirectHaptics.navigation(); this.onFlow(flow); }); }
+  @Builder private currentCard(server: LocationItem) { Column() { Row() { Text('ЛОКАЦИЯ').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.muted).fontFamily('monospace'); Blank(); Text('● ВЫБРАНА').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace'); } Row() { DirectFlag({ code: server.code, width: 36, height: 24 }); Column() { Text(server.country).fontSize(19).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink); Text(server.city).fontSize(10).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 12 }); Column() { Text(server.latency.toLowerCase().replace(' MS', ' ms')).fontSize(14).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.ink).fontFamily('monospace'); Text(server.quality).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.End); }.width('100%').padding({ top: 14, bottom: 14 }); Row() { Text('ВЫБРАННЫЙ СЕРВЕР').fontSize(10).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.acid).fontFamily('monospace'); Blank(); DirectIcon({ name: DirectIconName.Checkmark, iconSize: 12, color: DirectTheme.acid, weight: 1.5 }); }.width('100%').height(46).padding({ left: 13, right: 13 }).backgroundColor(DirectTheme.ink); }.width('100%').padding(14).margin({ top: 14 }).backgroundColor(DirectTheme.paper).border({ width: 1.5, color: DirectTheme.ink }); }
+  @Builder private emptyLocations() { Column() { Text('Нет локаций').fontSize(15).fontWeight(DirectTheme.weightMedium).fontColor(DirectTheme.ink); Text('Каталог ещё не загружен. Обновите список или подключите backend.').fontSize(12).fontColor(DirectTheme.muted).margin({ top: 8 }); Row() { Text('Открыть тарифы').fontSize(13).fontWeight(DirectTheme.weightMedium).fontColor(DirectTheme.acid); Blank(); DirectIcon({ name: DirectIconName.ArrowRight, iconSize: 12, color: DirectTheme.acid, weight: 1.5 }); }.width('100%').height(48).padding({ left: 14, right: 14 }).backgroundColor(DirectTheme.ink).margin({ top: 14 }).onClick(() => { DirectHaptics.navigation(); this.onFlow(DirectFlow.Plans); }); }.width('100%').alignItems(HorizontalAlign.Start).margin({ top: 14 }); }
+  @Builder private serverRow(item: LocationItem) { Row() { DirectFlag({ code: item.code, width: 30, height: 20 }); Column() { Text(item.country).fontSize(13).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink); Text(item.city).fontSize(9).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 11 }); Column() { Text(item.latency.toLowerCase().replace(' MS', ' ms')).fontSize(10).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.ink).fontFamily('monospace'); Text(item.quality).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.End); DirectIcon({ name: DirectIconName.ChevronRight, iconSize: 10, color: DirectTheme.ink, weight: 1.6 }); }.width('100%').height(58).padding({ left: 12, right: 12 }).border({ width: { bottom: 1 }, color: DirectTheme.line }).backgroundColor(this.selected === item.id ? DirectTheme.acidSelected : Color.Transparent).onClick(() => this.select(item)); }
 }
