@@ -29,17 +29,11 @@ AGENTS.md
 *.generated.json
 *.generated.conf
 
-# Swift package test build
-tests/VPNDirectParserPackage/.build/
-
-# Swift package test build
-/tests/fixtures/battle/cache/
-
-# Local agent ship logs / meta
-.ship_*
-
-.build/
-.build/**
+# HarmonyOS generated/native release artifacts
+/harmony/entry/src/main/cpp/prebuilt/
+/harmony/entry/build/
+/harmony/entry/.cxx/
+/harmony/build/
 
 # =============================================================================
 # Backend / Direct API / ops — NEVER GitHub (local + server only)
