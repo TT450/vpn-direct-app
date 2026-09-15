@@ -7,7 +7,6 @@ import { LocationsPage } from '../pages/LocationsPage';
 import { ManagementPage } from '../pages/ManagementPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { DirectFlow, DirectFlowHost } from '../ui/DirectFlows';
-import { DirectPlanParityHost } from '../ui/DirectPlanParity';
 import { DirectPrivacyDisclosure } from '../ui/DirectPrivacyDisclosure';
 import { DirectPrivacyConsentStore } from '../ui/DirectPrivacyConsentStore';
 
@@ -21,7 +20,7 @@ export struct AppShell {
   @StorageProp('direct_import_ts') @Watch('onImportSuccess') private importTs: number = 0;
   aboutToAppear(): void { const context = this.getUIContext().getHostContext() as common.UIAbilityContext; DirectPrivacyConsentStore.init(context); this.privacyAccepted = DirectPrivacyConsentStore.accepted(); }
   onImportSuccess(): void { this.sheetOpen = false; this.activeFlow = DirectFlow.None; this.selectedTab = DirectTab.Management; this.isMenuOpen = false; }
-  private isSheetFlow(flow: DirectFlow): boolean { return flow === DirectFlow.ServerPicker || flow === DirectFlow.ConnectionReport || flow === DirectFlow.Profiles || flow === DirectFlow.Subscription || flow === DirectFlow.BalanceTopUp || flow === DirectFlow.Devices || flow === DirectFlow.PaymentHistory; }
+  private isSheetFlow(flow: DirectFlow): boolean { return flow === DirectFlow.ServerPicker || flow === DirectFlow.ConnectionReport || flow === DirectFlow.Profiles || flow === DirectFlow.Subscription || flow === DirectFlow.BalanceTopUp || flow === DirectFlow.Devices || flow === DirectFlow.PaymentHistory || flow === DirectFlow.Promo || flow === DirectFlow.Support || flow === DirectFlow.AccountLinking; }
   private openSheet(flow: DirectFlow): void { this.activeFlow = flow; this.sheetOpen = true; DirectHaptics.navigation(); }
   private closeSheet(): void { this.sheetOpen = false; this.activeFlow = DirectFlow.None; }
   private readonly addMenuActions: AddMenuAction[] = [
@@ -39,7 +38,7 @@ export struct AppShell {
         Row() { this.tab('Главная', DirectTab.Home, 1); this.tab('Локации', DirectTab.Locations, 2); this.tab('Управление', DirectTab.Management, 3); this.tab('Профиль', DirectTab.Profile, 4); }.width('100%').height(DirectTheme.tabBarHeight).backgroundColor(DirectTheme.paper).border({ width: { top: 1 }, color: DirectTheme.line }); }.width('100%').height('100%').backgroundColor(DirectTheme.paper);
       if (this.isMenuOpen) { Column() { Blank().height(DirectTheme.appBarHeight); Column().width('100%').layoutWeight(1).backgroundColor('#1F000000').onClick(() => this.closeAddMenu()); }.width('100%').height('100%').zIndex(30); Column() { Blank().height(DirectTheme.appBarHeight + 4); this.addSubscriptionMenu(); }.width('100%').height('100%').alignItems(HorizontalAlign.End).padding({ right: 16 }).zIndex(40); }
       Column() { this.appHeader(); }.width('100%').height(DirectTheme.appBarHeight).zIndex(150);
-      if (this.activeFlow !== DirectFlow.None && !this.isSheetFlow(this.activeFlow)) Column() { Blank().height(DirectTheme.appBarHeight).width('100%'); if (this.activeFlow === DirectFlow.Plans || this.activeFlow === DirectFlow.Constructor) DirectPlanParityHost({ flow: this.activeFlow, onClose: () => { this.activeFlow = DirectFlow.None; }, onFlow: (flow: DirectFlow) => { this.activeFlow = flow; } }).layoutWeight(1); else DirectFlowHost({ flow: this.activeFlow, onClose: () => { this.activeFlow = DirectFlow.None; }, onFlow: (flow: DirectFlow) => { this.activeFlow = flow; } }).layoutWeight(1); }.width('100%').height('100%').backgroundColor(DirectTheme.paper).zIndex(100);
+      if (this.activeFlow !== DirectFlow.None && !this.isSheetFlow(this.activeFlow)) Column() { Blank().height(DirectTheme.appBarHeight).width('100%'); DirectFlowHost({ flow: this.activeFlow, onClose: () => { this.activeFlow = DirectFlow.None; }, onFlow: (flow: DirectFlow) => { this.activeFlow = flow; } }).layoutWeight(1); }.width('100%').height('100%').backgroundColor(DirectTheme.paper).zIndex(100);
       if (this.showPrivacyDisclosure) DirectPrivacyDisclosure({ onAccept: () => { DirectPrivacyConsentStore.accept(); this.privacyAccepted = true; this.showPrivacyDisclosure = false; this.onToggle(); }, onDecline: () => { this.showPrivacyDisclosure = false; } }).zIndex(200);
     }.width('100%').height('100%').bindSheet($$this.sheetOpen, this.SheetContent, { detents: [SheetSize.MEDIUM, SheetSize.LARGE], preferType: SheetType.BOTTOM, dragBar: true, showClose: false, backgroundColor: DirectTheme.paper, onDisappear: () => { if (this.isSheetFlow(this.activeFlow)) this.activeFlow = DirectFlow.None; this.sheetOpen = false; } });
   }
