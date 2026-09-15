@@ -3,7 +3,6 @@ import { DirectBalanceParityHost } from './DirectBalanceParity';
 import { DirectBalanceTopUpParityV2 } from './DirectBalanceTopUpParityV2';
 import { DirectPlanParityV3Host } from './DirectPlanParityV3';
 import { DirectFullParityHost } from './DirectFullParity';
-import { DirectNativeFlowHost } from './DirectNativeFlows';
 import { DirectAuthParityV4 } from './DirectAuthParityV4';
 import { DirectAccountParityV2 } from './DirectAccountParityV2';
 import { DirectServerPickerParityV2 } from './DirectServerPickerParityV2';
@@ -12,6 +11,8 @@ import { DirectSubscriptionsParityV3 } from './DirectSubscriptionsParityV3';
 import { DirectAdvancedParityV2 } from './DirectAdvancedParityV2';
 import { DirectPaymentParityV2 } from './DirectPaymentParityV2';
 import { DirectLegalAboutParityV2 } from './DirectLegalAboutParityV2';
+import { DirectSystemParityV2 } from './DirectSystemParityV2';
+import { DirectOnDemandParityV2 } from './DirectOnDemandParityV2';
 import { DirectFlow } from './DirectFlowModel';
 export { DirectFlow } from './DirectFlowModel';
 
@@ -28,7 +29,9 @@ export struct DirectFlowHost {
     else if (this.flow === DirectFlow.Account) DirectAccountParityV2({ onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow >= DirectFlow.AuthLogin && this.flow <= DirectFlow.AuthSuccess) DirectAuthParityV4({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.Payment) DirectPaymentParityV2({ onClose: this.onClose, onFlow: this.onFlow });
-    else if (this.flow >= DirectFlow.Security && this.flow <= DirectFlow.OnDemandSettings) DirectAdvancedParityV2({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
+    else if (this.flow === DirectFlow.SystemSettings) DirectSystemParityV2({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
+    else if (this.flow === DirectFlow.OnDemandSettings) DirectOnDemandParityV2({ onClose: this.onClose, onFlow: this.onFlow });
+    else if (this.flow >= DirectFlow.Security && this.flow < DirectFlow.SystemSettings) DirectAdvancedParityV2({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.BalanceTopUp) DirectBalanceTopUpParityV2({ onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.Balance) DirectBalanceParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.Legal || this.flow === DirectFlow.Privacy || this.flow === DirectFlow.About) DirectLegalAboutParityV2({ flow: this.flow, onClose: this.onClose });
