@@ -1,7 +1,7 @@
 import { DirectTheme } from './Theme';
 
 export enum DirectIconName {
-  ArrowClockwise = 'arrow.clockwise', ArrowLeftArrowRight = 'arrow.left.arrow.right', LocationNorth = 'location.north', Minus = 'minus', ArrowUpRight = 'arrow.up.right', ChevronRight = 'chevron.right', Menu = 'line.3.horizontal', ArrowLeft = 'arrow.left', Magnifyingglass = 'magnifyingglass', Xmark = 'xmark', Plus = 'plus', Checkmark = 'checkmark', ArrowRight = 'arrow.right', Star = 'star', Shield = 'shield', Connection = 'connection', Waveform = 'waveform', SlidersHorizontal = 'slider.horizontal.3'
+  ArrowClockwise = 'arrow.clockwise', ArrowLeftArrowRight = 'arrow.left.arrow.right', LocationNorth = 'location.north', Minus = 'minus', ArrowUpRight = 'arrow.up.right', ChevronRight = 'chevron.right', Menu = 'line.3.horizontal', ArrowLeft = 'arrow.left', Magnifyingglass = 'magnifyingglass', Xmark = 'xmark', Plus = 'plus', Checkmark = 'checkmark', ArrowRight = 'arrow.right', Star = 'star', Shield = 'shield', Connection = 'connection', Waveform = 'waveform', SlidersHorizontal = 'slider.horizontal.3', Document = 'document', Trash = 'trash'
 }
 
 @Component
@@ -20,6 +20,8 @@ export struct DirectIcon {
     else if (this.name === DirectIconName.ChevronRight) this.svgIcon(this.color === DirectTheme.green ? $r('app.media.ic_chevron_right_green') : $r('app.media.ic_chevron_right'));
     else if (this.name === DirectIconName.Xmark) this.svgIcon(this.color === DirectTheme.acid ? $r('app.media.ic_xmark_acid') : $r('app.media.ic_xmark'));
     else if (this.name === DirectIconName.Star) this.svgIcon(this.color === DirectTheme.green ? $r('app.media.ic_star_green') : $r('app.media.ic_star'));
+    else if (this.name === DirectIconName.Document) this.svgIcon($r('app.media.ic_document'));
+    else if (this.name === DirectIconName.Trash) this.svgIcon($r('app.media.ic_trash'));
     else if (this.name === DirectIconName.Shield) this.svgIcon($r('app.media.ic_shield'));
     else if (this.name === DirectIconName.Connection) this.svgIcon($r('app.media.ic_connection'));
     else if (this.name === DirectIconName.Waveform) this.svgIcon($r('app.media.ic_waveform'));
