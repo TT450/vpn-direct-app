@@ -71,12 +71,10 @@ export struct LocationsPage {
     return this.locations.filter((item: LocationItem) => item.country.toLowerCase().includes(q) || item.city.toLowerCase().includes(q) || item.code.toLowerCase().includes(q));
   }
   private currentItem(): LocationItem | undefined { return this.locations.find((item: LocationItem) => item.id === this.selected); }
+  private otherCount(): number { return Math.max(0, this.listForRender().length - (this.search.trim().length === 0 && this.currentItem() !== undefined ? 1 : 0)); }
   private listForRender(): LocationItem[] { return this.filtered(); }
-  private select(item: LocationItem): void {
-    this.selected = item.id;
-    VpnServerSelection.set({ id: item.id, displayName: `${item.country} · ${item.city}`, countryCode: item.code });
-    DirectHaptics.selection();
-  }
+  private showCurrent(): boolean { return this.search.trim().length === 0 && this.currentItem() !== undefined; }
+  private select(item: LocationItem): void { this.selected = item.id; VpnServerSelection.set({ id: item.id, displayName: `${item.country} · ${item.city}`, countryCode: item.code }); DirectHaptics.selection(); }
   build() {
     Scroll() {
       Column() {
@@ -87,40 +85,29 @@ export struct LocationsPage {
             Text(this.loading ? 'Загрузка…' : `${this.locations.length} локаций · можно сменить сервер`).fontSize(13).fontColor(DirectTheme.muted).margin({ top: 4 });
           }.alignItems(HorizontalAlign.Start).layoutWeight(1);
           Column() { DirectIcon({ name: DirectIconName.ArrowClockwise, iconSize: 14, color: DirectTheme.ink, weight: 1.5 }); }
-            .width(36).height(36).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
-            .border({ width: 1, color: DirectTheme.line })
+            .width(36).height(36).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center).border({ width: 1, color: DirectTheme.line })
             .onClick(() => { DirectHaptics.navigation(); void this.reload(); });
         }.width('100%').margin({ bottom: 16 });
-
         Row({ space: 0 }) {
           this.accessCard('ТАРИФЫ', 'Готовые планы', 'START · PLUS · PRO · MAX · ULTRA', false, DirectFlow.Plans);
           this.accessCard('КОНСТРУКТОР', 'Собрать свой', 'ДНИ · УСТРОЙСТВА · ТРАФИК', true, DirectFlow.Constructor);
         }.width('100%');
-
         if (this.errorText.length > 0) Text(this.errorText).fontSize(12).fontColor(DirectTheme.muted).width('100%').padding(12).border({ width: 1, color: DirectTheme.line }).margin({ top: 14 });
-
         Row() {
           DirectIcon({ name: DirectIconName.Magnifyingglass, iconSize: 13, color: DirectTheme.muted, weight: 1.5 });
           TextInput({ placeholder: 'Страна или город', text: this.search }).layoutWeight(1).height(43).fontSize(11).fontColor(DirectTheme.ink).fontFamily('monospace').backgroundColor(Color.Transparent).padding({ left: 10, right: 10 }).onChange((value: string) => this.search = value);
           if (this.search.length > 0) DirectIcon({ name: DirectIconName.Xmark, iconSize: 9, color: DirectTheme.muted, weight: 1.8 }).onClick(() => this.search = '');
         }.width('100%').height(43).padding({ left: 12, right: 12 }).border({ width: 1, color: DirectTheme.line }).margin({ top: 14 });
-
-        if (!this.loading && this.listForRender().length === 0) {
-          this.emptyLocations();
-        } else {
-          if (this.search.trim().length === 0) {
-            const current = this.currentItem();
-            if (current !== undefined) this.currentCard(current);
-          }
+        if (!this.loading && this.listForRender().length === 0) this.emptyLocations();
+        else {
+          if (this.showCurrent()) this.currentCard(this.currentItem() as LocationItem);
           Row() {
             Text('ДРУГИЕ ЛОКАЦИИ').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.ink).fontFamily('monospace');
             Blank();
-            Text(String(Math.max(0, this.listForRender().length - (this.search.trim().length === 0 && this.currentItem() !== undefined ? 1 : 0))).padStart(2, '0')).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.muted).fontFamily('monospace');
+            Text(String(this.otherCount()).padStart(2, '0')).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.muted).fontFamily('monospace');
           }.width('100%').height(38).margin({ top: 22 }).border({ width: { top: 1 }, color: DirectTheme.ink });
           Column() {
-            ForEach(this.listForRender(), (item: LocationItem) => {
-              if (this.search.trim().length > 0 || this.currentItem() === undefined || item.id !== this.currentItem()?.id) this.serverRow(item);
-            }, (item: LocationItem) => item.id);
+            ForEach(this.listForRender(), (item: LocationItem) => this.renderServerIfNeeded(item), (item: LocationItem) => item.id);
           }.width('100%').border({ width: 1, color: DirectTheme.line });
           Text('Нажмите на локацию, чтобы выбрать сервер.').fontSize(9).fontColor(DirectTheme.muted).width('100%').margin({ top: 10, bottom: 24 });
         }
@@ -128,65 +115,29 @@ export struct LocationsPage {
       }.width('100%').padding({ left: DirectTheme.pageHorizontal, right: DirectTheme.pageHorizontal, top: DirectTheme.pageTop, bottom: 0 });
     }.scrollBar(BarState.Off).width('100%').height('100%').backgroundColor(DirectTheme.paper);
   }
+  @Builder private renderServerIfNeeded(item: LocationItem) { if (this.search.trim().length > 0 || this.currentItem() === undefined || item.id !== this.currentItem()?.id) this.serverRow(item); }
   @Builder private accessCard(kicker: string, title: string, detail: string, primary: boolean, flow: DirectFlow) {
     Column({ space: 0 }) {
-      Row() {
-        Text(kicker).fontSize(8).fontWeight(DirectTheme.weightBold).fontColor(primary ? DirectTheme.acid : DirectTheme.ink).fontFamily('monospace');
-        Blank();
-        DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 8, color: primary ? DirectTheme.acid : DirectTheme.muted, weight: 1.4 });
-      }.width('100%');
+      Row() { Text(kicker).fontSize(8).fontWeight(DirectTheme.weightBold).fontColor(primary ? DirectTheme.acid : DirectTheme.ink).fontFamily('monospace'); Blank(); DirectIcon({ name: DirectIconName.ArrowUpRight, iconSize: 8, color: primary ? DirectTheme.acid : DirectTheme.muted, weight: 1.4 }); }.width('100%');
       Text(title).fontSize(13).fontWeight(DirectTheme.weightSemibold).fontColor(primary ? DirectTheme.paper : DirectTheme.ink).margin({ top: 5 }).maxLines(1);
       Text(detail).fontSize(8).fontWeight(DirectTheme.weightMedium).fontColor(primary ? '#94FFFFFF' : DirectTheme.muted).fontFamily('monospace').margin({ top: 5 }).maxLines(1);
     }.layoutWeight(1).constraintSize({ minHeight: 70 }).padding({ left: 11, right: 11, top: 10, bottom: 10 }).margin({ right: primary ? 0 : 8 }).backgroundColor(primary ? DirectTheme.ink : DirectTheme.paper).border({ width: primary ? 1.5 : 1, color: primary ? DirectTheme.ink : DirectTheme.line }).onClick(() => { DirectHaptics.navigation(); this.onFlow(flow); });
   }
   @Builder private currentCard(server: LocationItem) {
     Column() {
-      Row() {
-        Text('ЛОКАЦИЯ').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.muted).fontFamily('monospace');
-        Blank();
-        Text('● ВЫБРАНА').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace');
-      }
+      Row() { Text('ЛОКАЦИЯ').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.muted).fontFamily('monospace'); Blank(); Text('● ВЫБРАНА').fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace'); }
       Row() {
         DirectFlag({ code: server.code, width: 36, height: 24 });
-        Column() {
-          Text(server.country).fontSize(19).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink);
-          Text(server.city).fontSize(10).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 3 });
-        }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 12 });
-        Column() {
-          Text(server.latency.toLowerCase().replace(' MS', ' ms')).fontSize(14).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.ink).fontFamily('monospace');
-          Text(server.quality).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace').margin({ top: 3 });
-        }.alignItems(HorizontalAlign.End);
+        Column() { Text(server.country).fontSize(19).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink); Text(server.city).fontSize(10).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 12 });
+        Column() { Text(server.latency.toLowerCase().replace(' MS', ' ms')).fontSize(14).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.ink).fontFamily('monospace'); Text(server.quality).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.End);
       }.width('100%').padding({ top: 14, bottom: 14 });
-      Row() {
-        Text('ВЫБРАННЫЙ СЕРВЕР').fontSize(10).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.acid).fontFamily('monospace');
-        Blank();
-        DirectIcon({ name: DirectIconName.Checkmark, iconSize: 12, color: DirectTheme.acid, weight: 1.5 });
-      }.width('100%').height(46).padding({ left: 13, right: 13 }).backgroundColor(DirectTheme.ink);
+      Row() { Text('ВЫБРАННЫЙ СЕРВЕР').fontSize(10).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.acid).fontFamily('monospace'); Blank(); DirectIcon({ name: DirectIconName.Checkmark, iconSize: 12, color: DirectTheme.acid, weight: 1.5 }); }.width('100%').height(46).padding({ left: 13, right: 13 }).backgroundColor(DirectTheme.ink);
     }.width('100%').padding(14).margin({ top: 14 }).backgroundColor(DirectTheme.paper).border({ width: 1.5, color: DirectTheme.ink });
   }
   @Builder private emptyLocations() {
-    Column() {
-      Text('Нет локаций').fontSize(15).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink);
-      Text('Каталог ещё не загружен. Обновите список или подключите backend.').fontSize(12).fontColor(DirectTheme.muted).margin({ top: 8 });
-      Row() {
-        Text('Открыть тарифы').fontSize(13).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.acid);
-        Blank();
-        DirectIcon({ name: DirectIconName.ArrowRight, iconSize: 12, color: DirectTheme.acid, weight: 1.5 });
-      }.width('100%').height(48).padding({ left: 14, right: 14 }).backgroundColor(DirectTheme.ink).margin({ top: 14 }).onClick(() => { DirectHaptics.navigation(); this.onFlow(DirectFlow.Plans); });
-    }.width('100%').alignItems(HorizontalAlign.Start).margin({ top: 14 });
+    Column() { Text('Нет локаций').fontSize(15).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink); Text('Каталог ещё не загружен. Обновите список или подключите backend.').fontSize(12).fontColor(DirectTheme.muted).margin({ top: 8 }); Row() { Text('Открыть тарифы').fontSize(13).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.acid); Blank(); DirectIcon({ name: DirectIconName.ArrowRight, iconSize: 12, color: DirectTheme.acid, weight: 1.5 }); }.width('100%').height(48).padding({ left: 14, right: 14 }).backgroundColor(DirectTheme.ink).margin({ top: 14 }).onClick(() => { DirectHaptics.navigation(); this.onFlow(DirectFlow.Plans); }); }.width('100%').alignItems(HorizontalAlign.Start).margin({ top: 14 });
   }
   @Builder private serverRow(item: LocationItem) {
-    Row() {
-      DirectFlag({ code: item.code, width: 30, height: 20 });
-      Column() {
-        Text(item.country).fontSize(13).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink);
-        Text(item.city).fontSize(9).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 3 });
-      }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 11 });
-      Column() {
-        Text(item.latency.toLowerCase().replace(' MS', ' ms')).fontSize(10).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.ink).fontFamily('monospace');
-        Text(item.quality).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace').margin({ top: 3 });
-      }.alignItems(HorizontalAlign.End);
-      DirectIcon({ name: DirectIconName.ChevronRight, iconSize: 10, color: DirectTheme.ink, weight: 1.6 });
-    }.width('100%').height(58).padding({ left: 12, right: 12 }).border({ width: { bottom: 1 }, color: DirectTheme.line }).backgroundColor(this.selected === item.id ? DirectTheme.acidSelected : Color.Transparent).onClick(() => this.select(item));
+    Row() { DirectFlag({ code: item.code, width: 30, height: 20 }); Column() { Text(item.country).fontSize(13).fontWeight(DirectTheme.weightSemibold).fontColor(DirectTheme.ink); Text(item.city).fontSize(9).fontColor(DirectTheme.muted).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 11 }); Column() { Text(item.latency.toLowerCase().replace(' MS', ' ms')).fontSize(10).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.ink).fontFamily('monospace'); Text(item.quality).fontSize(DirectTypography.caption).fontWeight(DirectTheme.weightBold).fontColor(DirectTheme.green).fontFamily('monospace').margin({ top: 3 }); }.alignItems(HorizontalAlign.End); DirectIcon({ name: DirectIconName.ChevronRight, iconSize: 10, color: DirectTheme.ink, weight: 1.6 }); }.width('100%').height(58).padding({ left: 12, right: 12 }).border({ width: { bottom: 1 }, color: DirectTheme.line }).backgroundColor(this.selected === item.id ? DirectTheme.acidSelected : Color.Transparent).onClick(() => this.select(item));
   }
 }
