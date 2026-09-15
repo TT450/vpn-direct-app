@@ -3,7 +3,7 @@ import { DirectHaptics, DirectHapticEvent } from './Haptics';
 
 @Component
 export struct DialView {
-  @Prop isConnected: boolean = false;
+  @Prop @Watch('onConnectionChanged') isConnected: boolean = false;
   @Prop isBusy: boolean = false;
   onAction: () => void = () => {};
 
@@ -14,6 +14,10 @@ export struct DialView {
   private readonly frameH: number = DirectTheme.dialFrameHeight;
   private readonly ringStart: number = 0.085 * Math.PI * 2;
   private readonly ringSweep: number = 0.83 * Math.PI * 2;
+
+  private onConnectionChanged(): void {
+    this.drawRing();
+  }
 
   private drawRing(): void {
     this.context.clearRect(0, 0, this.outer, this.outer);
