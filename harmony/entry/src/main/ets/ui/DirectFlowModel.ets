@@ -6,5 +6,6 @@ export enum DirectFlow {
   ServiceLog, ApplicationSettings, CoreSettings, TunnelSettings, OnDemandSettings,
   ImportFile, ImportText, ImportClipboard, ImportConfigText,
   Legal, Privacy,
-  Account, Devices, PaymentHistory
+  Account, Devices, PaymentHistory,
+  Promo, Support, AccountLinking
 }
