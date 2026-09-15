@@ -9,12 +9,18 @@ export enum DirectHapticEvent {
 export class DirectHaptics {
   private static lastAt: number = 0;
 
-  static play(event: DirectHapticEvent): void {
+  static play(event: DirectHapticEvent | string): void {
     const now: number = Date.now();
     if (now - DirectHaptics.lastAt < 35) return;
     DirectHaptics.lastAt = now;
+    let resolved: DirectHapticEvent = DirectHapticEvent.Selection;
+    if (typeof event === 'string') {
+      resolved = event === 'error' ? DirectHapticEvent.Error : DirectHapticEvent.PurchaseCompleted;
+    } else {
+      resolved = event;
+    }
     let effectId: string = 'haptic.effect.soft';
-    switch (event) {
+    switch (resolved) {
       case DirectHapticEvent.Warning: effectId = 'haptic.notice.warning'; break;
       case DirectHapticEvent.Error: effectId = 'haptic.notice.fail'; break;
       case DirectHapticEvent.VPNConnected:
