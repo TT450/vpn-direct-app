@@ -112,10 +112,6 @@ export struct DialView {
       });
     }
     .width(this.outer)
-    .height(this.frameH)
-    .onClick(() => {
-      DirectHaptics.play(this.isConnected ? DirectHapticEvent.ToggleOff : DirectHapticEvent.ToggleOn);
-      this.onAction();
-    });
+    .height(this.frameH);
   }
 }
