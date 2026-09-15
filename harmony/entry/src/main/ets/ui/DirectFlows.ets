@@ -14,9 +14,10 @@ import { DirectLegalAboutParityV2 } from './DirectLegalAboutParityV2';
 import { DirectSystemParityV2 } from './DirectSystemParityV2';
 import { DirectOnDemandParityV2 } from './DirectOnDemandParityV2';
 import { DirectAccountUtilityParityV2 } from './DirectAccountUtilityParityV2';
+import { DirectReportParityV2 } from './DirectReportParityV2';
+import { DirectProfilesParityV2 } from './DirectProfilesParityV2';
 import { DirectFlow } from './DirectFlowModel';
 export { DirectFlow } from './DirectFlowModel';
-
 @Component
 export struct DirectFlowHost {
   @Prop flow: DirectFlow = DirectFlow.None;
@@ -24,6 +25,8 @@ export struct DirectFlowHost {
   onFlow: (flow: DirectFlow) => void = (_flow: DirectFlow) => {};
   build() {
     if (this.flow === DirectFlow.ServerPicker) DirectServerPickerParityV2({ onClose: this.onClose });
+    else if (this.flow === DirectFlow.ConnectionReport) DirectReportParityV2({ onClose: this.onClose });
+    else if (this.flow === DirectFlow.Profiles) DirectProfilesParityV2({ onClose: this.onClose });
     else if (this.flow === DirectFlow.Access) DirectAccessParityV2({ onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.Subscription) DirectSubscriptionsParityV3({ onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.Plans || this.flow === DirectFlow.Constructor) DirectPlanParityV3Host({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
