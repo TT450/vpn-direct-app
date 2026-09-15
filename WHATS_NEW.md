@@ -1,19 +1,19 @@
-# What's New — VPN Direct 1.0.11 (111)
+# What's New — VPN Direct 1.0.11 (112)
 
-Release date: 2026-09-14  
-App build: `111`  
-Prior: `110`
+Release date: 2026-09-15  
+App build: `112`  
+Prior: `111`
 
 ## App Store / short What's New
 
-- Clearer email/password login errors
-- Legal docs, account deletion, App Store rate
-- Build **111**
+- TestFlight rebuild **112** on the clean Apple main tip
+- Same product surface as **111**: login errors, legal docs, account deletion, App Store rate
+- No private backend clients or secrets in this public tree
 
 ## TestFlight
 
 | Field | Value |
 | --- | --- |
 | Version | **1.0.11** |
-| Build | **111** |
+| Build | **112** |
 | Join | https://testflight.apple.com/join/yfCEbunt |

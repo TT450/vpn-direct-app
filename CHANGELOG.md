@@ -2,6 +2,22 @@
 
 All notable changes to VPN Direct (Apple client) are documented here.
 
+## [1.0.11.112] — 2026-09-15
+
+### TestFlight rebuild (build 112)
+
+- Public Apple tip cleaned on `main` (Harmony-only commits moved off default branch)
+- TestFlight **1.0.11 (112)** — same client surface as 111, new build number
+- No private backend clients or secrets
+
+## [1.0.11.111] — 2026-09-14
+
+### Legal center + account deletion (build 111)
+
+- Clearer email/password login errors
+- Legal docs, account deletion, App Store rate prompt
+- TestFlight **1.0.11 (111)**
+
 ## [1.0.11.109] — 2026-09-13
 
 ### Privacy disclosure + renew fixes (build 109)
