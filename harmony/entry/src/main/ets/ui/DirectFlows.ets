@@ -36,7 +36,7 @@ export struct DirectFlowHost {
     else if (this.flow === DirectFlow.BalanceTopUp) DirectBalanceTopUpParityV2({ onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.Balance) DirectBalanceParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     else if (this.flow === DirectFlow.Legal || this.flow === DirectFlow.Privacy || this.flow === DirectFlow.About) DirectLegalAboutParityV2({ flow: this.flow, onClose: this.onClose });
-    else if (this.flow === DirectFlow.Devices || this.flow === DirectFlow.PaymentHistory || this.flow === DirectFlow.AuthLogin || this.flow === DirectFlow.Account) DirectAccountUtilityParityV2({ flow: this.flow, onClose: this.onClose });
+    else if (this.flow === DirectFlow.Devices || this.flow === DirectFlow.PaymentHistory || this.flow === DirectFlow.Promo || this.flow === DirectFlow.Support || this.flow === DirectFlow.AccountLinking) DirectAccountUtilityParityV2({ flow: this.flow, onClose: this.onClose });
     else if (this.flow !== DirectFlow.None) DirectFullParityHost({ flow: this.flow, onClose: this.onClose, onFlow: this.onFlow });
     else Blank().backgroundColor(DirectTheme.paper);
   }
