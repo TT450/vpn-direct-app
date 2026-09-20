@@ -78,6 +78,9 @@ platform :ios do
       output_directory: "build/fastlane",
       output_name: "VPNDirect",
       derived_data_path: "build/DerivedData",
+      cloned_source_packages_path: "build/SourcePackages",
+      skip_package_dependencies_resolution: true,
+      disable_package_automatic_updates: true,
       xcargs: "DEVELOPMENT_TEAM=#{team_id} -allowProvisioningUpdates",
       export_xcargs: "-allowProvisioningUpdates",
       export_options: {
@@ -99,7 +102,7 @@ platform :ios do
       apple_id: ENV.fetch("APP_STORE_APP_ID"),
       skip_waiting_for_build_processing: true,
       distribute_external: false,
-      changelog: ENV["TESTFLIGHT_CHANGELOG"] || "VPN Direct 1.0.11 (112) — TestFlight rebuild; legal center, account deletion, review prompt"
+      changelog: ENV["TESTFLIGHT_CHANGELOG"] || "VPN Direct 1.0.11 (153) — logout wipe + auth hardening (Keychain session, bot races, 401)"
     )
   end
 

@@ -21,10 +21,10 @@ public enum VPNDirectPricingEngine {
         return max(49, Int((raw / 10.0).rounded() * 10))
     }
 
-    /// 30-day sticker price for a resource pack (used to derive longer periods).
+    /// Demo/local fallback only — prefer admin catalog `tariff.price` / checkout quote in UI.
+    /// Base tuned so START (100 GB · 1 device · 30 days) ≈ 699 ₽ (admin sticker).
     public static func monthlyBase(devices: Int, trafficGB: Int?, whitelistGB: Int) -> Double {
-        // Tuned so Plus (300 GB · 50 WL · 3 devices · 30 days) ≈ 799 ₽.
-        270.0
+        699.0
             * deviceFactor(devices)
             * trafficFactor(trafficGB)
             * whitelistFactor(whitelistGB)

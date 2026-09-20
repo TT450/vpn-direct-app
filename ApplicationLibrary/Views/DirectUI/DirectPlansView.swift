@@ -24,39 +24,34 @@ struct DirectPlansView: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                PageHeading(
-                    kicker: "DIRECT / PLANS",
-                    title: "Тарифы",
-                    subtitle: "Выберите готовый вариант и подключите его сразу"
-                )
+        VStack(alignment: .leading, spacing: 0) {
+            periodPicker
+                .padding(.horizontal, 20)
                 .padding(.top, DS.pageTop)
-                .padding(.bottom, 18)
+                .padding(.bottom, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(DS.paper)
 
-                periodPicker
-
-                VStack(spacing: 10) {
-                    if !catalogTariffs.isEmpty {
-                        ForEach(catalogTariffs) { tariff in
-                            catalogCard(tariff)
-                        }
-                    } else {
-                        ForEach(fallbackPlans) { plan in
-                            planCard(plan)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    VStack(spacing: 10) {
+                        if !catalogTariffs.isEmpty {
+                            ForEach(catalogTariffs) { tariff in
+                                catalogCard(tariff)
+                            }
+                        } else {
+                            ForEach(fallbackPlans) { plan in
+                                planCard(plan)
+                            }
                         }
                     }
-                }
-                .padding(.top, 16)
-
-                constructorButton
-                    .padding(.top, 14)
                     .padding(.bottom, 28)
+                }
+                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, 20)
+            .hapticScrollThresholds()
         }
         .background(DS.paper.ignoresSafeArea())
-        .hapticScrollThresholds()
         .onAppear {
             model.planBrowseMode = .presets
             if let match = PlanPeriod.allCases.first(where: { $0.days == model.selectedPlan.days }) {
@@ -207,34 +202,16 @@ struct DirectPlansView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var constructorButton: some View {
-        Button {
-            HapticManager.shared.play(.navigation)
-            model.openPremiumPlans(mode: .constructor)
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("НЕ НАШЛИ ПОДХОДЯЩИЙ?").microLabel(color: DS.muted)
-                    Text("Собрать свой тариф")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                Spacer()
-                Image(systemName: "arrow.up.right")
-            }
-            .foregroundStyle(DS.ink)
-            .padding(.horizontal, 13)
-            .frame(height: 60)
-            .overlay(Rectangle().stroke(DS.line))
-        }
-        .buttonStyle(HapticButtonStyle())
-    }
-
     private func trafficLabel(_ gb: Int?) -> String {
         guard let gb else { return "∞" }
         return gb >= 1000 ? "\(gb / 1000) TB" : "\(gb) GB"
     }
 
     private func scaledCatalogPrice(_ tariff: DirectAppTariff) -> Int {
+        // Admin catalog price is authoritative for the tariff's native period.
+        if period.days == tariff.days {
+            return max(0, tariff.price)
+        }
         let months = Double(period.days) / Double(max(tariff.days, 1))
         let mult = model.appCatalog?.monthMultipliers[period.days]
             ?? VPNDirectPricingEngine.durationMultiplier(forDays: period.days)
@@ -252,7 +229,14 @@ struct DirectPlansView: View {
     }
 
     private func displayPrice(for plan: DirectPresetPlan) -> Int {
-        VPNDirectPricingEngine.price(for: configuration(for: plan))
+        // Prefer live catalog / quote — never the local demo PricingEngine base (270).
+        if let tariff = catalogTariffs.first(where: {
+            $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                .caseInsensitiveCompare(plan.name) == .orderedSame
+        }) {
+            return quotedPrices[tariff.id] ?? scaledCatalogPrice(tariff)
+        }
+        return VPNDirectPricingEngine.price(for: configuration(for: plan))
     }
 
     private func purchase(_ plan: DirectPresetPlan) {

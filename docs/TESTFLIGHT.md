@@ -18,11 +18,11 @@ How to install beta builds and invite people. **No signing secrets belong in thi
 | Field | Value |
 | --- | --- |
 | Marketing version | **1.0.11** |
-| Build | **112** (TestFlight rebuild; same surface as 111) |
+| Build | **153** (auth hardening + logout wipe) |
 | Bundle ID | `com.vpndirect.vpndirectapp` |
-| GitHub tag | [`v1.0.11.112`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.112) |
+| GitHub tag | [`v1.0.11.153`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.153) |
 
-Prefer **112+**. Older builds may still appear in history.
+Prefer **153+**. Older builds may still appear in history.
 
 ## How to add testers (you / App Store Connect)
 
@@ -33,7 +33,7 @@ Use [App Store Connect](https://appstoreconnect.apple.com) → **Apps** → **VP
 1. Open **Internal Testing**.
 2. Select the group (or create one).
 3. **Testers** → add Apple IDs that are already **Users** of your App Store Connect team (Users and Access).
-4. Assign the latest build (1.0.11 / **112+**).
+4. Assign the latest build (1.0.11 / **111+**).
 5. Testers install the **TestFlight** app and accept the invite email / notification.
 
 Limits: up to **100** Internal testers; they must be on your ASC team.
@@ -57,7 +57,7 @@ Limits: up to **10_000** External testers per app (Apple’s current cap). Publi
 
 TestFlight purchases use Apple Sandbox + RevenueCat. Packs: `direct.credits.4.99` … `199.99`.
 
-1. Install **112+** from TestFlight.
+1. Install **111+** from TestFlight.
 2. Sign in to VPN Direct account.
 3. Buy a credit pack — Apple Sheet is sandbox (no real charge with Sandbox Apple ID).
 4. Balance should credit after RC verification on the Direct ledger.

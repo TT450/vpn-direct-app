@@ -249,6 +249,16 @@ struct DirectDevicesView: View {
     private var deviceLimitLabel: String {
         let used = devices.count
         let limit = model.hasPremiumEntitlement ? model.premiumDeviceLimit : model.selectedPlan.devices
+        if limit <= 0 {
+            return "Безлимит · устройств"
+        }
+        let subLabel = model.activeSubscription?.devices ?? ""
+        if subLabel == "∞" || subLabel.contains("∞")
+            || subLabel.localizedCaseInsensitiveContains("unlim")
+            || subLabel.localizedCaseInsensitiveContains("безлим")
+        {
+            return "Безлимит · устройств"
+        }
         return String(format: "%02d / %d", used, max(limit, 1))
     }
 

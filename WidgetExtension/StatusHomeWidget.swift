@@ -12,7 +12,7 @@ struct StatusHomeWidget: Widget {
         StaticConfiguration(kind: kind, provider: StatusProvider()) { entry in
             StatusWidgetView(entry: entry)
                 .containerBackground(for: .widget) {
-                    AladdinWidgetTheme.background()
+                    DirectWidgetTheme.background()
                 }
         }
         .configurationDisplayName("VPN Direct")
@@ -106,13 +106,13 @@ private struct SmallWidget: View {
             Spacer(minLength: 2)
 
             Button(intent: ToggleVPNWidgetIntent()) {
-                AladdinPowerMedallion(connected: entry.isConnected, connecting: false, size: 78)
+                DirectPowerMedallion(connected: entry.isConnected, connecting: false, size: 78)
             }
             .buttonStyle(.plain)
 
             Text(entry.isConnected ? "Включен" : "Включить")
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(AladdinWidgetTheme.goldBright)
+                .foregroundStyle(DirectWidgetTheme.acid)
 
             Spacer(minLength: 2)
         }
@@ -131,7 +131,7 @@ private struct MediumWidget: View {
     var body: some View {
         HStack(spacing: 14) {
             Button(intent: ToggleVPNWidgetIntent()) {
-                AladdinPowerMedallion(connected: entry.isConnected, connecting: false, size: 64)
+                DirectPowerMedallion(connected: entry.isConnected, connecting: false, size: 64)
             }
             .buttonStyle(.plain)
 
@@ -144,7 +144,7 @@ private struct MediumWidget: View {
                     .foregroundStyle(.white)
                 Text(entry.serverName)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(AladdinWidgetTheme.secondaryText)
+                    .foregroundStyle(DirectWidgetTheme.secondaryText)
             }
             Spacer(minLength: 0)
         }
@@ -163,16 +163,16 @@ private struct LargeWidget: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.white.opacity(0.7))
                 Spacer()
-                AladdinStatusDot(connected: entry.isConnected)
+                DirectStatusDot(connected: entry.isConnected)
             }
             Spacer(minLength: 0)
             Button(intent: ToggleVPNWidgetIntent()) {
-                AladdinPowerMedallion(connected: entry.isConnected, connecting: false, size: 96)
+                DirectPowerMedallion(connected: entry.isConnected, connecting: false, size: 96)
             }
             .buttonStyle(.plain)
             Text(entry.isConnected ? "Включен" : "Включить")
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(AladdinWidgetTheme.goldBright)
+                .foregroundStyle(DirectWidgetTheme.acid)
             Spacer(minLength: 0)
         }
         .padding(18)

@@ -70,7 +70,7 @@ struct DirectSubscriptionsPage: View {
                             .padding(.top, 10)
                         HStack(spacing: 8) {
                             Button {
-                                model.openDetail(.premiumPlans)
+                                model.select(tab: .plans)
                             } label: {
                                 Text("Сменить тариф")
                                     .font(.system(size: 13, weight: .semibold))
@@ -145,7 +145,7 @@ private struct DirectNeedsPlanCard: View {
                 .font(.system(size: 12))
                 .foregroundStyle(DS.muted)
             Button {
-                model.openDetail(.premiumPlans)
+                model.select(tab: .plans)
             } label: {
                 HStack {
                     Text("Открыть тарифы")
@@ -223,8 +223,10 @@ private struct PremiumAccessCard: View {
             Button {
                 if let premiumID, !isActive, model.hasPremiumEntitlement {
                     model.activate(subscriptionID: premiumID)
+                } else if model.hasPremiumEntitlement {
+                    model.openDetail(.addOns)
                 } else {
-                    model.openDetail(model.hasPremiumEntitlement ? .addOns : .premiumPlans)
+                    model.select(tab: .plans)
                 }
             } label: {
                 HStack(spacing: 12) {
@@ -272,7 +274,7 @@ private struct PremiumAccessCard: View {
 
             HStack(spacing: 0) {
                 Button {
-                    model.openDetail(.premiumPlans)
+                    model.select(tab: .plans)
                 } label: {
                     Text("Выбрать тариф")
                         .font(.system(size: 13, weight: .semibold))
@@ -284,7 +286,11 @@ private struct PremiumAccessCard: View {
                 Rectangle().fill(DS.line).frame(width: 1, height: 28)
 
                 Button {
-                    model.openDetail(model.hasPremiumEntitlement ? .addOns : .premiumPlans)
+                    if model.hasPremiumEntitlement {
+                        model.openDetail(.addOns)
+                    } else {
+                        model.select(tab: .plans)
+                    }
                 } label: {
                     Text(isActive ? "Подключено" : "Управление")
                         .font(.system(size: 13, weight: .semibold))

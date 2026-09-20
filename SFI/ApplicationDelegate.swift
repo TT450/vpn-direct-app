@@ -11,7 +11,7 @@ class ApplicationDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCe
     private var profileServer: ProfileServer?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        NSLog("Here I stand")
+        print("Here I stand")
         let options = LibboxSetupOptions()
         options.basePath = FilePath.sharedDirectory.relativePath
         options.workingPath = FilePath.workingDirectory.relativePath
@@ -31,13 +31,22 @@ class ApplicationDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCe
             ),
         ])
         notificationCenter.delegate = self
-        requestPushAuthorization(application)
+        // Do not prompt here — alert is often swallowed before the window is up.
+        // Splash end in MainView calls DirectPushRegistration.requestPermissionIfNeeded().
+        DispatchQueue.main.async {
+            DirectPushRegistration.registerIfAuthorized()
+        }
         setup()
         #if os(iOS)
         DirectBackendRuntime.warmUp()
         DirectRevenueCat.configureIfNeeded()
         #endif
         return true
+    }
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        // Never re-prompt from becomeActive (overlapping calls kill the dialog).
+        DirectPushRegistration.registerIfAuthorized()
     }
 
     func application(_: UIApplication, supportedInterfaceOrientationsFor _: UIWindow?) -> UIInterfaceOrientationMask {
@@ -54,14 +63,29 @@ class ApplicationDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCe
         UserDefaults.standard.set(token, forKey: "vpndirect.apns.token")
         UserDefaults.standard.set(environment, forKey: "vpndirect.apns.env")
         Task {
-            DirectBackendRuntime.warmUp()
-            guard let register = DirectBackendRuntime.registerPushToken else { return }
-            try? await register(token, environment)
+            await DirectPushRegistration.uploadCachedTokenIfPossible()
         }
     }
 
     func application(_: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        NSLog("APNs registration failed: \(error.localizedDescription)")
+        print("APNs registration failed: \(error.localizedDescription)")
+    }
+
+    func application(
+        _: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        let cmd = (userInfo["cmd"] as? String)?.lowercased() ?? ""
+        let type = (userInfo["type"] as? String)?.lowercased() ?? ""
+        if cmd == "refresh_subscription" || type == "refresh_subscription" {
+            Task {
+                await DirectSilentSubscriptionRefresh.handleFromPush()
+                completionHandler(.newData)
+            }
+            return
+        }
+        completionHandler(.noData)
     }
 
     func userNotificationCenter(_: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
@@ -114,15 +138,6 @@ class ApplicationDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCe
         }
     }
 
-    private func requestPushAuthorization(_ application: UIApplication) {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
-            guard granted else { return }
-            DispatchQueue.main.async {
-                application.registerForRemoteNotifications()
-            }
-        }
-    }
-
     private static func isCheckoutPaid(_ userInfo: [AnyHashable: Any]) -> Bool {
         if let type = userInfo["type"] as? String, type == "checkout_paid" {
             return true
@@ -133,9 +148,9 @@ class ApplicationDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCe
     private func setup() {
         do {
             try UIProfileUpdateTask.configure()
-            NSLog("setup background task success")
+            print("setup background task success")
         } catch {
-            NSLog("setup background task error: \(error.localizedDescription)")
+            print("setup background task error: \(error.localizedDescription)")
         }
         Task {
             if UIDevice.current.userInterfaceIdiom == .phone {
@@ -153,9 +168,9 @@ class ApplicationDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCe
                 await MainActor.run {
                     self.profileServer = profileServer
                 }
-                NSLog("started profile server")
+                print("started profile server")
             } catch {
-                NSLog("setup profile server error: \(error.localizedDescription)")
+                print("setup profile server error: \(error.localizedDescription)")
             }
             registerFileProviderDomain()
         }
@@ -169,7 +184,7 @@ class ApplicationDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCe
         )
         NSFileProviderManager.add(domain) { error in
             if let error {
-                NSLog("Failed to add file provider domain: \(error)")
+                print("Failed to add file provider domain: \(error)")
             }
         }
     }

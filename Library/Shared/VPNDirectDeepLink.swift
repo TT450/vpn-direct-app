@@ -166,4 +166,5 @@ public extension Notification.Name {
     static let vpnDirectCheckoutPaid = Notification.Name("vpnDirectCheckoutPaid")
     static let vpnDirectOpenPlans = Notification.Name("vpnDirectOpenPlans")
     static let vpnDirectOpenAccount = Notification.Name("vpnDirectOpenAccount")
+    static let vpnDirectSilentSubscriptionRefreshed = Notification.Name("vpnDirectSilentSubscriptionRefreshed")
 }

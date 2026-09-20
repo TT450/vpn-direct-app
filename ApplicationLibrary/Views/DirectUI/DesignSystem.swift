@@ -77,6 +77,72 @@ struct Hairline: View {
     var body: some View { Rectangle().fill(color).frame(height: 1) }
 }
 
+/// In-card usage gauge for limited locations (not a row divider).
+/// Fill grows with used/cap; solid color green→red as remaining shrinks.
+struct DirectLocationQuotaBar: View {
+    /// Used fraction in `0…1`.
+    let usedFraction: Double
+    var height: CGFloat = 4
+
+    private var clamped: Double {
+        min(1, max(0, usedFraction.isFinite ? usedFraction : 0))
+    }
+
+    private var fillFraction: CGFloat {
+        let t = CGFloat(clamped)
+        if t <= 0 { return 0 }
+        return max(t, 0.04)
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let fillW = geo.size.width * fillFraction
+            ZStack(alignment: .leading) {
+                Capsule(style: .continuous)
+                    .fill(DS.ink.opacity(0.10))
+                Capsule(style: .continuous)
+                    .fill(Self.color(usedFraction: clamped))
+                    .frame(width: fillW)
+            }
+        }
+        .frame(height: height)
+        .clipShape(Capsule(style: .continuous))
+        .accessibilityLabel("Использовано трафика")
+        .accessibilityValue("\(Int((clamped * 100).rounded())) процентов")
+    }
+
+    /// Less remaining (higher used) → redder.
+    static func color(usedFraction used: Double) -> Color {
+        let t = CGFloat(min(1, max(0, used)))
+        // Ease toward red sooner so mid-usage already reads warm.
+        let eased = pow(t, 0.85)
+        let green = UIColor(red: 0.18, green: 0.55, blue: 0.31, alpha: 1)
+        let amber = UIColor(red: 0.90, green: 0.58, blue: 0.12, alpha: 1)
+        let red = UIColor(red: 0.82, green: 0.24, blue: 0.20, alpha: 1)
+        let blended: UIColor
+        if eased <= 0.45 {
+            blended = Self.lerp(green, amber, eased / 0.45)
+        } else {
+            blended = Self.lerp(amber, red, (eased - 0.45) / 0.55)
+        }
+        return Color(blended)
+    }
+
+    private static func lerp(_ a: UIColor, _ b: UIColor, _ t: CGFloat) -> UIColor {
+        var ar: CGFloat = 0, ag: CGFloat = 0, ab: CGFloat = 0, aa: CGFloat = 0
+        var br: CGFloat = 0, bg: CGFloat = 0, bb: CGFloat = 0, ba: CGFloat = 0
+        a.getRed(&ar, green: &ag, blue: &ab, alpha: &aa)
+        b.getRed(&br, green: &bg, blue: &bb, alpha: &ba)
+        let u = min(1, max(0, t))
+        return UIColor(
+            red: ar + (br - ar) * u,
+            green: ag + (bg - ag) * u,
+            blue: ab + (bb - ab) * u,
+            alpha: aa + (ba - aa) * u
+        )
+    }
+}
+
 struct PageHeading: View {
     let kicker: String
     let title: String
@@ -134,6 +200,8 @@ struct FlagImage: View {
     let code: String
     var width: CGFloat = 30
     var height: CGFloat = 20
+    /// Shown in the black fallback square when no flag asset exists (e.g. «5G»).
+    var fallbackLabel: String? = nil
 
     private static let imageCache = NSCache<NSString, UIImage>()
     private static let missToken = UIImage()
@@ -145,7 +213,7 @@ struct FlagImage: View {
             if let image = Self.cachedImage(named: name) {
                 Image(uiImage: image).resizable().interpolation(.high).scaledToFill()
             } else {
-                Text(normalized.isEmpty ? "XX" : normalized)
+                Text(Self.fallbackText(code: normalized, label: fallbackLabel))
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
                     .foregroundStyle(DS.acid)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -155,6 +223,14 @@ struct FlagImage: View {
         .frame(width: width, height: height)
         .clipped()
         .overlay(Rectangle().stroke(Color.black.opacity(0.12), lineWidth: 0.5))
+    }
+
+    private static func fallbackText(code: String, label: String?) -> String {
+        if let label = label?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty {
+            if label.uppercased().contains("5G") { return "5G" }
+            return String(label.prefix(3)).uppercased()
+        }
+        return code.isEmpty ? "XX" : code
     }
 
     private static func normalizedCode(_ code: String) -> String {

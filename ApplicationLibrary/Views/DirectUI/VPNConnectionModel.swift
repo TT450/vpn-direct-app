@@ -16,6 +16,8 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var activeSheet: AppSheet?
     @Published public var connectionMode = "Авто"
     @Published public var isMenuOpen = false
+    /// Limited location caps from /me — exhausted stay visible but not selectable.
+    @Published public var locationCaps: [DirectLocationCap] = []
     @Published public private(set) var isConnected = false
     @Published public private(set) var phase: ConnectionPhase = .idle
     /// Full-screen Guideline 5.4 disclosure before first VPN connect (all users until accepted).
@@ -46,6 +48,8 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var premiumTrafficGB = 300
     /// Remaining traffic in GB (from `traffic_gb_remaining`). `nil` until server reports it.
     @Published public var premiumTrafficRemainingGB: Int?
+    /// Live used GB for the shared subscription pool (`traffic_gb_used` from /me).
+    @Published public var premiumTrafficUsedExactGB: Double?
     @Published public var premiumWhitelistGB = 0
     @Published public var premiumDevicesUsed = 1
     @Published public var premiumDeviceLimit = 5
@@ -71,12 +75,20 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var checkoutAuthCode = ""
     @Published public var checkoutAuthBotCode = ""
     @Published public var checkoutAuthBotIdentifier = ""
+    /// Segment on «Аккаунт бота»: code entry vs Telegram confirm. Kept on the model so deep links / busy state do not reset it.
+    @Published public var checkoutAuthBotMode: CheckoutAuthBotMode = .code
     @Published public var checkoutAuthPhone = ""
     @Published public var checkoutAuthPhoneRequestId = ""
     @Published public var checkoutAuthError: String?
     @Published public var checkoutAuthBusy = false
+    @Published public var showBotLoginRateLimitNotice = false
+    @Published public var botLoginRateLimitRetryAfter = 600
+    /// In-flight Telegram confirm poll — cancelled on re-entry / deep link / logout.
+    var botLoginConfirmTask: Task<Void, Never>?
     @Published public var authAccountSwitchWarning = false
     @Published public var pendingAuthDestination: DetailPage?
+    /// Apple/Google after account-switch confirm (not a DetailPage).
+    @Published public var pendingSocialAuth: SocialAuthKind?
     /// When true, auth success returns to account instead of continuing checkout.
     @Published public var authFlowReturnsToAccount = false
     @Published public var paymentErrorMessage = "Не удалось завершить оплату"
@@ -85,6 +97,8 @@ public final class VPNConnectionModel: ObservableObject {
     @Published public var paymentWaitingSubtitle = ""
     @Published public var paymentWaitingTimedOut = false
     @Published public var appCatalog: DirectAppCatalog?
+    /// Non-nil when catalog says this binary is below ios_min_version / ios_min_build.
+    @Published public var forceUpdateRequirement: DirectForceUpdateRequirement?
     /// Catalog tariff id for app_tariff checkout (must survive savePendingCheckout).
     @Published public var pendingCheckoutTariffID: Int?
     private var paymentPollTask: Task<Void, Never>?
@@ -155,6 +169,8 @@ public final class VPNConnectionModel: ObservableObject {
     private static let premiumPeriodDaysKey = "vpndirect.access.premium.period.days"
     private static let activePlanNameKey = "vpndirect.access.premium.plan.name"
     private static let privacyDisclosureAcceptedKey = "vpndirect.privacyDisclosureAccepted.v1"
+    private static let phoneOTPPhoneKey = "vpndirect.auth.phone"
+    private static let phoneOTPRequestIdKey = "vpndirect.auth.phone.request_id"
     /// Sentinel for Unlimited traffic in local demo entitlement.
     public static let unlimitedTrafficGB = 100_000
 
@@ -221,6 +237,91 @@ public final class VPNConnectionModel: ObservableObject {
             checkoutPrice = VPNDirectPricingEngine.price(for: selectedPlan)
         }
         activeAccess = Self.loadAccessSource()
+        // Restore phone OTP mid-flow after process death.
+        if let phone = UserDefaults.standard.string(forKey: Self.phoneOTPPhoneKey), !phone.isEmpty {
+            checkoutAuthPhone = phone
+        }
+        if let rid = UserDefaults.standard.string(forKey: Self.phoneOTPRequestIdKey), !rid.isEmpty {
+            checkoutAuthPhoneRequestId = rid
+        }
+    }
+
+    /// Wipe Direct session + entitlement so Management/Home/Profile do not show stale tariff/traffic.
+    /// Does not delete imported (non-Direct) profiles.
+    public func clearDirectSessionState() {
+        botLoginConfirmTask?.cancel()
+        botLoginConfirmTask = nil
+
+        directAccountEmail = nil
+        directAccountKind = nil
+        directAuthMethod = nil
+        directAccountUsername = nil
+        directAccountPhone = nil
+        directSubscriptionURL = nil
+        locationCaps = []
+
+        hasPremiumEntitlement = false
+        premiumRemainingDays = 0
+        premiumTrafficGB = 300
+        premiumTrafficRemainingGB = nil
+        premiumTrafficUsedExactGB = nil
+        premiumWhitelistGB = 0
+        premiumDevicesUsed = 1
+        premiumDeviceLimit = 5
+        activePlanName = ""
+        autoRenewPremium = true
+
+        checkoutAuthError = nil
+        checkoutAuthBusy = false
+        showBotLoginRateLimitNotice = false
+        checkoutAuthBotCode = ""
+        checkoutAuthBotIdentifier = ""
+        checkoutAuthCode = ""
+        clearPersistedPhoneOTP()
+
+        UserDefaults.standard.set(false, forKey: "vpndirect.authenticated")
+        persistPremiumState()
+        setActiveAccess(.free)
+
+        DirectBalanceFlow.shared.applyMeBalance(usdCents: 0)
+
+        // If the active profile is Direct-owned, deselect it (keep imported subs).
+        if let item = activeSubscription,
+           DirectBuiltinProfile.isDirectOwned(item.profile.remoteURL)
+        {
+            activeSubscriptionID = 0
+            selectedServerID = nil
+            Task {
+                await SharedPreferences.selectedProfileID.set(-1)
+                await SharedPreferences.preferredOutboundTag.set("")
+                environments?.selectedProfileUpdate.send()
+            }
+        }
+
+        switch detailPage {
+        case .account, .authSuccess, .authLogin, .authEmail, .authCode, .authRegister,
+             .authRecovery, .authBot, .authPhone, .authPhoneCode:
+            detailStack.removeAll()
+            detailPage = .account
+        default:
+            break
+        }
+
+        objectWillChange.send()
+    }
+
+    func persistPhoneOTP(phone: String, requestId: String) {
+        checkoutAuthPhone = phone
+        checkoutAuthPhoneRequestId = requestId
+        UserDefaults.standard.set(phone, forKey: Self.phoneOTPPhoneKey)
+        UserDefaults.standard.set(requestId, forKey: Self.phoneOTPRequestIdKey)
+    }
+
+    func clearPersistedPhoneOTP() {
+        checkoutAuthPhone = ""
+        checkoutAuthPhoneRequestId = ""
+        UserDefaults.standard.removeObject(forKey: Self.phoneOTPPhoneKey)
+        UserDefaults.standard.removeObject(forKey: Self.phoneOTPRequestIdKey)
     }
 
     /// Name shown on Management / subscription chrome (active paid plan, not checkout cart).
@@ -250,8 +351,11 @@ public final class VPNConnectionModel: ObservableObject {
         return "\(premiumTrafficGB) ГБ"
     }
 
-    /// Used GB for management meter. Prefer limit − remaining from backend.
+    /// Used GB for management meter. Prefer exact used from /me, else limit − remaining.
     public var premiumTrafficUsedGB: Int {
+        if let exact = premiumTrafficUsedExactGB, exact.isFinite {
+            return max(0, Int(exact.rounded(.down)))
+        }
         guard premiumTrafficGB > 0, premiumTrafficGB < Self.unlimitedTrafficGB else { return 0 }
         guard let remaining = premiumTrafficRemainingGB else { return 0 }
         return max(0, premiumTrafficGB - max(0, remaining))
@@ -390,16 +494,31 @@ public final class VPNConnectionModel: ObservableObject {
 
     /// Live Direct outbounds only (builtin + Direct-owned hosts). Never third-party imports.
     public var liveDirectServers: [VPNServer] {
-        let directItems = subscriptions.filter { DirectBuiltinProfile.isDirectOwned($0.profile.remoteURL) }
-        // Prefer premium builtin, then free builtin, then any Direct-owned remote with nodes.
-        let ordered = directItems.sorted { lhs, rhs in
-            Self.builtinSortRank(lhs.profile.remoteURL) < Self.builtinSortRank(rhs.profile.remoteURL)
-        }
-        for item in ordered {
-            let servers = item.servers.filter { server in
+        func usable(_ servers: [VPNServer]) -> [VPNServer] {
+            servers.filter { server in
                 let id = server.id.lowercased()
                 return !id.isEmpty && id != "direct" && id != "auto"
             }
+        }
+
+        // Same source as home: the active Direct-owned profile (Remnawave remote), not empty builtins.
+        if let active = activeSubscription,
+           DirectBuiltinProfile.isDirectOwned(active.profile.remoteURL)
+        {
+            let fromActive = usable(active.servers)
+            if !fromActive.isEmpty { return fromActive }
+        }
+
+        let directItems = subscriptions.filter { DirectBuiltinProfile.isDirectOwned($0.profile.remoteURL) }
+        // Prefer live remotes over builtin stubs, then premium/free builtins.
+        let ordered = directItems.sorted { lhs, rhs in
+            let lBuiltin = DirectBuiltinProfile.isBuiltin(lhs.profile.remoteURL)
+            let rBuiltin = DirectBuiltinProfile.isBuiltin(rhs.profile.remoteURL)
+            if lBuiltin != rBuiltin { return !lBuiltin && rBuiltin }
+            return Self.builtinSortRank(lhs.profile.remoteURL) < Self.builtinSortRank(rhs.profile.remoteURL)
+        }
+        for item in ordered {
+            let servers = usable(item.servers)
             if !servers.isEmpty { return servers }
         }
         return []
@@ -413,11 +532,235 @@ public final class VPNConnectionModel: ObservableObject {
     /// Servers for the Direct «Локации» tab — Direct only, never external imports.
     public var directServerItems: [DirectServerItem] {
         let live = liveDirectServers
+        var items: [DirectServerItem] = []
         if !live.isEmpty {
-            return live.map(DirectServerItem.from(server:))
+            items = live.map(DirectServerItem.from(server:))
+        } else {
+            items = DirectLocationsCatalog.shared.items
         }
-        // Showcase catalog (seed/CDN). Never fall back to active imported subscription.
-        return DirectLocationsCatalog.shared.items
+        return mergeExhaustedLocationItems(into: items)
+    }
+
+    public func isLocationCapExhausted(serverID: String?, locationLabel: String?) -> Bool {
+        let id = (serverID ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if id.hasPrefix("exhausted:") { return true }
+        guard let cap = locationCap(serverID: id, locationLabel: locationLabel) else { return false }
+        return cap.exhausted == true || cap.available == false
+    }
+
+    public func isLocationCapExhausted(_ server: VPNServer) -> Bool {
+        isLocationCapExhausted(serverID: server.id, locationLabel: server.locationLabel)
+    }
+
+    /// Tell metering which limited squad is selected (null = Default / unlimited path).
+    public func reportMeteringActiveLocation(serverID: String?) async {
+        DirectBackendRuntime.warmUp()
+        guard DirectBackendRuntime.isAuthenticated() else { return }
+        var squadUuid: String?
+        if let serverID,
+           let server = (activeSubscription?.servers ?? liveDirectServers).first(where: { $0.id == serverID })
+            ?? serversForLocationPicker.first(where: { $0.id == serverID })
+        {
+            squadUuid = locationCap(for: server)?.squadUuid
+        } else if let serverID {
+            squadUuid = locationCap(serverID: serverID, locationLabel: serverID)?.squadUuid
+        }
+        if let report = DirectBackendRuntime.reportActiveLocation {
+            await report(squadUuid)
+        }
+    }
+
+    /// Matching limited-location cap from account state, if any.
+    public func locationCap(for server: VPNServer) -> DirectLocationCap? {
+        locationCap(serverID: server.id, locationLabel: server.locationLabel, city: server.city, country: server.country)
+    }
+
+    public func locationCap(
+        serverID: String?,
+        locationLabel: String?,
+        city: String? = nil,
+        country: String? = nil
+    ) -> DirectLocationCap? {
+        let id = (serverID ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let needles = [locationLabel, city, country, serverID]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .map { $0.lowercased() }
+        // Prefer exact title match (important for short names like «5G»).
+        for cap in locationCaps {
+            let key = (cap.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !key.isEmpty else { continue }
+            if needles.contains(where: { $0 == key }) {
+                return cap
+            }
+        }
+        for cap in locationCaps {
+            let title = (cap.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty else { continue }
+            let key = title.lowercased()
+            if needles.contains(where: { $0.contains(key) || key.contains($0) }) {
+                return cap
+            }
+            if !id.isEmpty, id.contains(key) { return cap }
+        }
+        return nil
+    }
+
+    /// Second line on location cards: «Безлимитный» / «0.14 / 3 GB» / «Лимит 3 GB исчерпан».
+    public func locationQuotaSubtitle(for server: VPNServer) -> String {
+        guard let cap = locationCap(for: server) else {
+            return String(localized: "Безлимитный")
+        }
+        let amount = Self.formatTrafficCapGb(cap.capGb)
+        let exhausted = server.id.hasPrefix("exhausted:")
+            || cap.exhausted == true
+            || cap.available == false
+        if exhausted {
+            return "Лимит \(amount) исчерпан"
+        }
+        let used = Self.formatTrafficUsedGb(cap.usedGb, cap: cap.capGb)
+        return "\(used) / \(amount)"
+    }
+
+    /// Used / cap in `0…1` for limited locations. `nil` = unlimited (no meter bar).
+    public func locationQuotaUsedFraction(for server: VPNServer) -> Double? {
+        locationQuotaUsedFraction(
+            cap: locationCap(for: server),
+            exhaustedOverride: server.id.hasPrefix("exhausted:")
+        )
+    }
+
+    public func locationQuotaUsedFraction(
+        serverID: String?,
+        locationLabel: String?,
+        city: String? = nil,
+        country: String? = nil
+    ) -> Double? {
+        locationQuotaUsedFraction(
+            cap: locationCap(serverID: serverID, locationLabel: locationLabel, city: city, country: country),
+            exhaustedOverride: (serverID ?? "").hasPrefix("exhausted:")
+        )
+    }
+
+    private func locationQuotaUsedFraction(
+        cap: DirectLocationCap?,
+        exhaustedOverride: Bool
+    ) -> Double? {
+        guard let cap else { return nil }
+        if exhaustedOverride || cap.exhausted == true || cap.available == false {
+            return 1
+        }
+        let limit = cap.capGb ?? 0
+        guard limit > 0, limit.isFinite else { return nil }
+        if let used = cap.usedGb, used.isFinite, used >= 0 {
+            return min(1, max(0, used / limit))
+        }
+        if let rem = cap.remainingGb, rem.isFinite {
+            return min(1, max(0, (limit - rem) / limit))
+        }
+        return 0
+    }
+
+    /// Lightweight `/me` refresh — only location caps (for live usage meters).
+    public func refreshLocationCaps() async {
+        DirectBackendRuntime.warmUp()
+        if let run = DirectBackendRuntime.refreshLocationCaps {
+            await run(self)
+            return
+        }
+    }
+
+    /// Black-square fallback when there is no flag asset (e.g. named «5G»).
+    public func flagFallbackLabel(for server: VPNServer) -> String? {
+        let hay = "\(server.locationLabel) \(server.city) \(server.country) \(server.id)"
+        if hay.range(of: "5G", options: [.caseInsensitive, .diacriticInsensitive]) != nil {
+            return "5G"
+        }
+        return nil
+    }
+
+    public static func formatTrafficCapGb(_ gb: Double?) -> String {
+        guard let gb, gb > 0, gb.isFinite else { return "—" }
+        if abs(gb - gb.rounded()) < 0.05 {
+            return "\(Int(gb.rounded())) GB"
+        }
+        let trimmed = String(format: "%g", gb)
+        return "\(trimmed) GB"
+    }
+
+    public static func formatTrafficUsedGb(_ used: Double?, cap: Double?) -> String {
+        let value: Double
+        if let used, used.isFinite, used >= 0 {
+            value = used
+        } else {
+            value = 0
+        }
+        if value < 0.01 {
+            return "0 GB"
+        }
+        // Always keep two decimals under 1 GB so 0.4 of a large plan does not round to 0.0.
+        if value < 1 {
+            return String(format: "%.2f GB", value)
+        }
+        if abs(value - value.rounded()) < 0.05 {
+            return "\(Int(value.rounded())) GB"
+        }
+        return String(format: "%.1f GB", value)
+    }
+
+    /// Live subscription servers plus phantom rows for exhausted limited locations removed from Remna.
+    public var serversForLocationPicker: [VPNServer] {
+        var servers = activeSubscription?.servers ?? liveDirectServers
+        let existing = Set(servers.map { $0.locationLabel.lowercased() })
+        for cap in locationCaps where cap.exhausted == true || cap.available == false {
+            let title = (cap.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty else { continue }
+            if existing.contains(where: { $0.contains(title.lowercased()) }) { continue }
+            let sid = "exhausted:\(cap.squadUuid ?? title)"
+            servers.append(
+                VPNServer(
+                    id: sid,
+                    city: title,
+                    country: title,
+                    countryCode: "ZZ",
+                    ping: 0,
+                    load: 100,
+                    groupTag: "proxy",
+                    locationLabel: title
+                )
+            )
+        }
+        return servers
+    }
+
+    private func mergeExhaustedLocationItems(into items: [DirectServerItem]) -> [DirectServerItem] {
+        var out = items
+        let existing = Set(out.map { $0.city.lowercased() + "|" + $0.country.lowercased() })
+        for cap in locationCaps where cap.exhausted == true || cap.available == false {
+            let title = (cap.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty else { continue }
+            if out.contains(where: {
+                $0.city.localizedCaseInsensitiveContains(title)
+                    || $0.country.localizedCaseInsensitiveContains(title)
+                    || $0.id.localizedCaseInsensitiveContains(title)
+            }) {
+                continue
+            }
+            let key = title.lowercased() + "|" + title.lowercased()
+            guard !existing.contains(key) else { continue }
+            out.append(
+                DirectServerItem(
+                    id: "exhausted:\(cap.squadUuid ?? title)",
+                    countryCode: "ZZ",
+                    country: title,
+                    city: title,
+                    latency: 0,
+                    load: 100,
+                    region: "EUROPE"
+                )
+            )
+        }
+        return out
     }
 
     public func openPremiumPlans(mode: VPNDirectPlanMode) {
@@ -430,7 +773,7 @@ public final class VPNConnectionModel: ObservableObject {
                     : preset.defaultDays
                 applySelectedPlan(preset.configuration(days: days), presetID: preset.id)
             }
-            openDetail(.premiumPlans)
+            select(tab: .plans)
         } else {
             var custom = selectedPlan
             custom.name = nil
@@ -536,6 +879,47 @@ public final class VPNConnectionModel: ObservableObject {
     public var headerPageIndex: Int { selectedTab.rawValue }
 
     public var usesAutoSelection: Bool { selectedServerID == nil }
+
+    /// Short label for the connection-mode card (home + locations list).
+    public var connectionModeDisplayTitle: String {
+        switch connectionMode {
+        case "Авто":
+            return "Автовыбор"
+        case "Максимальная скорость":
+            return "Скорость"
+        case "Антиблокировка":
+            return "5G"
+        default:
+            return connectionMode
+        }
+    }
+
+    /// Subtitle under the mode title: fixed text for 5G, otherwise the resolved location.
+    public var connectionModeDisplaySubtitle: String {
+        switch connectionMode {
+        case "5G", "Антиблокировка":
+            return "Для Сотовой связи"
+        default:
+            if let label = activeServer?.locationLabel, !label.isEmpty {
+                return label
+            }
+            if isProtected || isBusy {
+                return "Определяем…"
+            }
+            return "Локация не выбрана"
+        }
+    }
+
+    /// Location currently driven by the active mode / manual pick (pin under the mode card).
+    public var pinnedLocationServer: VPNServer? {
+        if let selectedServerID,
+           let sub = activeSubscription,
+           let selected = Self.resolveServer(id: selectedServerID, in: sub.servers)
+        {
+            return selected
+        }
+        return activeServer
+    }
 
     public var activeSubscription: VPNSubscriptionItem? {
         guard activeSubscriptionID > 0 else { return nil }
@@ -704,6 +1088,7 @@ public final class VPNConnectionModel: ObservableObject {
     private static func shortTitle(for page: DetailPage) -> String {
         switch page {
         case .premiumPlans: return "Тарифы"
+        case .locations: return "Локации"
         case .planConstructor: return "Конструктор"
         case .payment: return "Оплата"
         case .balanceAccount: return "Баланс"
@@ -742,12 +1127,24 @@ public final class VPNConnectionModel: ObservableObject {
         openDetail(.authLogin)
     }
 
-    /// Deep link from Telegram bot (`vpndirect://auth/bot`) — jump straight to code entry.
+    /// Deep link from Telegram bot (`vpndirect://auth/bot`).
+    /// Cancels any in-flight confirm poll; keeps «Подтверждение» only if still busy with an identifier.
     public func openBotAuthFromDeepLink() {
         authFlowReturnsToAccount = true
         checkoutAuthError = nil
-        checkoutAuthBotCode = ""
         selectedTab = .profile
+        botLoginConfirmTask?.cancel()
+        botLoginConfirmTask = nil
+        let keepConfirm = checkoutAuthBusy
+            && !checkoutAuthBotIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if keepConfirm {
+            checkoutAuthBotMode = .confirm
+            checkoutAuthBusy = false
+        } else {
+            checkoutAuthBusy = false
+            checkoutAuthBotCode = ""
+            checkoutAuthBotMode = .code
+        }
         openDetail(.authBot)
     }
 
@@ -764,9 +1161,13 @@ public final class VPNConnectionModel: ObservableObject {
     public func openAccessStripAction() {
         switch activeAccess {
         case .free:
-            openDetail(.premiumPlans)
+            select(tab: .plans)
         case .premium:
-            openDetail(hasPremiumEntitlement ? .addOns : .premiumPlans)
+            if hasPremiumEntitlement {
+                openDetail(.addOns)
+            } else {
+                select(tab: .plans)
+            }
         case .imported:
             select(tab: .management)
         }
@@ -793,7 +1194,7 @@ public final class VPNConnectionModel: ObservableObject {
             activeSubscriptionID = 0
             selectedServerID = nil
             assignedServerID = nil
-            setActiveAccess(.free)
+        setActiveAccess(.free)
             await SharedPreferences.selectedProfileID.set(-1)
             await SharedPreferences.preferredOutboundTag.set("")
             await disableVPNAutoConnect()
@@ -805,8 +1206,8 @@ public final class VPNConnectionModel: ObservableObject {
     public func refreshActiveSubscription() {
         guard let subscription = activeSubscription else {
             alert = AlertState(errorMessage: String(localized: "Нет активной подписки."))
-            return
-        }
+                return
+            }
         refreshSubscription(subscriptionID: subscription.id)
     }
 
@@ -827,7 +1228,7 @@ public final class VPNConnectionModel: ObservableObject {
         Task { @MainActor in
             if activeSubscription == nil {
                 activeSheet = .subscriptionPicker
-            } else {
+        } else {
                 activeSheet = .serverPicker
             }
         }
@@ -943,7 +1344,7 @@ public final class VPNConnectionModel: ObservableObject {
 
     public func activateFreeAccess() {
         // Free-via-ads removed — open Direct tariff picker instead.
-        openDetail(.premiumPlans)
+        select(tab: .plans)
     }
 
     public func clearAccessChoiceContext() {
@@ -953,7 +1354,7 @@ public final class VPNConnectionModel: ObservableObject {
     public func handleAccessChoicePremium() {
         if isPremiumAccessReady {
             guard let premiumID = premiumProfileID else {
-                openDetail(.premiumPlans)
+                select(tab: .plans)
                 return
             }
             setActiveAccess(.premium)
@@ -963,7 +1364,7 @@ public final class VPNConnectionModel: ObservableObject {
             closeDetail()
             Task { await connectAfterAccessChoice() }
         } else if !hasPremiumEntitlement {
-            openDetail(.premiumPlans)
+            select(tab: .plans)
         } else {
             openDetail(.addOns)
         }
@@ -1529,24 +1930,51 @@ public final class VPNConnectionModel: ObservableObject {
     public func refreshAppCatalog() async {
         DirectBackendRuntime.warmUp()
         do {
-            appCatalog = try await DirectBackendRuntime.fetchAppCatalog()
+            // Hard ceiling so a stalled catalog never freezes bootstrap / pull-to-refresh.
+            // Force-update is live from this response only — no disk/URL cache.
+            let catalog = try await withThrowingTaskGroup(of: DirectAppCatalog.self) { group in
+                group.addTask {
+                    try await DirectBackendRuntime.fetchAppCatalog()
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 12_000_000_000)
+                    throw CancellationError()
+                }
+                let first = try await group.next()!
+                group.cancelAll()
+                return first
+            }
+            appCatalog = catalog
+            evaluateForceUpdateGate()
         } catch {
-            // Keep previous catalog
+            // Network/timeout: keep previous catalog. Never invent a force-update from cache.
+            if appCatalog == nil {
+                forceUpdateRequirement = nil
+            } else {
+                evaluateForceUpdateGate()
+            }
         }
+    }
+
+    public func evaluateForceUpdateGate() {
+        forceUpdateRequirement = DirectAppVersionGate.evaluate(catalog: appCatalog)
     }
 
     /// Pull-to-refresh for every Direct screen except the home tab.
     public func performPullToRefresh() async {
-        async let subs: Void = reloadSubscriptions()
-        async let catalog: Void = refreshAppCatalog()
-        async let locs: Void = DirectLocationsCatalog.shared.refreshFromBackendIfNeeded(force: true)
+        // Refresh remote sub BEFORE reloading local graphs — parallel reload raced the old cache.
         if isDirectAuthenticated {
             await refreshDirectAccount()
+        } else if let url = directSubscriptionURL, !url.isEmpty {
+            await attachDirectSubscription(url: url)
         }
-        _ = await (subs, catalog, locs)
+        async let catalog: Void = refreshAppCatalog()
+        async let locs: Void = DirectLocationsCatalog.shared.refreshFromBackendIfNeeded(force: true)
+        await reloadSubscriptions()
+        _ = await (catalog, locs)
         syncFromExtension()
         refreshPublicIP()
-        if selectedTab == .locations {
+        if detailPage == .locations {
             requestURLTest()
         }
         HapticManager.shared.play(.selection)
@@ -1606,19 +2034,13 @@ public final class VPNConnectionModel: ObservableObject {
             await run(self)
             return
         }
-        directAccountEmail = nil
-        directAccountKind = nil
-        directAuthMethod = nil
-        directAccountUsername = nil
-        directAccountPhone = nil
-        directSubscriptionURL = nil
-        UserDefaults.standard.set(false, forKey: "vpndirect.authenticated")
-        objectWillChange.send()
+        clearDirectSessionState()
     }
 
     /// Independent accounts: warn before replacing the current session with another login method.
     public func requestAuthDestination(_ page: DetailPage) {
         checkoutAuthError = nil
+        pendingSocialAuth = nil
         if isDirectAuthenticated {
             pendingAuthDestination = page
             authAccountSwitchWarning = true
@@ -1627,8 +2049,35 @@ public final class VPNConnectionModel: ObservableObject {
         openDetail(page)
     }
 
+    public func requestSocialAuth(_ kind: SocialAuthKind) {
+        checkoutAuthError = nil
+        pendingAuthDestination = nil
+        if isDirectAuthenticated {
+            pendingSocialAuth = kind
+            authAccountSwitchWarning = true
+            return
+        }
+        Task {
+            switch kind {
+            case .apple: await signInWithAppleForAuth()
+            case .google: await signInWithGoogleForAuth()
+            }
+        }
+    }
+
     public func confirmAccountSwitchAndContinue() {
         authAccountSwitchWarning = false
+        if let social = pendingSocialAuth {
+            pendingSocialAuth = nil
+            pendingAuthDestination = nil
+            Task {
+                switch social {
+                case .apple: await signInWithAppleForAuth()
+                case .google: await signInWithGoogleForAuth()
+                }
+            }
+            return
+        }
         guard let page = pendingAuthDestination else { return }
         pendingAuthDestination = nil
         openDetail(page)
@@ -1637,6 +2086,7 @@ public final class VPNConnectionModel: ObservableObject {
     public func cancelAccountSwitch() {
         authAccountSwitchWarning = false
         pendingAuthDestination = nil
+        pendingSocialAuth = nil
     }
 
     public var authMethodLabel: String {
@@ -1790,8 +2240,15 @@ public final class VPNConnectionModel: ObservableObject {
     public func attachDirectSubscription(url: String) async {
         guard let environments else { return }
         do {
-            _ = try await AutoSubscriptionImporter.importIfNeeded(url: url, environments: environments)
+            let profile = try await AutoSubscriptionImporter.importIfNeeded(url: url, environments: environments)
             await reloadSubscriptions()
+            if let profile,
+               let item = subscriptions.first(where: { $0.id == profile.mustID })
+            {
+                setActiveAccess(.premium)
+                activate(subscriptionID: item.id)
+                return
+            }
             if let item = subscriptions.first(where: {
                 DirectBuiltinProfile.isDirectOwned($0.profile.remoteURL)
                     && !DirectBuiltinProfile.isBuiltin($0.profile.remoteURL)
@@ -1813,7 +2270,7 @@ public final class VPNConnectionModel: ObservableObject {
         if checkoutReturnPage == .addOns {
             if pendingAddOnTrafficGB > 0 {
                 if premiumTrafficGB < Self.unlimitedTrafficGB {
-                    premiumTrafficGB += pendingAddOnTrafficGB
+                premiumTrafficGB += pendingAddOnTrafficGB
                     if let remaining = premiumTrafficRemainingGB {
                         premiumTrafficRemainingGB = remaining + pendingAddOnTrafficGB
                     }
@@ -2035,12 +2492,12 @@ public final class VPNConnectionModel: ObservableObject {
             }
             do {
                 try await applyConnectionModeBehavior(force: true)
-                if isConnected {
+            if isConnected {
                     await refreshAssignedFromGroups()
                     await mergeLivePings()
                     try? await Task.sleep(nanoseconds: 450_000_000)
-                    phase = .idle
-                    HapticManager.shared.play(.vpnSwitched)
+                phase = .idle
+                HapticManager.shared.play(.vpnSwitched)
                 }
             } catch {
                 phase = .idle
@@ -2280,11 +2737,43 @@ public final class VPNConnectionModel: ObservableObject {
                     alert = AlertState(errorMessage: String(localized: "Встроенные подписки VPN Direct нельзя удалить."))
                     return
                 }
-                if activeSubscriptionID == subscriptionID {
+
+                // If this profile is in the VPN client — disconnect, clear selection, then delete.
+                let selectedProfileID = await SharedPreferences.selectedProfileID.get()
+                let isActiveInClient = activeSubscriptionID == subscriptionID
+                    || selectedProfileID == subscriptionID
+                if isActiveInClient {
+                    connectTimeoutTask?.cancel()
+                    connectPollTask?.cancel()
+                    isStarting = false
+                    connectTimeoutExtended = false
+                    if let ext = environments?.extensionProfile {
+                        ext.refreshStatus()
+                        let status = ext.status
+                        let needsStop = status.isConnected
+                            || status == .connecting
+                            || status == .reasserting
+                            || phase == .connecting
+                            || phase == .disconnecting
+                            || phase == .switching
+                        if needsStop {
+                            HapticManager.shared.play(.vpnDisconnecting)
+                            phase = .disconnecting
+                            try? await ext.updateOnDemand(enabled: false, useDefaultRules: false)
+                            try? await ext.stop()
+                        }
+                    }
+                    phase = .idle
+                    isConnected = false
                     activeSubscriptionID = 0
                     selectedServerID = nil
+                    assignedServerID = nil
                     await SharedPreferences.selectedProfileID.set(-1)
+                    await SharedPreferences.preferredOutboundTag.set("")
+                    await disableVPNAutoConnect()
+                    syncFromExtension()
                 }
+
                 try await ProfileManager.delete(profile)
                 if detailPage == .subscription(subscriptionID) {
                     closeDetail()
@@ -2298,6 +2787,7 @@ public final class VPNConnectionModel: ObservableObject {
                 if subscriptions.isEmpty {
                     await disableVPNAutoConnect()
                 }
+                HapticManager.shared.play(.selection)
             } catch {
                 alert = AlertState(action: "удалить подписку", error: error)
             }
@@ -2339,26 +2829,35 @@ public final class VPNConnectionModel: ObservableObject {
 
     private func applyConnectionModeBehavior(force: Bool = false) async throws {
         guard let servers = activeSubscription?.servers, !servers.isEmpty else { return }
-        let groupTag = resolveSelectorGroupTag(fallback: activeServer?.groupTag ?? servers.first!.groupTag)
+        let usable = servers.filter { !isLocationCapExhausted($0) }
+        let pool = usable.isEmpty ? servers : usable
+        let groupTag = resolveSelectorGroupTag(fallback: activeServer?.groupTag ?? pool.first!.groupTag)
 
         switch connectionMode {
         case "Авто":
             selectedServerID = nil
             await SharedPreferences.preferredOutboundTag.set("")
             guard isConnected else { return }
-            let autoTag = outboundExists(inGroup: groupTag, tag: "auto") ? "auto" : (servers.first?.id ?? "auto")
+            let autoTag = outboundExists(inGroup: groupTag, tag: "auto") ? "auto" : (pool.first?.id ?? "auto")
+            // Prefer a concrete non-exhausted outbound over urltest `auto` when caps are exhausted.
+            if autoTag == "auto", !usable.isEmpty, usable.count < servers.count {
+                if let best = usable.filter({ $0.ping > 0 }).min(by: { $0.ping < $1.ping }) ?? usable.first {
+                    try await commitServerPick(best, manualSelection: false)
+                    return
+                }
+            }
             try await LibboxNewStandaloneCommandClient()!.selectOutbound(groupTag, outboundTag: autoTag)
             try? await LibboxNewStandaloneCommandClient()!.urlTest(autoTag == "auto" ? "auto" : groupTag)
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            await refreshAssignedFromGroups()
-            await mergeLivePings()
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                await refreshAssignedFromGroups()
+                await mergeLivePings()
         case "Пользовательский":
             // Stick to the manually chosen outbound; never fall back to urltest `auto`.
             let stickyID = selectedServerID
-                ?? assignedServerID.flatMap { id in servers.contains(where: { $0.id == id }) ? id : nil }
-            if let stickyID, let server = servers.first(where: { $0.id == stickyID }) {
+                ?? assignedServerID.flatMap { id in pool.contains(where: { $0.id == id }) ? id : nil }
+            if let stickyID, let server = pool.first(where: { $0.id == stickyID }), !isLocationCapExhausted(server) {
                 try await commitServerPick(server, manualSelection: true)
-            } else if let first = servers.first {
+            } else if let first = pool.first {
                 try await commitServerPick(first, manualSelection: true)
             }
         case "Максимальная скорость":
@@ -2366,13 +2865,17 @@ public final class VPNConnectionModel: ObservableObject {
                 groupTag: groupTag,
                 manualSelection: true,
                 preferFreshPings: true,
-                chooser: { $0.filter { $0.ping > 0 }.min(by: { $0.ping < $1.ping }) ?? $0.first }
+                chooser: { list in
+                    let filtered = list.filter { !self.isLocationCapExhausted($0) }
+                    let src = filtered.isEmpty ? list : filtered
+                    return src.filter { $0.ping > 0 }.min(by: { $0.ping < $1.ping }) ?? src.first
+                }
             )
         case "Стабильный":
-            let sticky = assignedServerID.flatMap { id in servers.contains(where: { $0.id == id }) ? id : nil }
-                ?? selectedServerID.flatMap { id in servers.contains(where: { $0.id == id }) ? id : nil }
-                ?? servers.first?.id
-            if let sticky, let server = servers.first(where: { $0.id == sticky }) {
+            let sticky = assignedServerID.flatMap { id in pool.contains(where: { $0.id == id }) ? id : nil }
+                ?? selectedServerID.flatMap { id in pool.contains(where: { $0.id == id }) ? id : nil }
+                ?? pool.first?.id
+            if let sticky, let server = pool.first(where: { $0.id == sticky }) {
                 try await commitServerPick(server, manualSelection: true)
             }
         case "Для видео":
@@ -2381,10 +2884,12 @@ public final class VPNConnectionModel: ObservableObject {
                 manualSelection: true,
                 preferFreshPings: true,
                 chooser: { list in
-                    let stable = list.filter { $0.ping >= 40 && $0.ping <= 180 }
+                    let filtered = list.filter { !self.isLocationCapExhausted($0) }
+                    let src = filtered.isEmpty ? list : filtered
+                    let stable = src.filter { $0.ping >= 40 && $0.ping <= 180 }
                     return stable.min(by: { $0.load < $1.load })
-                        ?? list.filter { $0.ping > 0 }.min(by: { $0.ping < $1.ping })
-                        ?? list.first
+                        ?? src.filter { $0.ping > 0 }.min(by: { $0.ping < $1.ping })
+                        ?? src.first
                 }
             )
         case "5G", "Антиблокировка":
@@ -2393,7 +2898,9 @@ public final class VPNConnectionModel: ObservableObject {
                 manualSelection: true,
                 preferFreshPings: true,
                 chooser: { [assignedServerID, selectedServerID] list in
-                    let pool = list.filter { VPNServerNameParser.matchesAntiBlockOrMobileProfile($0) }
+                    let pool = list.filter {
+                        VPNServerNameParser.matchesAntiBlockOrMobileProfile($0) && !self.isLocationCapExhausted($0)
+                    }
                     guard !pool.isEmpty else { return nil }
                     let sorted = pool.filter { $0.ping > 0 }.sorted(by: { $0.ping < $1.ping })
                     let ranked = sorted.isEmpty ? pool : sorted
@@ -2447,11 +2954,11 @@ public final class VPNConnectionModel: ObservableObject {
             try await commitServerPick(pick, manualSelection: manualSelection)
         }
         guard isConnected else { return }
-        try? await LibboxNewStandaloneCommandClient()!.urlTest(groupTag)
+            try? await LibboxNewStandaloneCommandClient()!.urlTest(groupTag)
         try? await Task.sleep(nanoseconds: 350_000_000)
-        await mergeLivePings()
-        let refreshed = activeSubscription?.servers ?? []
-        if let pick = chooser(refreshed) {
+            await mergeLivePings()
+            let refreshed = activeSubscription?.servers ?? []
+            if let pick = chooser(refreshed) {
             try await commitServerPick(pick, manualSelection: manualSelection)
         }
     }
@@ -2461,10 +2968,12 @@ public final class VPNConnectionModel: ObservableObject {
             selectedServerID = server.id
             assignedServerID = server.id
             await SharedPreferences.preferredOutboundTag.set(server.id)
+            await reportMeteringActiveLocation(serverID: server.id)
         } else {
             selectedServerID = nil
             assignedServerID = server.id
             await SharedPreferences.preferredOutboundTag.set("")
+            await reportMeteringActiveLocation(serverID: nil)
         }
         guard isConnected else { return }
         let groupTag = resolveSelectorGroupTag(fallback: server.groupTag)
@@ -2482,7 +2991,7 @@ public final class VPNConnectionModel: ObservableObject {
             await SharedPreferences.includeAllNetworks.set(false)
             let resetKey = "direct.neProfileReset.v51"
             if !UserDefaults.standard.bool(forKey: resetKey) {
-                await ExtensionProfile.disableAllSavedProfiles()
+            await ExtensionProfile.disableAllSavedProfiles()
                 environments.extensionProfile = nil
                 UserDefaults.standard.set(true, forKey: resetKey)
             }
@@ -2512,6 +3021,7 @@ public final class VPNConnectionModel: ObservableObject {
             if let run = DirectBackendRuntime.bootstrapSession {
                 await run(self)
             }
+            await refreshAppCatalog()
             try? await environments.ensureExtensionProfileReady()
             await applySecuritySettings()
             await migrateUrlTestBalancerIfNeeded()
@@ -2866,6 +3376,7 @@ public final class VPNConnectionModel: ObservableObject {
         Task {
             await SharedPreferences.preferredOutboundTag.set(serverID ?? "")
             await SharedPreferences.connectionMode.set(mode)
+            await reportMeteringActiveLocation(serverID: serverID)
             // Only switch live outbound when tunnel + command.sock are actually up.
             guard isConnected,
                   !isStarting,
@@ -2904,6 +3415,11 @@ public final class VPNConnectionModel: ObservableObject {
 
     /// Локации tab: switch when entitled + live Direct config, otherwise open tariffs.
     public func selectDirectLocation(serverID: String?) {
+        if let sid = serverID,
+           isLocationCapExhausted(serverID: sid, locationLabel: serversForLocationPicker.first(where: { $0.id == sid })?.locationLabel) {
+            alert = AlertState(errorMessage: String(localized: "Трафик по этой локации исчерпан. Она видна в списке, но подключение недоступно до сброса периода."))
+            return
+        }
         if canSwitchDirectLocations {
             // Always switch on a Direct-owned profile, never a third-party import.
             if let direct = subscriptions.first(where: {
@@ -2932,7 +3448,7 @@ public final class VPNConnectionModel: ObservableObject {
 
         // Disconnect / cancel never requires disclosure.
         if dialIsConnected {
-            Task { await toggleConnectionAsync() }
+        Task { await toggleConnectionAsync() }
             return
         }
 
@@ -2953,6 +3469,9 @@ public final class VPNConnectionModel: ObservableObject {
     public func acceptPrivacyDisclosureAndConnect() {
         UserDefaults.standard.set(true, forKey: Self.privacyDisclosureAcceptedKey)
         showPrivacyDisclosure = false
+        #if os(iOS)
+        DirectPushRegistration.requestPermissionIfNeeded()
+        #endif
         guard phase == .idle, !dialIsConnected else { return }
         Task { await toggleConnectionAsync() }
     }
@@ -3201,7 +3720,7 @@ public final class VPNConnectionModel: ObservableObject {
                     userInfo: [NSLocalizedDescriptionKey: "\(error.localizedDescription)\n\(disconnectHint)"]
                 ))
             } else {
-                await cancelPendingConnection(showError: true, error: error)
+            await cancelPendingConnection(showError: true, error: error)
             }
         }
     }
@@ -3366,8 +3885,8 @@ public final class VPNConnectionModel: ObservableObject {
         if let pick = resolveAutoOutboundPick(from: groups) {
             next = pick
         } else {
-            let selectable = groups.filter { $0.selectable }
-            guard let group = selectable.first(where: { $0.type == "selector" }) ?? selectable.first else { return }
+        let selectable = groups.filter { $0.selectable }
+        guard let group = selectable.first(where: { $0.type == "selector" }) ?? selectable.first else { return }
             if group.selected == "auto", let pick = resolveAutoOutboundPick(from: groups) {
                 next = pick
             } else if !group.selected.isEmpty, group.selected != "auto" {
@@ -3412,11 +3931,11 @@ public final class VPNConnectionModel: ObservableObject {
 
         var delays: [String: Int] = [:]
         if let iterator = group.getItems() {
-            while iterator.hasNext() {
-                guard let item = iterator.next() else { continue }
-                let delay = Int(item.urlTestDelay)
-                if delay > 0 { delays[item.tag] = delay }
-            }
+        while iterator.hasNext() {
+            guard let item = iterator.next() else { continue }
+            let delay = Int(item.urlTestDelay)
+            if delay > 0 { delays[item.tag] = delay }
+        }
         }
         // urltest `auto` holds the real per-country delays used for selection.
         if let auto = groups.first(where: { $0.tag == "auto" }), let iterator = auto.getItems() {
@@ -3518,7 +4037,7 @@ public final class VPNConnectionModel: ObservableObject {
               let connectedDate = environments?.extensionProfile?.connectedDate
         else {
             if runtimeText != "00:00:00" {
-                runtimeText = "00:00:00"
+            runtimeText = "00:00:00"
             }
             lastPeriodicURLTestAt = nil
             return

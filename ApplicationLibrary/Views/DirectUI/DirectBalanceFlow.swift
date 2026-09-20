@@ -197,6 +197,10 @@ public final class DirectBalanceFlow: ObservableObject {
         return max(0, need - balanceUSDCents)
     }
 
+    public func applyMeBalance(usdCents: Int) {
+        balanceUSDCents = max(0, usdCents)
+    }
+
     public func refresh() async {
         guard !isLoadingBalance else { return }
         isLoadingBalance = true

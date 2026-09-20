@@ -83,16 +83,24 @@ private struct OptionPills: View {
     }
 }
 
-private struct SheetScaffold<Content: View>: View {
+struct SheetScaffold<Content: View>: View {
     let kicker: String
     let title: String
     let close: () -> Void
+    var embedsScroll: Bool = true
     let content: Content
 
-    init(kicker: String, title: String, close: @escaping () -> Void, @ViewBuilder content: () -> Content) {
+    init(
+        kicker: String,
+        title: String,
+        close: @escaping () -> Void,
+        embedsScroll: Bool = true,
+        @ViewBuilder content: () -> Content
+    ) {
         self.kicker = kicker
         self.title = title
         self.close = close
+        self.embedsScroll = embedsScroll
         self.content = content()
     }
 
@@ -123,14 +131,19 @@ private struct SheetScaffold<Content: View>: View {
             .overlay(alignment: .bottom) { Hairline() }
             .background(DS.paper)
 
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    content
+            if embedsScroll {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        content
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                    .padding(.bottom, 28)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 14)
-                .padding(.bottom, 28)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         .background(DS.paper.ignoresSafeArea())

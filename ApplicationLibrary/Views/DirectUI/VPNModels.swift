@@ -3,16 +3,27 @@ import Library
 
 #if os(iOS)
 
+/// Segment on bot login: 6-digit code vs Telegram approve/deny.
+public enum CheckoutAuthBotMode: String, CaseIterable, Hashable {
+    case code = "Код"
+    case confirm = "Подтверждение"
+}
+
+public enum SocialAuthKind: String, Hashable {
+    case apple
+    case google
+}
+
 public enum AppTab: Int, CaseIterable {
     case home = 1
-    case locations
+    case plans
     case management
     case profile
 
     public var title: String {
         switch self {
         case .home: "Главная"
-        case .locations: "Локации"
+        case .plans: "Тарифы"
         case .management: "Управление"
         case .profile: "Профиль"
         }
@@ -41,8 +52,10 @@ public enum DetailPage: Equatable {
     case tunnelSettings
     case onDemandSettings
     case accessChoice
-    // freeAccess removed — free-via-ads abandoned; tariffs live under premiumPlans
+    // freeAccess removed — free-via-ads abandoned; tariffs live under premiumPlans / plans tab
     case premiumPlans
+    /// Full locations catalog (opened from home / payment — not a navbar tab).
+    case locations
     case planConstructor
     case payment
     case balanceAccount
@@ -71,6 +84,42 @@ public enum AccessSource: Equatable {
     case free
     case premium
     case imported(Int64)
+}
+
+/// Limited-location traffic cap shown on Home / picker (filled by local backend hooks).
+public struct DirectLocationCap: Equatable, Identifiable {
+    public var id: String { (squadUuid ?? title ?? UUID().uuidString) }
+    public var squadUuid: String?
+    public var title: String?
+    public var capMode: String?
+    public var capGb: Double?
+    public var usedGb: Double?
+    public var remainingGb: Double?
+    public var exhausted: Bool?
+    public var available: Bool?
+    public var unavailableReason: String?
+
+    public init(
+        squadUuid: String? = nil,
+        title: String? = nil,
+        capMode: String? = nil,
+        capGb: Double? = nil,
+        usedGb: Double? = nil,
+        remainingGb: Double? = nil,
+        exhausted: Bool? = nil,
+        available: Bool? = nil,
+        unavailableReason: String? = nil
+    ) {
+        self.squadUuid = squadUuid
+        self.title = title
+        self.capMode = capMode
+        self.capGb = capGb
+        self.usedGb = usedGb
+        self.remainingGb = remainingGb
+        self.exhausted = exhausted
+        self.available = available
+        self.unavailableReason = unavailableReason
+    }
 }
 
 public enum PaymentMethod: String, CaseIterable, Codable {
@@ -151,6 +200,43 @@ public struct DirectAppCatalog: Equatable {
     public var addons: DirectPricingSettings?
     /// Period day → multiplier for preset tariff scaling (30/90/180/365).
     public var monthMultipliers: [Int: Double]
+    /// When true, clients below `iosMinVersion`/`iosMinBuild` are hard-blocked.
+    public var iosForceUpdate: Bool
+    /// Soft/hard gate from the app catalog — block clients below this marketing version.
+    public var iosMinVersion: String?
+    /// Optional build gate paired with `iosMinVersion` (e.g. block 1.0.11 build 112).
+    public var iosMinBuild: Int?
+    /// Latest marketing version for the force-update UI ("ДОСТУПНА").
+    public var iosLatestVersion: String?
+    public var iosLatestBuild: Int?
+    /// App Store / TestFlight URL. Falls back to the public App Store listing.
+    public var iosUpdateURL: String?
+
+    public init(
+        currency: String,
+        tariffs: [DirectAppTariff],
+        constructor: DirectPricingSettings?,
+        addons: DirectPricingSettings?,
+        monthMultipliers: [Int: Double],
+        iosForceUpdate: Bool = false,
+        iosMinVersion: String? = nil,
+        iosMinBuild: Int? = nil,
+        iosLatestVersion: String? = nil,
+        iosLatestBuild: Int? = nil,
+        iosUpdateURL: String? = nil
+    ) {
+        self.currency = currency
+        self.tariffs = tariffs
+        self.constructor = constructor
+        self.addons = addons
+        self.monthMultipliers = monthMultipliers
+        self.iosForceUpdate = iosForceUpdate
+        self.iosMinVersion = iosMinVersion
+        self.iosMinBuild = iosMinBuild
+        self.iosLatestVersion = iosLatestVersion
+        self.iosLatestBuild = iosLatestBuild
+        self.iosUpdateURL = iosUpdateURL
+    }
 }
 
 public struct DirectAppTariff: Identifiable, Equatable {
@@ -417,11 +503,12 @@ public enum VPNServerNameParser {
         "TW", // TimeWeb
     ]
 
-    /// Tokens that must never become a country code (Wi-Fi → Fi → Finland, LTE, etc.).
+    /// Tokens that must not be mistaken for ISO country codes (e.g. Wi-Fi → `Fi` → Finland).
+    /// Do NOT treat `5g`/`lte` as noise — they are valid Remnawave location labels.
     private static let nonCountryNoiseTokens: Set<String> = [
-        "wi", "fi", "wifi", "lte", "5g", "4g", "3g", "tcp", "udp", "tls", "ws", "http", "https",
+        "wi", "fi", "wifi", "tcp", "udp", "tls", "ws", "http", "https",
         "vpn", "vip", "os", "tv", "ip", "v2", "v3", "x2", "x3", "cdn", "bgp", "asn",
-        "безлим", "лимит", "unlimited", "limit", "mobile", "mobiledata",
+        "безлим", "лимит", "unlimited", "limit", "mobiledata",
     ]
 
     public static func parse(tag: String, groupTag: String = "proxy", ping: Int = 0, load: Int = 0) -> VPNServer {
@@ -525,8 +612,10 @@ public enum VPNServerNameParser {
             cityRaw = remaining[0]
             countryRaw = countryName(for: countryCode) ?? remaining[0]
         } else {
-            cityRaw = tag
-            countryRaw = "Server"
+            // Keep the human label (e.g. «5G») instead of a useless «Server» title.
+            let fallbackLabel = working.isEmpty ? tag : working
+            cityRaw = fallbackLabel
+            countryRaw = countryName(for: countryCode) ?? fallbackLabel
         }
 
         if countryCode.isEmpty {

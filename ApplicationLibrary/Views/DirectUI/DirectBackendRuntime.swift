@@ -13,8 +13,9 @@ public enum DirectBackendRuntime {
 
     public static var ownedHosts: () -> [String] = { [] }
     public static var fetchLocations: () async throws -> [DirectLocationRecord] = { [] }
+    /// Token presence only — never authenticate from the legacy bool alone.
     public static var isAuthenticated: () -> Bool = {
-        UserDefaults.standard.bool(forKey: "vpndirect.authenticated")
+        !(UserDefaults.standard.string(forKey: "vpndirect.session.token") ?? "").isEmpty
     }
 
     public static var startCheckout: ((VPNConnectionModel) async -> Void)?
@@ -33,6 +34,10 @@ public enum DirectBackendRuntime {
     public static var deleteAccount: ((VPNConnectionModel) async throws -> Void)?
     public static var refreshAccount: ((VPNConnectionModel) async -> Void)?
     public static var bootstrapSession: ((VPNConnectionModel) async -> Void)?
+    /// Refresh limited-location caps into `model.locationCaps` (local hooks only).
+    public static var refreshLocationCaps: ((VPNConnectionModel) async -> Void)?
+    /// Report currently selected limited squad for metering (local hooks only).
+    public static var reportActiveLocation: ((String?) async -> Void)?
     public static var sendEmailCode: ((VPNConnectionModel, String) async -> Void)?
     public static var resendEmailCode: ((VPNConnectionModel) async -> Void)?
     public static var verifyEmailCode: ((VPNConnectionModel) async -> Void)?

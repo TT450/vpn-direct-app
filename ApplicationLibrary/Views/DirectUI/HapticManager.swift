@@ -9,7 +9,7 @@ public enum HapticEvent: Hashable {
     case touchDown, touchUp, navigation, back, tabChanged, selection
     case serverSelected, favoriteAdded, favoriteRemoved
     case toggleOn, toggleOff, sheetPresented, sheetDismissed, menuOpened, menuClosed
-    case expand, collapse, swipeThreshold
+    case expand, collapse, swipeThreshold, scrollTick
     case copied, shared, saved, imported, deleted, deviceRemoved, promoApplied, balanceChanged
     case warning, error, networkError, loading, refreshStarted, refreshCompleted, dataArrived
     case validationSuccess, validationFailure, authStarted, authSuccess
@@ -51,9 +51,9 @@ public final class HapticManager {
     public func play(_ event: HapticEvent) {
         guard isEnabled else { return }
         let now = CACurrentMediaTime()
-        let perEventWindow: CFTimeInterval = event == .selection || event == .swipeThreshold ? 0.07 : 0.12
+        let perEventWindow: CFTimeInterval = event == .selection || event == .swipeThreshold || event == .scrollTick ? 0.05 : 0.12
         guard now - (lastPlayedAt[event] ?? 0) >= perEventWindow else { return }
-        if event != .touchDown && event != .touchUp && now - lastGlobalAt < 0.035 { return }
+        if event != .touchDown && event != .touchUp && event != .scrollTick && now - lastGlobalAt < 0.035 { return }
         lastPlayedAt[event] = now; lastGlobalAt = now
         if UIAccessibility.isReduceMotionEnabled { playReduced(event); prepareFeedbackGenerators(); return }
         switch event {
@@ -73,6 +73,7 @@ public final class HapticManager {
         case .expand: playPattern([(0.00,0.20,0.18),(0.06,0.40,0.36)], fallback:{ impactLight.impactOccurred(intensity:0.40) })
         case .collapse: playPattern([(0.00,0.40,0.36),(0.07,0.18,0.16)], fallback:{ impactSoft.impactOccurred(intensity:0.38) })
         case .swipeThreshold: impactRigid.impactOccurred(intensity:0.38)
+        case .scrollTick: impactRigid.impactOccurred(intensity:0.72)
         case .copied: playPattern([(0.00,0.28,0.25),(0.07,0.62,0.58)], fallback:{ notification.notificationOccurred(.success) })
         case .shared: playPattern([(0.00,0.22,0.20),(0.08,0.46,0.42),(0.16,0.30,0.28)], fallback:{ notification.notificationOccurred(.success) })
         case .saved: playPattern([(0.00,0.30,0.26),(0.075,0.56,0.54)], fallback:{ notification.notificationOccurred(.success) })
@@ -110,7 +111,7 @@ public final class HapticManager {
         case .error, .networkError, .validationFailure, .paymentFailed: notification.notificationOccurred(.error)
         case .warning: notification.notificationOccurred(.warning)
         case .vpnConnected, .vpnSwitched, .purchaseCompleted, .authSuccess, .copied, .shared, .saved, .imported, .promoApplied, .refreshCompleted, .dataArrived: notification.notificationOccurred(.success)
-        case .selection, .tabChanged, .swipeThreshold: selection.selectionChanged()
+        case .selection, .tabChanged, .swipeThreshold, .scrollTick: selection.selectionChanged()
         case .touchDown, .touchUp, .back, .sheetDismissed, .menuClosed, .toggleOff, .vpnDisconnected, .deleted, .deviceRemoved, .favoriteRemoved, .collapse, .paymentCancelled: impactSoft.impactOccurred(intensity:0.35)
         default: impactLight.impactOccurred(intensity:0.45)
         }
@@ -151,9 +152,34 @@ private struct HapticScrollThresholdModifier: ViewModifier {
         }.onEnded { _ in crossedFirst=false; crossedSecond=false })
     }
 }
+
+/// Dense rigid ticks while dragging a vertical list — feels like heavy scroll.
+private struct HapticHeavyScrollModifier: ViewModifier {
+    var step: CGFloat = 42
+    @State private var lastTickDistance: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content.simultaneousGesture(
+            DragGesture(minimumDistance: 8)
+                .onChanged { value in
+                    guard abs(value.translation.height) >= abs(value.translation.width) * 0.65 else { return }
+                    let distance = abs(value.translation.height)
+                    if distance - lastTickDistance >= step {
+                        lastTickDistance = distance
+                        HapticManager.shared.play(.scrollTick)
+                    }
+                }
+                .onEnded { _ in
+                    lastTickDistance = 0
+                }
+        )
+    }
+}
+
 public extension View {
     func hapticTouchSurface() -> some View { modifier(HapticTouchSurfaceModifier()) }
     func hapticScrollThresholds() -> some View { modifier(HapticScrollThresholdModifier()) }
+    func hapticHeavyScroll(step: CGFloat = 42) -> some View { modifier(HapticHeavyScrollModifier(step: step)) }
     func hapticToggle(_ value: Bool) -> some View { onChangeCompat(of:value) { HapticManager.shared.play($0 ? .toggleOn : .toggleOff) } }
     func hapticSelection<Value:Equatable>(_ value: Value) -> some View { onChangeCompat(of:value) { _ in HapticManager.shared.play(.selection) } }
 }

@@ -26,6 +26,17 @@ public enum AutoSubscriptionImporter {
         return value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Last non-empty path segment — Remnawave short UUID / sub token.
+    public static func subscriptionToken(from rawURL: String) -> String? {
+        let normalized = normalizeImportURL(rawURL)
+        guard let url = URL(string: normalized) else { return nil }
+        let parts = url.path.split(separator: "/").map(String.init).filter { !$0.isEmpty }
+        guard let last = parts.last?.trimmingCharacters(in: .whitespacesAndNewlines), !last.isEmpty else {
+            return nil
+        }
+        return last.lowercased()
+    }
+
     public static func importIfNeeded(url: String, environments: ExtensionEnvironments) async throws -> Profile? {
         let normalized = normalizeImportURL(url)
         guard VLESSConfigBuilder.isVLESSLink(normalized)
@@ -36,7 +47,25 @@ public enum AutoSubscriptionImporter {
         }
 
         let profiles = try await ProfileManager.list()
-        if let existing = profiles.first(where: { ($0.remoteURL ?? "").caseInsensitiveCompare(normalized) == .orderedSame }) {
+        let token = subscriptionToken(from: normalized)
+
+        let existing =
+            profiles.first(where: { ($0.remoteURL ?? "").caseInsensitiveCompare(normalized) == .orderedSame })
+            ?? profiles.first(where: { profile in
+                guard let token,
+                      let existingToken = subscriptionToken(from: profile.remoteURL ?? "")
+                else { return false }
+                return existingToken == token
+            })
+
+        if let existing {
+            // Same sub token on a different host (remna vs app.vpsperviy) — retarget URL.
+            if (existing.remoteURL ?? "").caseInsensitiveCompare(normalized) != .orderedSame {
+                existing.remoteURL = normalized
+                try await ProfileManager.update(existing)
+            }
+            // Always refresh — panel hosts/squads change without URL changes.
+            try await existing.updateRemoteProfile()
             await SharedPreferences.selectedProfileID.set(existing.mustID)
             await MainActor.run {
                 environments.selectedProfileUpdate.send()

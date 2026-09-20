@@ -55,13 +55,13 @@ struct DirectAccountView: View {
                     }
 
                     Button {
-                        model.openDetail(.authBot)
+                        model.requestAuthDestination(.authBot)
                     } label: {
                         row("Код из бота", "Вход в аккаунт @vpndirectbot")
                     }
 
                     Button {
-                        model.openDetail(.authPhone)
+                        model.requestAuthDestination(.authPhone)
                     } label: {
                         row("По номеру телефона", "Отдельный app-аккаунт")
                     }

@@ -1,3 +1,12 @@
+## [1.0.11.153] — 2026-09-20
+
+### Auth hardening + logout wipe (build 153)
+
+- Logout/delete/401 clears premium entitlement, traffic, location caps, and Direct sub URL
+- Session token + device id in Keychain; bot-confirm poll cancellation; token-only auth
+- Account-switch warning for all login methods; email OTP resend cooldown
+- TestFlight **1.0.11 (153)**
+
 # Changelog
 
 All notable changes to VPN Direct (Apple client) are documented here.

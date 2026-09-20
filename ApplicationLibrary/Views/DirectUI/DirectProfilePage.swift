@@ -5,11 +5,10 @@ import SwiftUI
 
 struct DirectProfilePage: View {
     @ObservedObject var model: VPNConnectionModel
+    @ObservedObject private var balanceFlow = DirectBalanceFlow.shared
     @State private var utility: UtilityPage?
 
     private enum UtilityPage: String, Identifiable {
-        case devices
-        case payments
         case promo
         case support
         case linking
@@ -27,10 +26,8 @@ struct DirectProfilePage: View {
     }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                PageHeading(kicker: "АККАУНТ / ALD–0248", title: "Профиль", subtitle: "Управление приложением и безопасностью")
-
                 HStack(spacing: 16) {
                     Text(model.isDirectAuthenticated ? "D" : "A")
                         .font(.system(size: 30, weight: .medium, design: .monospaced))
@@ -59,7 +56,6 @@ struct DirectProfilePage: View {
                 .frame(height: 116)
                 .background(DS.ink)
                 .foregroundStyle(.white)
-                .padding(.top, 28)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     if model.isDirectAuthenticated {
@@ -70,86 +66,74 @@ struct DirectProfilePage: View {
                     HapticManager.shared.play(.selection)
                 }
 
-                HStack(spacing: 0) {
-                    ProfileStat(label: "ПОДПИСОК", value: String(format: "%02d", model.subscriptions.count))
-                    ProfileStat(label: "УСТРОЙСТВ", value: deviceCountLabel)
-                    ProfileStat(label: "ЗАЩИЩЕНО", value: model.isProtected ? model.runtimeText : "00:00")
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 76)
-                .overlay(alignment: .bottom) { Hairline() }
-
-                sectionHeader("АККАУНТ", "01")
-                    .padding(.top, 18)
-                UtilityProfileRow(
-                    mark: "BAL",
-                    title: "Баланс",
-                    detail: DirectBalanceFlow.shared.balanceDisplay,
-                    accent: true
-                ) {
-                    model.openDetail(.balanceAccount)
-                }
-                UtilityProfileRow(mark: "DEV", title: "Устройства", detail: "Активные сеансы и лимит тарифа") {
-                    utility = .devices
-                }
-                UtilityProfileRow(mark: "PAY", title: "Платежи", detail: "История оплат и возвратов") {
-                    utility = .payments
-                }
-                UtilityProfileRow(mark: "PROMO", title: "Промокод", detail: "Активировать код от VPN Direct", accent: true) {
-                    utility = .promo
-                }
-                UtilityProfileRow(mark: "HELP", title: "Поддержка", detail: "Оплата, вход, подписка и подключение") {
-                    utility = .support
-                }
-                UtilityProfileRow(mark: "LINK", title: "Способы входа", detail: "Apple, email и бот — безопасная склейка") {
-                    utility = .linking
-                }
-
-                sectionHeader("НАСТРОЙКИ", "02")
-                    .padding(.top, 18)
-                VStack(spacing: 0) {
-                    ForEach(Array(settings.enumerated()), id: \.offset) { index, item in
-                        Button {
-                            model.openDetail(item.3)
-                        } label: {
-                            HStack(spacing: 13) {
-                                Text(String(format: "%02d", index + 1)).microLabel()
-                                Image(systemName: item.2).frame(width: 23)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(item.0).font(.system(size: 14, weight: .semibold))
-                                        .lineLimit(1)
-                                    Text(item.1).font(.system(size: 10)).foregroundStyle(DS.muted)
-                                        .lineLimit(2)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                Image(systemName: "arrow.right").font(.system(size: 11))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 67)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(HapticButtonStyle())
-                        .overlay(alignment: .bottom) { Hairline() }
-                    }
-                }
-                .padding(.top, 5)
-
-                sectionHeader("ЮРИДИЧЕСКАЯ ИНФОРМАЦИЯ", "03")
-                    .padding(.top, 18)
-                DirectLegalInformationSection(model: model)
-                    .padding(.top, 5)
+                balanceCard
+                    .padding(.top, 12)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, DS.pageTop)
+            .padding(.top, DS.pageTop)
+            .padding(.bottom, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DS.paper)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    sectionHeader("АККАУНТ", "01")
+                        .padding(.top, 10)
+                    UtilityProfileRow(mark: "PROMO", title: "Промокод", detail: "Активировать код от VPN Direct", accent: true) {
+                        utility = .promo
+                    }
+                    UtilityProfileRow(mark: "HELP", title: "Поддержка", detail: "Оплата, вход, подписка и подключение") {
+                        utility = .support
+                    }
+                    UtilityProfileRow(mark: "LINK", title: "Способы входа", detail: "Apple, email и бот — безопасная склейка") {
+                        utility = .linking
+                    }
+
+                    sectionHeader("НАСТРОЙКИ", "02")
+                        .padding(.top, 18)
+                    VStack(spacing: 0) {
+                        ForEach(Array(settings.enumerated()), id: \.offset) { index, item in
+                            Button {
+                                model.openDetail(item.3)
+                            } label: {
+                                HStack(spacing: 13) {
+                                    Text(String(format: "%02d", index + 1)).microLabel()
+                                    Image(systemName: item.2).frame(width: 23)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(item.0).font(.system(size: 14, weight: .semibold))
+                                            .lineLimit(1)
+                                        Text(item.1).font(.system(size: 10)).foregroundStyle(DS.muted)
+                                            .lineLimit(2)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    Image(systemName: "arrow.right").font(.system(size: 11))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 67)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(HapticButtonStyle())
+                            .overlay(alignment: .bottom) { Hairline() }
+                        }
+                    }
+                    .padding(.top, 5)
+
+                    sectionHeader("ЮРИДИЧЕСКАЯ ИНФОРМАЦИЯ", "03")
+                        .padding(.top, 18)
+                    DirectLegalInformationSection(model: model)
+                        .padding(.top, 5)
+                        .padding(.bottom, 28)
+                }
+                .padding(.horizontal, 20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DS.paper.ignoresSafeArea())
         .sheet(item: $utility) { page in
             Group {
                 switch page {
-                case .devices: DirectDevicesView(model: model)
-                case .payments: DirectPaymentHistoryView(model: model)
                 case .promo: DirectPromoView(model: model)
                 case .support: DirectSupportView()
                 case .linking: DirectAccountLinkingView(model: model)
@@ -159,11 +143,40 @@ struct DirectProfilePage: View {
             .tint(DS.ink)
             .modifier(DirectUtilitySheetChrome())
         }
+        .task {
+            await balanceFlow.refresh()
+        }
     }
 
-    private var deviceCountLabel: String {
-        let limit = model.hasPremiumEntitlement ? model.premiumDeviceLimit : model.selectedPlan.devices
-        return String(format: "%02d", max(1, min(limit, 99)))
+    private var balanceCard: some View {
+        Button {
+            HapticManager.shared.play(.selection)
+            model.openDetail(.balanceAccount)
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("БАЛАНС").microLabel(color: .white.opacity(0.42))
+                    Text(balanceFlow.balanceDisplay)
+                        .font(.system(size: 26, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                    Text("Пополнение и история")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.48))
+                }
+                Spacer(minLength: 8)
+                Text("USD")
+                    .microLabel(color: DS.acid)
+                    .frame(width: 48, height: 48)
+                    .overlay(Rectangle().stroke(DS.acid.opacity(0.5)))
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DS.ink)
+            .overlay(Rectangle().stroke(DS.acid.opacity(0.7)))
+        }
+        .buttonStyle(HapticButtonStyle())
     }
 
     private func sectionHeader(_ title: String, _ number: String) -> some View {
@@ -173,7 +186,6 @@ struct DirectProfilePage: View {
             Spacer()
         }
         .frame(height: 36)
-        .overlay(alignment: .top) { Hairline(color: DS.ink) }
     }
 }
 
@@ -225,23 +237,6 @@ private struct UtilityProfileRow: View {
         }
         .buttonStyle(HapticButtonStyle())
         .overlay(alignment: .bottom) { Hairline() }
-    }
-}
-
-private struct ProfileStat: View {
-    let label: String
-    let value: String
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(label).microLabel()
-            Text(value)
-                .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .padding(.leading, 12)
-        .overlay(alignment: .leading) { Hairline().frame(width: 1) }
     }
 }
 

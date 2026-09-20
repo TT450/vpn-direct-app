@@ -27,12 +27,16 @@ public struct VPNHomeView: View {
         GeometryReader { proxy in
             let chromeWidth = proxy.size.width
 
+            let showAppBar = model.detailPage != nil
+
             ZStack(alignment: .top) {
                 DS.paper.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Reserve space for the overlay app bar — header itself is not in this tree.
-                    Color.clear.frame(height: DirectChrome.appBarHeight)
+                    // App bar only on pushed detail pages — root tabs (Home/Plans/Management/Profile) are chrome-free.
+                    if showAppBar {
+                        Color.clear.frame(height: DirectChrome.appBarHeight)
+                    }
 
                     Group {
                         if let detailPage = model.detailPage {
@@ -73,6 +77,8 @@ public struct VPNHomeView: View {
                                 DirectAccessChoiceView(model: model)
                             case .premiumPlans:
                                 DirectPlansView(model: model)
+                            case .locations:
+                                DirectServersPage(model: model)
                             case .planConstructor:
                                 DirectConstructorView(model: model)
                             case .payment:
@@ -130,7 +136,7 @@ public struct VPNHomeView: View {
                                     activationPending: model.paymentActivationPending,
                                     openLocations: {
                                         model.closeDetail()
-                                        model.select(tab: .locations)
+                                        model.openChangeServer()
                                     },
                                     openHome: {
                                         model.closeDetail()
@@ -158,8 +164,8 @@ public struct VPNHomeView: View {
                             switch model.selectedTab {
                             case .home:
                                 DirectHomePage(model: model)
-                            case .locations:
-                                DirectServersPage(model: model)
+                            case .plans:
+                                DirectPlansView(model: model)
                             case .management:
                                 DirectManagementPage(model: model) {
                                     model.isMenuOpen = true
@@ -181,7 +187,7 @@ public struct VPNHomeView: View {
                 if model.isMenuOpen {
                     Color.black.opacity(0.12)
                         .ignoresSafeArea(edges: .bottom)
-                        .padding(.top, DirectChrome.appBarHeight)
+                        .padding(.top, showAppBar ? DirectChrome.appBarHeight : 0)
                         .contentShape(Rectangle())
                         .onTapGesture {
                             model.isMenuOpen = false
@@ -190,16 +196,31 @@ public struct VPNHomeView: View {
                         .zIndex(30)
 
                     addSubscriptionMenu
-                        .padding(.top, DirectChrome.appBarHeight + 4)
+                        .padding(.top, showAppBar ? DirectChrome.appBarHeight + 4 : 8)
                         .padding(.trailing, 16)
                         .zIndex(40)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                // Overlay app bar: width locked to container, never laid out with tab content.
-                appHeader
-                    .frame(width: chromeWidth)
-                    .zIndex(50)
+                // Overlay app bar only for detail stack (back + brand). Root tabs rely on bottom nav.
+                if showAppBar {
+                    appHeader
+                        .frame(width: chromeWidth)
+                        .zIndex(50)
+                }
+
+                if let force = model.forceUpdateRequirement {
+                    VPNDirectForceUpdateView(
+                        currentVersion: force.currentLabel,
+                        requiredVersion: force.requiredLabel,
+                        updateURL: force.updateURL
+                    )
+                    .ignoresSafeArea()
+                    .zIndex(200)
+                    .allowsHitTesting(true)
+                    .transition(.opacity)
+                    .accessibilityAddTraits(.isModal)
+                }
             }
         }
         .tint(DS.ink)
@@ -489,6 +510,8 @@ public struct VPNHomeView: View {
             }
         }
         .frame(height: DirectChrome.tabBarHeight)
+        .frame(maxWidth: .infinity)
+        .background(DS.paper)
         .contentShape(Rectangle())
         .overlay(alignment: .top) { Hairline() }
     }
@@ -585,8 +608,7 @@ public struct VPNHomeView: View {
 
     private func consumePlansDeepLinkIfNeeded() {
         guard VPNDirectDeepLink.consumePendingPlans() else { return }
-        model.selectedTab = .home
-        model.openDetail(.premiumPlans)
+        model.select(tab: .plans)
     }
 
     private func consumeAccountDeepLinkIfNeeded() {

@@ -58,7 +58,7 @@ struct DirectServersPage: View {
         }
     }
 
-    /// Same picker as home «смена сервера», under the page header + tariff actions.
+    /// Same picker as home «смена сервера», under the page header + ping.
     private var switchableBody: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
@@ -66,14 +66,14 @@ struct DirectServersPage: View {
                     .padding(.top, DS.pageTop)
                     .padding(.bottom, 16)
 
-                accessActions
+                pingAllButton
                     .padding(.bottom, 14)
             }
             .padding(.horizontal, 20)
 
             DirectServerPickerContent(
                 model: model,
-                serverSource: .liveDirect,
+                serverSource: .activeSubscription,
                 selectServer: { model.selectDirectLocation(serverID: $0) }
             )
         }
@@ -86,7 +86,7 @@ struct DirectServersPage: View {
                     .padding(.top, DS.pageTop)
                     .padding(.bottom, 16)
 
-                accessActions
+                pingAllButton
 
                 searchField
                     .padding(.top, 14)
@@ -173,71 +173,22 @@ struct DirectServersPage: View {
         "Список из каталога Direct. После покупки тарифа локации станут переключаемыми."
     }
 
-    private var accessActions: some View {
-        HStack(spacing: 8) {
-            Button {
-                model.openPremiumPlans(mode: .presets)
-            } label: {
-                accessOption(
-                    kicker: "ТАРИФЫ",
-                    title: "Готовые планы",
-                    detail: "START · PLUS · PRO",
-                    primary: false
-                )
-            }
-            .buttonStyle(HapticButtonStyle())
-
-            Button {
-                model.openPremiumPlans(mode: .constructor)
-            } label: {
-                accessOption(
-                    kicker: "КОНСТРУКТОР",
-                    title: "Собрать свой",
-                    detail: "ДНИ · УСТРОЙСТВА · ТРАФИК",
-                    primary: true
-                )
-            }
-            .buttonStyle(HapticButtonStyle())
-        }
-    }
-
-    private func accessOption(
-        kicker: String,
-        title: String,
-        detail: String,
-        primary: Bool
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .center, spacing: 6) {
-                Text(kicker)
-                    .font(.system(size: 8, weight: .bold, design: .monospaced))
-                    .foregroundStyle(primary ? DS.acid : DS.ink)
-                Spacer(minLength: 4)
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(primary ? DS.acid : DS.muted)
-            }
-
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(primary ? DS.paper : DS.ink)
-                .lineLimit(1)
-
-            Text(detail)
-                .font(.system(size: 8, weight: .medium, design: .monospaced))
-                .foregroundStyle(primary ? DS.paper.opacity(0.58) : DS.muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
-        .padding(.horizontal, 11)
-        .padding(.vertical, 10)
-        .background(primary ? DS.ink : DS.paper)
-        .overlay(Rectangle().stroke(primary ? DS.ink : DS.line, lineWidth: primary ? 1.5 : 1))
+    /// Full-width black ping control (same action as home «Обновить пинг»).
+    private var pingAllButton: some View {
+        DirectPingAllButton(model: model)
     }
 
     private var planStripDetail: String {
-        let count = canSwitch ? model.liveDirectServers.count : model.directServerItems.count
+        let count: Int
+        if canSwitch {
+            let servers = model.activeSubscription?.servers ?? model.liveDirectServers
+            count = servers.filter { server in
+                let id = server.id.lowercased()
+                return !id.isEmpty && id != "direct" && id != "auto"
+            }.count
+        } else {
+            count = model.directServerItems.count
+        }
         if canSwitch {
             return "\(count) локаций • можно сменить"
         }
@@ -281,14 +232,24 @@ struct DirectServersPage: View {
             }
 
             HStack(spacing: 12) {
-                FlagImage(code: server.countryCode, width: 36, height: 24)
+                FlagImage(
+                    code: server.countryCode,
+                    width: 36,
+                    height: 24,
+                    fallbackLabel: flagFallback(for: server)
+                )
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(server.country)
                         .font(.system(size: 19, weight: .semibold))
-                    Text(server.city)
+                    Text(quotaSubtitle(for: server))
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(DS.muted)
+                    if let used = usedFraction(for: server) {
+                        DirectLocationQuotaBar(usedFraction: used, height: 4)
+                            .padding(.top, 4)
+                            .frame(maxWidth: 220, alignment: .leading)
+                    }
                 }
 
                 Spacer()
@@ -339,14 +300,24 @@ struct DirectServersPage: View {
             model.openPremiumPlans(mode: .presets)
         } label: {
             HStack(spacing: 11) {
-                FlagImage(code: server.countryCode, width: 30, height: 20)
+                FlagImage(
+                    code: server.countryCode,
+                    width: 30,
+                    height: 20,
+                    fallbackLabel: flagFallback(for: server)
+                )
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(server.country)
                         .font(.system(size: 13, weight: .semibold))
-                    Text(server.city)
+                    Text(quotaSubtitle(for: server))
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(DS.muted)
+                    if let used = usedFraction(for: server) {
+                        DirectLocationQuotaBar(usedFraction: used, height: 3.5)
+                            .padding(.top, 2)
+                            .frame(maxWidth: 180, alignment: .leading)
+                    }
                 }
 
                 Spacer()
@@ -402,6 +373,38 @@ struct DirectServersPage: View {
         if server.latency < 50 { return "ОТЛИЧНО" }
         if server.latency < 100 { return "ХОРОШО" }
         return "СРЕДНЕ"
+    }
+
+    private func quotaSubtitle(for server: DirectServerItem) -> String {
+        if let cap = model.locationCap(serverID: server.id, locationLabel: server.country, city: server.city, country: server.country) {
+            let amount = VPNConnectionModel.formatTrafficCapGb(cap.capGb)
+            let exhausted = server.id.hasPrefix("exhausted:")
+                || cap.exhausted == true
+                || cap.available == false
+            if exhausted {
+                return "Лимит \(amount) исчерпан"
+            }
+            let used = VPNConnectionModel.formatTrafficUsedGb(cap.usedGb, cap: cap.capGb)
+            return "\(used) / \(amount)"
+        }
+        return String(localized: "Безлимитный")
+    }
+
+    private func usedFraction(for server: DirectServerItem) -> Double? {
+        model.locationQuotaUsedFraction(
+            serverID: server.id,
+            locationLabel: server.country,
+            city: server.city,
+            country: server.country
+        )
+    }
+
+    private func flagFallback(for server: DirectServerItem) -> String? {
+        let hay = "\(server.country) \(server.city) \(server.id)"
+        if hay.range(of: "5G", options: [.caseInsensitive, .diacriticInsensitive]) != nil {
+            return "5G"
+        }
+        return nil
     }
 }
 

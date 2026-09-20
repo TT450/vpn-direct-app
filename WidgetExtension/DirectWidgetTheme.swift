@@ -1,60 +1,46 @@
 import SwiftUI
 
-// MARK: - Aladdin × TheTochka palette
+// MARK: - Direct widget palette (matches DesignSystem: paper / ink / acid)
 
-enum AladdinWidgetTheme {
-    // Deep TheTochka red
-    static let redDeep = Color(red: 0.20, green: 0.015, blue: 0.025)
-    static let red = Color(red: 0.72, green: 0.025, blue: 0.055)
-    static let redBright = Color(red: 0.92, green: 0.055, blue: 0.085)
-
-    // Aladdin gold
-    static let gold = Color(red: 0.98, green: 0.73, blue: 0.25)
-    static let goldBright = Color(red: 1.0, green: 0.84, blue: 0.42)
+enum DirectWidgetTheme {
+    static let paper = Color(red: 0.93, green: 0.94, blue: 0.91)
+    static let ink = Color(red: 0.08, green: 0.09, blue: 0.08)
+    static let acid = Color(red: 0.66, green: 0.94, blue: 0.41)
+    static let muted = Color(red: 0.08, green: 0.09, blue: 0.08).opacity(0.45)
 
     static let white = Color.white
     static let secondaryText = Color.white.opacity(0.58)
     static let tertiaryText = Color.white.opacity(0.36)
 
-    // MARK: Background
-
     @ViewBuilder
     static func background() -> some View {
         ZStack {
+            ink
             LinearGradient(
                 stops: [
-                    .init(color: redDeep, location: 0),
-                    .init(color: Color(red: 0.38, green: 0.015, blue: 0.035), location: 0.48),
-                    .init(color: Color(red: 0.16, green: 0.008, blue: 0.018), location: 1),
+                    .init(color: ink, location: 0),
+                    .init(color: Color(red: 0.12, green: 0.14, blue: 0.12), location: 0.55),
+                    .init(color: ink, location: 1),
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-
             Circle()
-                .fill(redBright.opacity(0.18))
+                .fill(acid.opacity(0.12))
                 .frame(width: 130, height: 130)
                 .blur(radius: 38)
                 .offset(x: 62, y: -58)
-
             Circle()
-                .fill(gold.opacity(0.055))
+                .fill(paper.opacity(0.06))
                 .frame(width: 110, height: 110)
                 .blur(radius: 32)
                 .offset(x: -55, y: 60)
-
-            Circle()
-                .stroke(gold.opacity(0.08), lineWidth: 1)
-                .frame(width: 170, height: 170)
-                .offset(x: 55, y: 65)
         }
         .clipped()
     }
 }
 
-// MARK: - Magical power button
-
-struct AladdinPowerMedallion: View {
+struct DirectPowerMedallion: View {
     let connected: Bool
     let connecting: Bool
     let size: CGFloat
@@ -62,17 +48,13 @@ struct AladdinPowerMedallion: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(
-                    connected
-                        ? AladdinWidgetTheme.redBright.opacity(0.18)
-                        : AladdinWidgetTheme.gold.opacity(0.055)
-                )
+                .fill(connected ? DirectWidgetTheme.acid.opacity(0.18) : DirectWidgetTheme.paper.opacity(0.08))
                 .frame(width: size, height: size)
                 .blur(radius: size * 0.18)
 
             Circle()
                 .stroke(
-                    AladdinWidgetTheme.gold.opacity(connected ? 0.82 : 0.52),
+                    DirectWidgetTheme.acid.opacity(connected ? 0.90 : 0.42),
                     lineWidth: max(1, size * 0.025)
                 )
                 .frame(width: size * 0.84, height: size * 0.84)
@@ -81,8 +63,8 @@ struct AladdinPowerMedallion: View {
                 .fill(
                     RadialGradient(
                         colors: [
-                            AladdinWidgetTheme.redBright.opacity(connected ? 0.72 : 0.30),
-                            AladdinWidgetTheme.redDeep.opacity(0.95),
+                            DirectWidgetTheme.ink.opacity(0.2),
+                            DirectWidgetTheme.ink,
                         ],
                         center: .center,
                         startRadius: 1,
@@ -92,16 +74,16 @@ struct AladdinPowerMedallion: View {
                 .frame(width: size * 0.72, height: size * 0.72)
 
             Circle()
-                .stroke(AladdinWidgetTheme.gold.opacity(0.28), lineWidth: 1)
+                .stroke(DirectWidgetTheme.acid.opacity(0.28), lineWidth: 1)
                 .frame(width: size * 0.62, height: size * 0.62)
 
             if connecting {
                 ProgressView()
-                    .tint(AladdinWidgetTheme.goldBright)
+                    .tint(DirectWidgetTheme.acid)
             } else {
                 Image(systemName: connected ? "checkmark" : "power")
                     .font(.system(size: size * 0.22, weight: .bold))
-                    .foregroundStyle(AladdinWidgetTheme.goldBright)
+                    .foregroundStyle(DirectWidgetTheme.acid)
             }
         }
         .frame(width: size, height: size)
@@ -110,29 +92,25 @@ struct AladdinPowerMedallion: View {
     }
 }
 
-// MARK: - Small status dot
-
-struct AladdinStatusDot: View {
+struct DirectStatusDot: View {
     let connected: Bool
 
     var body: some View {
         HStack(spacing: 5) {
             Circle()
-                .fill(connected ? Color.green : Color.white.opacity(0.32))
+                .fill(connected ? DirectWidgetTheme.acid : Color.white.opacity(0.32))
                 .frame(width: 6, height: 6)
 
             Text(connected ? "ЗАЩИЩЕНО" : "НЕ ЗАЩИЩЕНО")
                 .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(AladdinWidgetTheme.secondaryText)
+                .foregroundStyle(DirectWidgetTheme.secondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
         }
     }
 }
 
-// MARK: - Gold action
-
-struct AladdinActionButton: View {
+struct DirectActionButton: View {
     let title: String
     let icon: String
 
@@ -144,14 +122,13 @@ struct AladdinActionButton: View {
                 .minimumScaleFactor(0.65)
         }
         .font(.system(size: 10, weight: .bold))
-        .foregroundStyle(AladdinWidgetTheme.goldBright)
+        .foregroundStyle(DirectWidgetTheme.acid)
         .frame(maxWidth: .infinity)
         .frame(height: 30)
-        .background(AladdinWidgetTheme.gold.opacity(0.10))
+        .background(DirectWidgetTheme.acid.opacity(0.10))
         .overlay {
-            RoundedRectangle(cornerRadius: 9)
-                .stroke(AladdinWidgetTheme.gold.opacity(0.34), lineWidth: 1)
+            Rectangle()
+                .stroke(DirectWidgetTheme.acid.opacity(0.34), lineWidth: 1)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 9))
     }
 }

@@ -39,6 +39,10 @@ struct MainView: View {
                 isShowingSplash = false
             }
             HapticManager.shared.play(.navigation)
+            // Prompt only after splash — system alert needs a visible key window.
+            #if os(iOS)
+            DirectPushRegistration.requestPermissionIfNeeded()
+            #endif
         }
     }
 

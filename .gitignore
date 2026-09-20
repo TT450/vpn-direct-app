@@ -29,17 +29,11 @@ AGENTS.md
 *.generated.json
 *.generated.conf
 
-# Swift package test build
-tests/VPNDirectParserPackage/.build/
-
-# Swift package test build
-/tests/fixtures/battle/cache/
-
-# Local agent ship logs / meta
-.ship_*
-
-.build/
-.build/**
+# HarmonyOS generated/native release artifacts
+/harmony/entry/src/main/cpp/prebuilt/
+/harmony/entry/build/
+/harmony/entry/.cxx/
+/harmony/build/
 
 # =============================================================================
 # Backend / Direct API / ops — NEVER GitHub (local + server only)
@@ -64,10 +58,20 @@ tests/VPNDirectParserPackage/.build/
 **/DirectBackend*.local.swift
 **/DirectBackendPrivate*.swift
 
+# Harmony local Direct backend (never GitHub)
+# DirectBackendLocal.ets is TRACKED (empty stub). Real hosts live in *.local.ets only.
+harmony/**/DirectBackendAPI.local.ets
+harmony/**/DirectBackendHooks.local.ets
+harmony/**/DirectBackend*.local.ets
+harmony/**/backend_private/**
+**/direct_backend.local.json
+
 # Google OAuth local plist (never GitHub)
 **/GoogleOAuth.local.plist
 **/client_*.apps.googleusercontent.com.plist
 
-# Local ASC / RevenueCat key material
+# Local ASC / RevenueCat key material — never under app source trees (Xcode sync copies them into the IPA)
 **/ApplicationLibrary/Views/DirectUI/secrets/
 **/SubscriptionKey_*.p8
+/private/
+/private/**

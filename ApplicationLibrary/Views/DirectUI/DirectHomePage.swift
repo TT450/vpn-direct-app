@@ -5,33 +5,49 @@ import SwiftUI
 struct DirectHomePage: View {
     @ObservedObject var model: VPNConnectionModel
     @State private var showRemoveImportedConfirmation = false
+    @State private var showSupport = false
+    @State private var showDevices = false
+    @State private var toastText: String?
+    @State private var renewBusy = false
+    @State private var locationListContentHeight: CGFloat = 0
+    @State private var locationListViewportHeight: CGFloat = 0
+
+    private let stroke = DS.line
+    private let accent = DS.green
+    private let accentSoft = DS.acid
+    private let danger = DS.danger
+    private let inkDark = DS.ink
 
     var body: some View {
-        VStack(spacing: 0) {
-            Text("DIRECT / VPN")
-                .microLabel()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.top, DS.pageTop)
-                .padding(.bottom, 7)
+        ZStack(alignment: .top) {
+            DS.paper.ignoresSafeArea()
 
-            header
-                .padding(.horizontal, 20)
-
-            Spacer(minLength: 0)
-
-            // Keep the connection dial completely unchanged.
-            DialView(isConnected: model.dialIsConnected, isBusy: model.isBusy) {
-                model.toggleConnection()
+            VStack(spacing: 0) {
+                vpnCard
+                    .padding(.bottom, 16)
+                locationHeader
+                locationList
+                    .padding(.top, 16)
+                Spacer(minLength: 0)
+                quickActions
             }
+            .padding(.horizontal, 19)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
 
-            Spacer(minLength: 0)
-
-            serverRow
-            if showsExternalSubscriptionControls {
-                controlsRow
+            if let toastText {
+                Text(toastText)
+                    .font(.system(size: 9, weight: .regular))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 11)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 32)
+                    .background(inkDark)
+                    .padding(.horizontal, 19)
+                    .padding(.top, 4)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(20)
             }
-            telemetryRow
         }
         .background(DS.paper.ignoresSafeArea())
         .overlay {
@@ -52,298 +68,650 @@ struct DirectHomePage: View {
             Button("Убрать", role: .destructive) {
                 model.removeImportedFromClient()
             }
-            Button("Отмена", role: .cancel) { }
+            Button("Отмена", role: .cancel) {}
         } message: {
             Text("Подписка останется в списке внешних, но на главной больше не будет активной.")
         }
+        .sheet(isPresented: $showSupport) {
+            DirectSupportView()
+                .background(DS.paper.ignoresSafeArea())
+                .modifier(DirectHomeUtilitySheetChrome())
+        }
+        .sheet(isPresented: $showDevices) {
+            DirectDevicesView(model: model)
+                .background(DS.paper.ignoresSafeArea())
+                .modifier(DirectHomeUtilitySheetChrome())
+        }
+        .task {
+            await model.refreshLocationCaps()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 20_000_000_000)
+                await model.refreshLocationCaps()
+            }
+        }
     }
 
-    private var header: some View {
-        VStack(spacing: 10) {
-            Button {
-                model.activeSheet = .connectionReport
-            } label: {
-                HStack(alignment: .center, spacing: 10) {
-                    Rectangle()
-                        .fill(statusBarColor)
-                        .frame(width: 4, height: 32)
+    // MARK: - VPN card
 
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(model.statusTitle)
-                            .font(.system(size: 27, weight: .semibold))
-                            .foregroundStyle(DS.ink)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
+    private var vpnCard: some View {
+        HStack(spacing: 0) {
+            statusBadge
 
-                        Text(model.statusSubtitle)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(DS.muted)
-                            .lineLimit(1)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 4) {
+                    Text("●")
+                        .font(.system(size: 8))
+                    Text(statusTitle)
+                }
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(statusColor)
+
+                Text(profileTitle)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(DS.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .padding(.leading, 10)
+
+            Spacer(minLength: 8)
+
+            DirectHomeToggleButton(
+                isOn: model.isProtected,
+                isBusy: model.isBusy
+            ) {
+                model.toggleConnection()
+            }
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 96)
+        .background(DS.paper)
+        .overlay(Rectangle().stroke(stroke, lineWidth: 1))
+    }
+
+    private var statusBadge: some View {
+        Group {
+            if isNativeDirectSubscription {
+                DirectHomeBrandMark(size: 47)
+            } else {
+                Text(providerInitial)
+                    .font(.system(size: 22, weight: .bold, design: .monospaced))
+                    .foregroundStyle(DS.acid)
+                    .frame(width: 47, height: 47)
+                    .background(DS.ink)
+            }
+        }
+        .frame(width: 47, height: 47)
+        .clipped()
+    }
+
+    private var isNativeDirectSubscription: Bool {
+        guard let sub = model.activeSubscription else {
+            // No imported profile yet — still our product surface (free/premium stubs).
+            return model.isNativeDirectSubscriptionActive || model.hasPremiumEntitlement || model.isFreeAccessActive
+        }
+        return DirectBuiltinProfile.isDirectOwned(sub.profile.remoteURL)
+    }
+
+    private var providerInitial: String {
+        let name = profileTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = name.first else { return "?" }
+        return String(first).uppercased()
+    }
+
+    private var statusTitle: String {
+        if model.isBusy {
+            switch model.phase {
+            case .connecting: return "Подключение…"
+            case .disconnecting: return "Отключение…"
+            case .switching: return "Смена сервера…"
+            case .idle: break
+            }
+        }
+        return model.isProtected ? "Подключено" : "Отключено"
+    }
+
+    private var statusColor: Color {
+        if model.isBusy { return Color.orange }
+        return model.isProtected ? accent : danger
+    }
+
+    private var profileTitle: String {
+        (model.activeSubscription?.name ?? "VPN Direct").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: - Quick actions
+
+    private var quickActions: some View {
+        GeometryReader { geo in
+            let gap: CGFloat = 7
+            // Wider cards (~3.6 visible), shorter strip — icon left, 2-line title right.
+            let cardWidth = max(96, (geo.size.width - gap * 3) / 3.6)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: gap) {
+                    DirectHomeAction(title: "Обновить\nпинг", icon: .refreshCw, busy: model.isPingingServers) {
+                        model.pingAllServers()
+                        toast("Обновляем пинг…")
                     }
+                    .frame(width: cardWidth)
 
-                    Spacer(minLength: 8)
+                    DirectHomeAction(
+                        title: "Обновить\nподписку",
+                        icon: .refreshCcw,
+                        busy: model.isRefreshingSubscription,
+                        disabled: !canUpdateSubscription
+                    ) {
+                        model.refreshActiveSubscription()
+                        toast("Обновляем подписку…")
+                    }
+                    .frame(width: cardWidth)
 
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(model.isProtected ? "ЗАЩИЩЕНО" : "ОЖИДАНИЕ")
-                            .microLabel(color: model.isProtected ? DS.green : DS.muted)
-                        HStack(spacing: 3) {
-                            Text("ОТЧЁТ")
-                                .microLabel(color: DS.ink)
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(DS.ink)
+                    DirectHomeAction(
+                        title: "Продлить\nподписку",
+                        icon: .calendar,
+                        busy: renewBusy,
+                        disabled: !isNativeDirectSubscription
+                    ) {
+                        renewBusy = true
+                        Task {
+                            await model.beginRenewCheckout()
+                            renewBusy = false
                         }
                     }
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(HapticButtonStyle())
+                    .frame(width: cardWidth)
 
-            Button {
-                model.activeSheet = .profiles
-            } label: {
-                HStack(spacing: 8) {
-                    Text("01")
-                        .microLabel(color: DS.muted)
-                        .frame(width: 18, alignment: .leading)
-
-                    Rectangle()
-                        .fill(DS.acid)
-                        .frame(width: 3, height: 13)
-
-                    Text("РЕЖИМ")
-                        .microLabel()
-
-                    Text(model.connectionMode.uppercased())
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundStyle(DS.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-
-                    Spacer(minLength: 8)
-
-                    Text("ПРОФИЛЬ")
-                        .microLabel(color: DS.green)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(DS.green)
-                }
-                .padding(.horizontal, 10)
-                .frame(height: 30)
-                .overlay(Rectangle().stroke(DS.line))
-            }
-            .buttonStyle(HapticButtonStyle())
-        }
-    }
-
-    private var serverRow: some View {
-        Button {
-            model.openChangeServer()
-        } label: {
-            HStack(spacing: 10) {
-                Text("02")
-                    .microLabel(color: DS.muted)
-                    .frame(width: 20, alignment: .leading)
-
-                serverBadge
-
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 5) {
-                        Text(model.usesAutoSelection ? "АВТО" : "СЕРВЕР")
-                            .microLabel(color: DS.green)
-                        Text("·")
-                            .microLabel(color: DS.muted)
-                        Text((model.activeSubscription?.name ?? "VPN DIRECT").uppercased())
-                            .microLabel()
-                            .lineLimit(1)
+                    DirectHomeAction(
+                        title: "Контроль\nустройств",
+                        icon: .smartphone,
+                        disabled: !isNativeDirectSubscription
+                    ) {
+                        showDevices = true
                     }
+                    .frame(width: cardWidth)
 
-                    Text(serverSubtitle)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(DS.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                }
-
-                Spacer(minLength: 5)
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(model.activeServer == nil ? DS.muted : DS.green)
-                            .frame(width: 5, height: 5)
-                        Text(model.activeServer?.pingLabel ?? "— MS")
-                            .microLabel(color: DS.ink)
+                    DirectHomeAction(
+                        title: "Убрать\nподписку",
+                        icon: .x,
+                        disabled: !canSoftRemove
+                    ) {
+                        showRemoveImportedConfirmation = true
                     }
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(DS.muted)
+                    .frame(width: cardWidth)
+
+                    DirectHomeAction(title: "Режим\nподключения", icon: .slidersHorizontal) {
+                        model.activeSheet = .profiles
+                    }
+                    .frame(width: cardWidth)
+
+                    DirectHomeAction(
+                        title: "Поддержка\nVPNDirect",
+                        icon: .messagesSquare,
+                        disabled: !isNativeDirectSubscription
+                    ) {
+                        showSupport = true
+                    }
+                    .frame(width: cardWidth)
                 }
-            }
-            .padding(.horizontal, 20)
-            .frame(height: 58)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(HapticButtonStyle())
-        .overlay(alignment: .top) { Hairline() }
-        .overlay(alignment: .bottom) { Hairline() }
-    }
-
-    private var serverBadge: some View {
-        Group {
-            if model.usesAutoSelection {
-                Text("A")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .frame(width: 28, height: 28)
-                    .background(DS.ink)
-                    .foregroundStyle(DS.acid)
-            } else if let server = model.activeServer {
-                FlagImage(code: server.countryCode, width: 28, height: 20)
-            } else {
-                Text("A")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .frame(width: 28, height: 28)
-                    .background(DS.ink)
-                    .foregroundStyle(DS.acid)
+                .padding(.leading, 19)
+                .padding(.trailing, 19)
             }
         }
+        .frame(height: 40)
+        .padding(.horizontal, -19)
+        .padding(.top, 8)
     }
 
-    private var controlsRow: some View {
-        HStack(spacing: 0) {
-            compactControl(
-                icon: "arrow.clockwise",
-                title: model.isRefreshingSubscription ? "..." : "ОБНОВИТЬ",
-                disabled: !canUpdate || model.isRefreshingSubscription
-            ) {
-                model.refreshActiveSubscription()
-            }
+    // MARK: - Locations
 
-            controlDivider
-
-            compactControl(icon: "arrow.left.arrow.right", title: "ПОДПИСКА") {
-                model.openChangeSubscription()
-            }
-
-            controlDivider
-
-            compactControl(icon: "location.north", title: "СЕРВЕР") {
-                model.openChangeServer()
-            }
-
-            controlDivider
-
-            compactControl(icon: "minus", title: "УБРАТЬ", disabled: !canSoftRemove, destructive: true) {
-                showRemoveImportedConfirmation = true
-            }
-        }
-        .frame(height: 47)
-        .background(DS.panel.opacity(0.22))
-        .overlay(Rectangle().stroke(DS.line))
-    }
-
-    private var controlDivider: some View {
-        Rectangle()
-            .fill(DS.line)
-            .frame(width: 1, height: 27)
-    }
-
-    private func compactControl(
-        icon: String,
-        title: String,
-        disabled: Bool = false,
-        destructive: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(disabled ? DS.muted.opacity(0.35) : (destructive ? DS.danger : DS.ink))
-
-                Text(title)
-                    .font(.system(size: 7.5, weight: .bold, design: .monospaced))
-                    .foregroundStyle(disabled ? DS.muted.opacity(0.35) : DS.muted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.55)
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(HapticButtonStyle())
-        .disabled(disabled)
-    }
-
-    private var telemetryRow: some View {
-        HStack(spacing: 0) {
-            telemetryCell(value: "\(model.trafficText) \(model.trafficUnit)", label: "СЕГОДНЯ")
-            telemetryDivider
-            telemetryCell(value: model.isProtected ? model.runtimeText : "00:00:00", label: "В СЕТИ")
-            telemetryDivider
-            telemetryCell(value: "\(model.subscriptionTrafficText) \(model.subscriptionTrafficUnit)", label: "ОСТАЛОСЬ")
-        }
-        .frame(height: 50)
-        .overlay(alignment: .bottom) { Hairline() }
-    }
-
-    private var telemetryDivider: some View {
-        Rectangle()
-            .fill(DS.line)
-            .frame(width: 1, height: 28)
-    }
-
-    private func telemetryCell(value: String, label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+    private var locationHeader: some View {
+        HStack {
+            Text("Выбор локации")
+                .font(.system(size: 18, weight: .bold))
+                .kerning(-0.45)
                 .foregroundStyle(DS.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.55)
-            Text(label)
-                .font(.system(size: 6.5, weight: .bold, design: .monospaced))
-                .foregroundStyle(DS.muted)
+            Spacer(minLength: 8)
+            Button {
+                model.openChangeServer()
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Все локации")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(DS.ink)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(accent)
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 38)
+                .background(DS.paper)
+                .overlay(Rectangle().stroke(stroke, lineWidth: 1.5))
+            }
+            .buttonStyle(HapticButtonStyle())
+        }
+        .frame(height: 44)
+    }
+
+    private var homeServers: [VPNServer] {
+        let all = model.activeSubscription?.servers ?? []
+        let pinnedID = model.pinnedLocationServer?.id
+        let rest = all.filter { $0.id != pinnedID }
+        // Mode card + pinned + up to 9 more on home.
+        return Array(rest.prefix(9))
+    }
+
+    private var locationList: some View {
+        // Require clear overflow before enabling edge fade — otherwise the first
+        // row sits under the top gradient even when the list does not scroll.
+        let canScroll = locationListContentHeight > locationListViewportHeight + 28
+        let pinned = model.pinnedLocationServer
+        return ScrollView(showsIndicators: false) {
+            VStack(spacing: 7) {
+                DirectHomeLocationRow(
+                    title: model.connectionModeDisplayTitle,
+                    subtitle: model.connectionModeDisplaySubtitle,
+                    ping: model.activeServer?.pingLabel ?? "— MS",
+                    flagCode: nil,
+                    useGlobe: true,
+                    selected: true
+                ) {
+                    model.activeSheet = .profiles
+                    toast("Режим: \(model.connectionModeDisplayTitle)")
+                }
+
+                if let pinned {
+                    DirectHomeLocationRow(
+                        title: pinned.locationLabel,
+                        subtitle: model.locationQuotaSubtitle(for: pinned),
+                        ping: pinned.pingLabel,
+                        flagCode: pinned.countryCode,
+                        flagFallback: model.flagFallbackLabel(for: pinned),
+                        useGlobe: false,
+                        selected: true,
+                        exhausted: model.isLocationCapExhausted(pinned),
+                        usedFraction: model.locationQuotaUsedFraction(for: pinned)
+                    ) {
+                        model.select(serverID: pinned.id)
+                        toast("Локация: \(pinned.locationLabel)")
+                    }
+                }
+
+                ForEach(homeServers) { server in
+                    DirectHomeLocationRow(
+                        title: server.locationLabel,
+                        subtitle: model.locationQuotaSubtitle(for: server),
+                        ping: server.pingLabel,
+                        flagCode: server.countryCode,
+                        flagFallback: model.flagFallbackLabel(for: server),
+                        useGlobe: false,
+                        selected: false,
+                        exhausted: model.isLocationCapExhausted(server),
+                        usedFraction: model.locationQuotaUsedFraction(for: server)
+                    ) {
+                        model.select(serverID: server.id)
+                        toast("Локация: \(server.locationLabel)")
+                    }
+                }
+            }
+            .padding(.top, 1)
+            .padding(.trailing, 1)
+            .padding(.bottom, canScroll ? 10 : 8)
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: DirectHomeLocationContentHeightKey.self,
+                        value: geo.size.height
+                    )
+                }
+            )
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 2)
-    }
-
-    private var serverSubtitle: String {
-        guard model.activeSubscription != nil else { return "Выберите подписку" }
-        if model.usesAutoSelection {
-            if let server = model.activeServer {
-                return "Сейчас: \(server.locationLabel)"
+        .frame(maxHeight: .infinity)
+        .clipped()
+        .hapticHeavyScroll(step: 36)
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: DirectHomeLocationViewportHeightKey.self,
+                    value: geo.size.height
+                )
             }
-            return model.isProtected ? "Сейчас: определяем маршрут…" : "Автовыбор маршрута"
-        }
-        guard let server = model.activeServer else { return "Нет серверов" }
-        return server.locationLabel
+        )
+        .onPreferenceChange(DirectHomeLocationContentHeightKey.self) { locationListContentHeight = $0 }
+        .onPreferenceChange(DirectHomeLocationViewportHeightKey.self) { locationListViewportHeight = $0 }
+        .mask(
+            Group {
+                if canScroll {
+                    // Fade only the bottom edge — never the first location card.
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black, location: 0.90),
+                            .init(color: .clear, location: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                } else {
+                    Color.black
+                }
+            }
+        )
     }
 
-    private var statusBarColor: Color {
-        switch model.phase {
-        case .connecting: Color.orange
-        case .disconnecting: Color.orange.opacity(0.85)
-        case .switching: DS.acid
-        case .idle: model.isProtected ? DS.green : DS.danger
-        }
-    }
+    // MARK: - Utility helpers
 
-    /// Нижний блок (обновить / подписка / сервер / убрать) — только для внешней подписки.
-    private var showsExternalSubscriptionControls: Bool {
+    private var canSoftRemove: Bool {
         guard let sub = model.activeSubscription else { return false }
         return !DirectBuiltinProfile.isDirectOwned(sub.profile.remoteURL)
     }
 
-    private var canSoftRemove: Bool {
-        showsExternalSubscriptionControls
-    }
-
-    private var canUpdate: Bool {
-        guard showsExternalSubscriptionControls,
-              let sub = model.activeSubscription
-        else { return false }
+    private var canUpdateSubscription: Bool {
+        guard let sub = model.activeSubscription else { return false }
         let remote = sub.profile.remoteURL?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return sub.profile.type == .remote && !remote.isEmpty
+    }
+
+    private func toast(_ text: String) {
+        withAnimation(.easeOut(duration: 0.18)) { toastText = text }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            withAnimation(.easeIn(duration: 0.18)) { toastText = nil }
+        }
+    }
+}
+
+// MARK: - Toggle
+
+private struct DirectHomeToggleButton: View {
+    let isOn: Bool
+    let isBusy: Bool
+    let action: () -> Void
+
+    private let onStroke = Color(red: 0.333, green: 0.851, blue: 0.596)
+    private let onText = Color(red: 0.384, green: 0.863, blue: 0.6)
+    private let onKnob = Color(red: 0.443, green: 0.898, blue: 0.655)
+    private let offColor = Color(red: 0.89, green: 0.231, blue: 0.231)
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 0)
+                    .fill(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 0)
+                            .stroke(isBusy ? Color.orange : (isOn ? onStroke : offColor), lineWidth: 2)
+                    )
+                Text(isBusy ? "…" : (isOn ? "ON" : "OFF"))
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundStyle(isBusy ? Color.orange : (isOn ? onText : offColor))
+                    .frame(maxWidth: .infinity, alignment: isOn ? .leading : .trailing)
+                    .padding(.horizontal, 14)
+                DirectLucideIcon(
+                    name: .power,
+                    size: 18,
+                    color: isOn ? Color(red: 0.031, green: 0.067, blue: 0.043) : .white
+                )
+                .frame(width: 35, height: 35)
+                .background(isBusy ? Color.orange : (isOn ? onKnob : offColor))
+                .offset(x: isOn ? 24 : -24)
+            }
+            .frame(width: 94, height: 43)
+            .clipped()
+            .opacity(isBusy ? 0.72 : 1)
+        }
+        .buttonStyle(HapticButtonStyle())
+        .disabled(isBusy)
+    }
+}
+
+// MARK: - Action / Row
+
+private struct DirectHomeAction: View {
+    let title: String
+    let icon: DirectLucideIcon.Name
+    var busy = false
+    var disabled = false
+    let action: () -> Void
+
+    private let stroke = DS.line
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 6) {
+                DirectLucideIcon(
+                    name: busy ? .ellipsis : icon,
+                    size: 15,
+                    color: disabled ? DS.muted.opacity(0.4) : DS.ink
+                )
+                .frame(width: 17, height: 17)
+
+                Text(title)
+                    .font(.system(size: 9))
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                    .lineSpacing(-1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .foregroundStyle(disabled ? DS.muted.opacity(0.4) : DS.ink)
+            .background(DS.paper)
+            .overlay(Rectangle().stroke(stroke, lineWidth: 1))
+            .opacity(busy ? 0.7 : 1)
+        }
+        .buttonStyle(HapticButtonStyle())
+        .disabled(disabled || busy)
+    }
+}
+
+private struct DirectHomeLocationRow: View {
+    let title: String
+    let subtitle: String
+    let ping: String
+    let flagCode: String?
+    var flagFallback: String? = nil
+    let useGlobe: Bool
+    let selected: Bool
+    var exhausted: Bool = false
+    /// Limited locations only — `nil` hides the bottom meter.
+    var usedFraction: Double? = nil
+    let action: () -> Void
+
+    private let accent = DS.green
+    private let selectedBg = DS.acid.opacity(0.14)
+    private let selectedStroke = DS.green
+    private let stroke = DS.line
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 0) {
+                    Group {
+                        if useGlobe {
+                            DirectLucideIcon(name: .globe, size: 22, color: DS.acid)
+                        } else if let flagCode, !flagCode.isEmpty {
+                            FlagImage(code: flagCode, width: 34, height: 24, fallbackLabel: flagFallback)
+                        } else if let flagFallback, !flagFallback.isEmpty {
+                            FlagImage(code: "XX", width: 34, height: 24, fallbackLabel: flagFallback)
+                        } else {
+                            DirectLucideIcon(name: .globe, size: 22, color: accent)
+                        }
+                    }
+                    .frame(width: 38, height: 36)
+                    .padding(.trailing, 8)
+                    .opacity(exhausted ? 0.5 : 1)
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(title)
+                            .font(.system(size: 11.5, weight: .bold))
+                            .foregroundStyle(rowTitleColor)
+                            .lineLimit(1)
+                        Text(subtitle)
+                            .font(.system(size: 8.5))
+                            .foregroundStyle(rowSubtitleColor)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 6)
+
+                    HStack(spacing: 6) {
+                        Rectangle()
+                            .fill(exhausted ? DS.danger : (useGlobe ? DS.acid : DS.green))
+                            .frame(width: 7, height: 7)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(exhausted ? "—" : ping)
+                                .font(.system(size: 9.8, weight: .regular))
+                                .foregroundStyle(rowPrimaryText)
+                            Text(exhausted ? "Лимит" : "Пинг")
+                                .font(.system(size: 8))
+                                .foregroundStyle(rowSecondaryText)
+                        }
+                    }
+
+                    ZStack {
+                        Rectangle()
+                            .stroke(
+                                selected && !exhausted
+                                    ? (useGlobe ? DS.acid : accent)
+                                    : rowCheckboxStroke,
+                                lineWidth: 1.6
+                            )
+                            .frame(width: 18, height: 18)
+                        if selected && !exhausted {
+                            Rectangle()
+                                .fill(useGlobe ? DS.acid : accent)
+                                .frame(width: 8, height: 8)
+                        }
+                    }
+                    .padding(.leading, 14)
+                }
+                .padding(.horizontal, 9)
+                .padding(.top, usedFraction == nil ? 0 : 8)
+                .frame(minHeight: usedFraction == nil ? 56 : 48)
+
+                if let usedFraction {
+                    DirectLocationQuotaBar(usedFraction: usedFraction)
+                        .padding(.horizontal, 9)
+                        .padding(.top, 6)
+                        .padding(.bottom, 8)
+                }
+            }
+            .background(rowBackground)
+            .overlay(Rectangle().stroke(rowStroke, lineWidth: 1))
+            .opacity(exhausted ? 0.9 : 1)
+        }
+        .buttonStyle(HapticButtonStyle())
+    }
+
+    private var rowBackground: Color {
+        if useGlobe { return DS.ink }
+        return selected && !exhausted ? selectedBg : DS.paper
+    }
+
+    private var rowStroke: Color {
+        if useGlobe { return DS.ink }
+        return selected && !exhausted ? selectedStroke : stroke
+    }
+
+    private var rowPrimaryText: Color {
+        if useGlobe { return .white }
+        return exhausted ? DS.muted : DS.ink
+    }
+
+    private var rowSecondaryText: Color {
+        if useGlobe { return .white.opacity(0.45) }
+        return Color.gray
+    }
+
+    private var rowTitleColor: Color {
+        if useGlobe { return .white }
+        return exhausted ? DS.muted : DS.ink
+    }
+
+    private var rowSubtitleColor: Color {
+        if useGlobe { return .white.opacity(0.55) }
+        return exhausted ? DS.danger : Color.gray
+    }
+
+    private var rowCheckboxStroke: Color {
+        if useGlobe { return DS.acid.opacity(0.55) }
+        return DS.muted.opacity(0.45)
+    }
+}
+
+private struct DirectHomeBrandMark: View {
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let image = Self.loadLogo() {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Text("D")
+                    .font(.system(size: size * 0.42, weight: .bold, design: .monospaced))
+                    .foregroundStyle(DS.acid)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(DS.ink)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipped()
+        .accessibilityLabel("VPN Direct")
+    }
+
+    private static func loadLogo() -> UIImage? {
+        for name in ["DirectAppIcon", "AppIcon"] {
+            if let image = UIImage(named: name), image.size.width > 1 {
+                return image
+            }
+        }
+        if let icons = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any],
+           let primary = icons["CFBundlePrimaryIcon"] as? [String: Any],
+           let files = primary["CFBundleIconFiles"] as? [String]
+        {
+            for file in files.reversed() {
+                if let image = UIImage(named: file), image.size.width > 1 {
+                    return image
+                }
+            }
+        }
+        return nil
+    }
+}
+
+private struct DirectHomeLocationContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct DirectHomeLocationViewportHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct DirectHomeUtilitySheetChrome: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.4, *) {
+            content
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(0)
+                .preferredColorScheme(.light)
+        } else if #available(iOS 16.0, *) {
+            content
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .preferredColorScheme(.light)
+        } else {
+            content.preferredColorScheme(.light)
+        }
     }
 }
 

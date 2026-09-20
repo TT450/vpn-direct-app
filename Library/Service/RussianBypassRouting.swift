@@ -1,7 +1,7 @@
 import Foundation
 
 /// Injects sing-box `rule_set` rules so Russian domains/IPs go `direct` (no VPN).
-/// Same rule URLs as TheTochka. On Libbox 1.14 use ONLY `http_client` (not `download_detour`) —
+/// On Libbox 1.14 use ONLY `http_client` (not `download_detour`) —
 /// emitting both causes: "http_client is conflict with deprecated download_detour field".
 public enum RussianBypassRouting {
     private static let managedTags = [
@@ -56,16 +56,14 @@ public enum RussianBypassRouting {
 
         sets.removeAll { set in
             guard let tag = set["tag"] as? String else { return false }
-            return managedTags.contains(tag)
-                || tag.hasPrefix("aladdin-geosite")
-                || tag.hasPrefix("aladdin-geoip")
+            return managedTags.contains(tag) || tag.hasPrefix("vpndirect-geosite") || tag.hasPrefix("vpndirect-geoip")
         }
         rules.removeAll { rule in
             if let tag = rule["rule_set"] as? String {
-                return managedTags.contains(tag) || tag.hasPrefix("aladdin-")
+                return managedTags.contains(tag) || tag.hasPrefix("vpndirect-")
             }
             if let tags = rule["rule_set"] as? [String] {
-                return tags.contains(where: { managedTags.contains($0) || $0.hasPrefix("aladdin-") })
+                return tags.contains(where: { managedTags.contains($0) || $0.hasPrefix("vpndirect-") })
             }
             return false
         }

@@ -3,29 +3,75 @@ import Library
 
 #if os(iOS)
 
-/// Management — Direct subscription first; renew primary; third-party at bottom.
+/// Management — Direct subscription first; renew primary; no scroll chrome.
 struct DirectManagementPage: View {
     @ObservedObject var model: VPNConnectionModel
     let openAddMenu: () -> Void
 
-    private var imported: [VPNSubscriptionItem] { model.importedSubscriptions }
+    @State private var showDevices = false
+    @State private var showPayments = false
 
-    private var trafficLimit: Int {
+    /// Subscription-wide pool from `/me` limit + live used (subscription-userinfo / remaining).
+    /// Never sum limited-location caps — those are per-squad soft caps.
+    private var trafficMeter: (used: Double, limit: Double, unlimited: Bool) {
         if model.hasPremiumEntitlement {
-            return model.premiumTrafficGB >= VPNConnectionModel.unlimitedTrafficGB
-                ? 0
-                : max(model.premiumTrafficGB, 1)
+            if model.premiumTrafficGB > 0,
+               model.premiumTrafficGB < VPNConnectionModel.unlimitedTrafficGB
+            {
+                let limit = Double(model.premiumTrafficGB)
+                let used = min(limit, max(0, liveSubscriptionUsedGB(limit: limit)))
+                return (used, limit, false)
+            }
+            return (0, 0, true)
         }
-        return model.selectedPlan.trafficGB ?? 0
+
+        if let planGB = model.selectedPlan.trafficGB, planGB > 0 {
+            return (0, Double(planGB), false)
+        }
+        return (0, 0, true)
     }
 
-    /// Real usage from backend: limit − remaining (0 until /me reports remaining).
-    private var trafficUsed: Int {
-        guard trafficLimit > 0 else { return 0 }
-        if model.hasPremiumEntitlement {
-            return min(model.premiumTrafficUsedGB, trafficLimit)
+    /// Prefer live used from /me (Remna period total), then subscription-userinfo,
+    /// then sum of limited-location used (lower bound), then grant math.
+    private func liveSubscriptionUsedGB(limit: Double) -> Double {
+        if let exact = model.premiumTrafficUsedExactGB, exact.isFinite, exact >= 0 {
+            return exact
         }
-        return 0
+
+        let profileID: Int64? = {
+            if let active = model.activeSubscription?.id, active > 0 { return active }
+            if model.activeSubscriptionID > 0 { return model.activeSubscriptionID }
+            return model.subscriptions.first(where: {
+                DirectBuiltinProfile.isDirectOwned($0.profile.remoteURL)
+            })?.id
+        }()
+
+        if let profileID,
+           let meta = SubscriptionMetadataStore.load(profileID: profileID)
+        {
+            let bytes = meta.trafficUsedBytes
+            if bytes > 0 {
+                return Double(bytes) / (1024.0 * 1024.0 * 1024.0)
+            }
+        }
+
+        let locationUsed = model.locationCaps.reduce(0.0) { partial, cap in
+            if let used = cap.usedGb, used.isFinite, used > 0 {
+                return partial + used
+            }
+            if let rem = cap.remainingGb, let lim = cap.capGb, lim > rem {
+                return partial + max(0, lim - rem)
+            }
+            return partial
+        }
+        if locationUsed > 0 {
+            return min(locationUsed, limit)
+        }
+
+        if let remaining = model.premiumTrafficRemainingGB {
+            return max(0, limit - Double(max(0, remaining)))
+        }
+        return Double(model.premiumTrafficUsedGB)
     }
 
     private var expirationText: String {
@@ -40,38 +86,53 @@ struct DirectManagementPage: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                PageHeading(
-                    kicker: "DIRECT / MANAGEMENT",
-                    title: "Управление",
-                    subtitle: "Подписка, лимиты и настройки VPN Direct"
-                )
-                .padding(.top, DS.pageTop)
-                .padding(.bottom, 16)
-
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
                 subscriptionCard
-
                 primaryActions
-                    .padding(.top, 12)
-
-                usageSection
-                    .padding(.top, 24)
-
-                settingsSection
-                    .padding(.top, 24)
-
-                externalSection
-                    .padding(.top, 24)
-                    .padding(.bottom, 28)
             }
-            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
+
+            // Equal-height action cards fill the rest of the page (subscription block stays intrinsic).
+            VStack(spacing: 10) {
+                usageSection
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                devicesCard
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                paymentsCard
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                constructorButton
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                addSubscriptionButton
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .padding(.horizontal, 20)
+        .padding(.top, DS.pageTop)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(DS.paper.ignoresSafeArea())
         .onAppear {
             if model.hasPremiumEntitlement {
                 model.syncSelectedPlanFromActiveSubscription()
             }
+            Task {
+                await model.refreshDirectAccount()
+                await DirectBalanceFlow.shared.refresh()
+            }
+        }
+        .sheet(isPresented: $showDevices) {
+            DirectDevicesView(model: model)
+                .background(DS.paper.ignoresSafeArea())
+                .tint(DS.ink)
+                .modifier(DirectManagementSheetChrome())
+        }
+        .sheet(isPresented: $showPayments) {
+            DirectPaymentHistoryView(model: model)
+                .background(DS.paper.ignoresSafeArea())
+                .tint(DS.ink)
+                .modifier(DirectManagementSheetChrome())
         }
     }
 
@@ -90,6 +151,12 @@ struct DirectManagementPage: View {
         }()
         let devices = model.hasPremiumEntitlement ? model.premiumDeviceLimit : model.selectedPlan.devices
         return "\(traffic) · \(devices) устройства"
+    }
+
+    private var deviceCountLabel: String {
+        let used = max(1, min(model.premiumDevicesUsed, 99))
+        let limit = model.hasPremiumEntitlement ? model.premiumDeviceLimit : model.selectedPlan.devices
+        return String(format: "%02d / %02d", used, max(1, min(limit, 99)))
     }
 
     @ViewBuilder
@@ -199,161 +266,165 @@ struct DirectManagementPage: View {
     }
 
     private var usageSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            sectionHeader("02 / ИСПОЛЬЗОВАНИЕ")
+        let meter = trafficMeter
+        return VStack(alignment: .leading, spacing: 4) {
+            Text("Израсходовано трафика")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.black)
 
-            if trafficLimit > 0 {
-                usageRow(title: "VPN TRAFFIC", used: trafficUsed, limit: trafficLimit, unit: "GB")
+            if meter.unlimited {
+                Text("Без лимита")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.black)
+                Spacer(minLength: 0)
             } else {
-                usageUnlimitedRow(title: "VPN TRAFFIC", caption: model.hasPremiumEntitlement ? "UNLIMITED" : "—")
-            }
-        }
-    }
-
-    private func usageRow(title: String, used: Int, limit: Int, unit: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(title).microLabel(color: DS.muted)
-                Spacer()
-                Text("\(used) / \(limit) \(unit)")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(DS.ink)
-            }
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(DS.line)
-                        .frame(height: 5)
-                    Rectangle()
-                        .fill(DS.ink)
-                        .frame(
-                            width: geo.size.width * min(CGFloat(used) / CGFloat(max(limit, 1)), 1),
-                            height: 5
-                        )
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(VPNConnectionModel.formatTrafficUsedGb(meter.used, cap: meter.limit))
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Color.black)
+                    Text("/")
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Color.black)
+                    Text(VPNConnectionModel.formatTrafficCapGb(meter.limit))
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Color.black)
                 }
-            }
-            .frame(height: 5)
-        }
-        .padding(.vertical, 12)
-    }
 
-    private func usageUnlimitedRow(title: String, caption: String) -> some View {
-        HStack {
-            Text(title).microLabel(color: DS.muted)
-            Spacer()
-            Text(caption)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(DS.ink)
-        }
-        .padding(.vertical, 13)
-    }
+                Spacer(minLength: 8)
 
-    private var settingsSection: some View {
-        VStack(spacing: 0) {
-            sectionHeader("03 / НАСТРОЙКА")
-
-            managementRow("Изменить тариф", detail: "ГОТОВЫЕ ПЛАНЫ") {
-                model.openPremiumPlans(mode: .presets)
-            }
-            Hairline()
-            managementRow("Изменить устройства", detail: "КОНСТРУКТОР") {
-                model.openPremiumPlans(mode: .constructor)
-            }
-            Hairline()
-            managementRow("Изменить трафик", detail: "КОНСТРУКТОР") {
-                model.openPremiumPlans(mode: .constructor)
+                usageProgressBar(used: meter.used, limit: meter.limit)
             }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(DS.acid)
+        .overlay(Rectangle().stroke(DS.ink, lineWidth: 1.5))
     }
 
-    private func managementRow(_ title: String, detail: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func usageProgressBar(used: Double, limit: Double) -> some View {
+        let fraction = limit > 0 ? min(1, max(0, used / limit)) : 0
+        let fillFraction = fraction <= 0 ? 0 : max(fraction, 0.04)
+        return GeometryReader { geo in
+            let fillW = geo.size.width * CGFloat(fillFraction)
+            ZStack(alignment: .leading) {
+                Capsule(style: .continuous)
+                    .fill(Color.black.opacity(0.12))
+                Capsule(style: .continuous)
+                    .fill(Color.black.opacity(0.78))
+                    .frame(width: fillW)
+            }
+        }
+        .frame(height: 6)
+        .clipShape(Capsule(style: .continuous))
+        .accessibilityLabel("Использовано трафика")
+        .accessibilityValue("\(Int((fraction * 100).rounded())) процентов")
+    }
+
+    private var devicesCard: some View {
+        Button {
+            HapticManager.shared.play(.selection)
+            showDevices = true
+        } label: {
             HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.system(size: 12, weight: .medium))
+                Text("DEV")
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundStyle(DS.acid)
+                    .frame(width: 42, height: 42)
+                    .background(DS.ink)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Устройства")
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(DS.ink)
-                    Text(detail)
-                        .microLabel(color: DS.muted)
+                    Text("Активные сеансы и лимит тарифа")
+                        .font(.system(size: 10))
+                        .foregroundStyle(DS.muted)
                 }
-
-                Spacer()
-
+                Spacer(minLength: 8)
+                Text(deviceCountLabel)
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(DS.ink)
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(DS.ink)
             }
-            .frame(minHeight: 52)
+            .padding(14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(DS.paper)
+            .overlay(Rectangle().stroke(DS.ink, lineWidth: 1.5))
         }
         .buttonStyle(HapticButtonStyle())
     }
 
-    private var externalSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            sectionHeader("04 / ДРУГИЕ ПОДПИСКИ")
-
-            if imported.isEmpty {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Нет добавленных подписок")
-                        .font(.system(size: 12, weight: .medium))
+    private var paymentsCard: some View {
+        Button {
+            HapticManager.shared.play(.selection)
+            showPayments = true
+        } label: {
+            HStack(spacing: 12) {
+                Text("PAY")
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundStyle(DS.acid)
+                    .frame(width: 42, height: 42)
+                    .background(DS.ink)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Платежи")
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(DS.ink)
-                    Text("Добавьте стороннюю подписку, если хотите использовать её вместе с VPN Direct.")
-                        .font(.system(size: 9))
+                    Text("История оплат и возвратов")
+                        .font(.system(size: 10))
                         .foregroundStyle(DS.muted)
                 }
-                .padding(.vertical, 13)
-            } else {
-                ForEach(imported) { item in
-                    Button {
-                        model.setImportedAccessAndActivate(item.id)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(item.name)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(DS.ink)
-                                Text(model.isSubscriptionActive(item.id) ? "Добавлена · активна" : "Добавлена извне")
-                                    .font(.system(size: 9, design: .monospaced))
-                                    .foregroundStyle(DS.muted)
-                            }
-                            Spacer()
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(DS.ink)
-                        }
-                        .padding(.vertical, 12)
-                    }
-                    .buttonStyle(HapticButtonStyle())
-                    Hairline()
-                }
+                Spacer(minLength: 8)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(DS.ink)
             }
-
-            Button(action: openAddMenu) {
-                HStack(spacing: 9) {
-                    Image(systemName: "plus")
-                    Text("ДОБАВИТЬ ПОДПИСКУ")
-                    Spacer()
-                    Image(systemName: "arrow.right")
-                }
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundStyle(DS.acid)
-                .padding(.horizontal, 14)
-                .frame(height: 46)
-                .background(DS.ink)
-            }
-            .buttonStyle(HapticButtonStyle())
-            .padding(.top, 4)
+            .padding(14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(DS.paper)
+            .overlay(Rectangle().stroke(DS.ink, lineWidth: 1.5))
         }
+        .buttonStyle(HapticButtonStyle())
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        HStack {
-            Text(title).microLabel(color: DS.ink)
-            Spacer()
+    private var constructorButton: some View {
+        Button {
+            HapticManager.shared.play(.navigation)
+            model.openPremiumPlans(mode: .constructor)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("НЕ НАШЛИ ПОДХОДЯЩИЙ?").microLabel(color: DS.paper.opacity(0.55))
+                    Text("Собрать свой тариф")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .bold))
+            }
+            .foregroundStyle(DS.paper)
+            .padding(.horizontal, 13)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(DS.ink)
         }
-        .frame(height: 38)
-        .overlay(alignment: .top) { Hairline(color: DS.ink) }
+        .buttonStyle(HapticButtonStyle())
+    }
+
+    private var addSubscriptionButton: some View {
+        Button(action: openAddMenu) {
+            HStack(spacing: 9) {
+                Image(systemName: "plus")
+                Text("ДОБАВИТЬ ПОДПИСКУ")
+                Spacer()
+                Image(systemName: "arrow.right")
+            }
+            .font(.system(size: 9, weight: .bold, design: .monospaced))
+            .foregroundStyle(DS.acid)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(DS.ink)
+        }
+        .buttonStyle(HapticButtonStyle())
     }
 
     private func renew() {
@@ -363,6 +434,20 @@ struct DirectManagementPage: View {
             }
         } else {
             model.openPremiumPlans(mode: .presets)
+        }
+    }
+}
+
+private struct DirectManagementSheetChrome: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.4, *) {
+            content
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(0)
+                .preferredColorScheme(.light)
+        } else {
+            content.preferredColorScheme(.light)
         }
     }
 }

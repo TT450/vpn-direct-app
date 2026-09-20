@@ -116,16 +116,16 @@ struct DirectAuthLoginView: View {
                     model.requestAuthDestination(.authEmail)
                 }
                 AuthSecondaryButton(title: "Продолжить с Apple", assetIcon: "auth-apple-black") {
-                    Task { await model.signInWithAppleForAuth() }
+                    model.requestSocialAuth(.apple)
                 }
                 AuthSecondaryButton(title: "Продолжить с Google", assetIcon: "auth-google") {
-                    Task { await model.signInWithGoogleForAuth() }
+                    model.requestSocialAuth(.google)
                 }
                 AuthSecondaryButton(title: "По номеру телефона", icon: "phone") {
-                    model.openDetail(.authPhone)
+                    model.requestAuthDestination(.authPhone)
                 }
                 AuthSecondaryButton(title: "Код из бота", assetIcon: "auth-telegram") {
-                    model.openDetail(.authBot)
+                    model.requestAuthDestination(.authBot)
                 }
                 AuthDivider()
                 AuthSecondaryButton(title: "Создать аккаунт", icon: "plus") {
@@ -203,11 +203,17 @@ struct DirectAuthEmailView: View {
 
 struct DirectAuthCodeView: View {
     @ObservedObject var model: VPNConnectionModel
+    @State private var resendCooldownUntil: Date?
 
     private var subtitle: String {
         model.checkoutAuthEmail.isEmpty
             ? "Код отправлен на вашу почту."
             : "Код отправлен на \(model.checkoutAuthEmail)."
+    }
+
+    private var resendSecondsLeft: Int {
+        guard let until = resendCooldownUntil else { return 0 }
+        return max(0, Int(ceil(until.timeIntervalSinceNow)))
     }
 
     var body: some View {
@@ -224,16 +230,32 @@ struct DirectAuthCodeView: View {
                 AuthPrimaryButton(title: "ПОДТВЕРДИТЬ", icon: "checkmark") {
                     Task { await model.verifyEmailCodeForAuth() }
                 }
-                Button("Отправить код снова") {
+                Button {
+                    guard resendSecondsLeft == 0 else { return }
+                    resendCooldownUntil = Date().addingTimeInterval(30)
                     Task { await model.resendEmailCodeForAuth() }
+                } label: {
+                    Text(resendSecondsLeft > 0 ? "Повтор через \(resendSecondsLeft) с" : "Отправить код снова")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(resendSecondsLeft > 0 ? DS.muted.opacity(0.55) : DS.muted)
+                        .frame(maxWidth: .infinity, minHeight: 42)
                 }
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(DS.muted)
-                .frame(maxWidth: .infinity, minHeight: 42)
+                .disabled(resendSecondsLeft > 0 || model.checkoutAuthBusy)
+                .buttonStyle(.plain)
             }
         }
         .disabled(model.checkoutAuthBusy)
         .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
+        .onAppear {
+            if resendCooldownUntil == nil {
+                resendCooldownUntil = Date().addingTimeInterval(30)
+            }
+        }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            if resendSecondsLeft == 0 { return }
+            // Tick for SwiftUI refresh of countdown label.
+            _ = resendSecondsLeft
+        }
     }
 }
 
@@ -354,31 +376,20 @@ struct DirectAuthRecoveryView: View {
 
 struct DirectAuthBotView: View {
     @ObservedObject var model: VPNConnectionModel
-    @State private var mode: Mode = .code
-
-    private enum Mode: String, CaseIterable {
-        case code = "Код"
-        case confirm = "Подтверждение"
-    }
 
     var body: some View {
         AuthPageShell(
             kicker: "ACCOUNT / BOT",
             title: "Аккаунт бота",
-            subtitle: mode == .code
+            subtitle: model.checkoutAuthBotMode == .code
                 ? "В @vpndirectbot нажмите «Синхронизировать с приложением» и введите 6 цифр."
-                : "Укажите @username или Telegram ID — в боте придёт запрос «Согласиться / Запретить»."
+                : "Отправим запрос в Telegram — примите или отклоните вход в боте."
         ) {
             VStack(alignment: .leading, spacing: 14) {
                 AuthErrorText(model.checkoutAuthError)
-                Picker("", selection: $mode) {
-                    ForEach(Mode.allCases, id: \.self) { item in
-                        Text(item.rawValue).tag(item)
-                    }
-                }
-                .pickerStyle(.segmented)
+                botModeSwitcher
 
-                if mode == .code {
+                if model.checkoutAuthBotMode == .code {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("КОД ИЗ БОТА").microLabel(color: DS.ink)
                         Text("Кнопка в боте создаёт одноразовый 6-значный код. Старый формат XXXX-XXXX тоже ещё принимается.")
@@ -395,13 +406,15 @@ struct DirectAuthBotView: View {
                         text: $model.checkoutAuthBotCode,
                         keyboard: .numberPad
                     )
+                    .disabled(model.checkoutAuthBusy)
                     AuthPrimaryButton(title: "ВОЙТИ", icon: "arrow.right") {
                         Task { await model.linkBotCodeForAuth() }
                     }
+                    .disabled(model.checkoutAuthBusy)
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("ПОДТВЕРЖДЕНИЕ В TELEGRAM").microLabel(color: DS.ink)
-                        Text("Мы отправим запрос в чат с ботом. Пока ждёте — ничего не означает: подтверждение, отказ и неизвестный аккаунт выглядят одинаково.")
+                        Text("Отправим запрос в Telegram — в боте нужно принять или отклонить вход.")
                             .font(.system(size: 11))
                             .foregroundStyle(DS.muted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -414,6 +427,7 @@ struct DirectAuthBotView: View {
                         placeholder: "@username или 123456789",
                         text: $model.checkoutAuthBotIdentifier
                     )
+                    .disabled(model.checkoutAuthBusy)
                     AuthPrimaryButton(title: "ЗАПРОСИТЬ ВХОД", icon: "paperplane") {
                         Task {
                             await model.requestBotLoginConfirmForAuth(
@@ -421,16 +435,120 @@ struct DirectAuthBotView: View {
                             )
                         }
                     }
+                    .disabled(model.checkoutAuthBusy)
                     if model.checkoutAuthBusy {
-                        Text("Ожидаем подтверждение в Telegram…")
-                            .font(.system(size: 11))
-                            .foregroundStyle(DS.muted)
+                        HStack(spacing: 8) {
+                            ProgressView().scaleEffect(0.85)
+                            Text("Ожидаем подтверждение в Telegram…")
+                                .font(.system(size: 11))
+                                .foregroundStyle(DS.muted)
+                        }
                     }
                 }
             }
         }
-        .disabled(model.checkoutAuthBusy)
-        .overlay { if model.checkoutAuthBusy { ProgressView().scaleEffect(1.1) } }
+        // Full-screen spinner only for code submit — confirm wait uses the inline row above.
+        .overlay {
+            if model.checkoutAuthBusy, model.checkoutAuthBotMode == .code {
+                ProgressView().scaleEffect(1.1)
+            }
+        }
+        .overlay {
+            if model.showBotLoginRateLimitNotice {
+                botLoginRateLimitOverlay
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .zIndex(80)
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: model.showBotLoginRateLimitNotice)
+    }
+
+    /// Same visual language as burger «Добавить подписку» menu (ink card + micro labels).
+    private var botLoginRateLimitOverlay: some View {
+        let minutes = max(1, Int((Double(model.botLoginRateLimitRetryAfter) / 60.0).rounded(.up)))
+        return ZStack(alignment: .top) {
+            Color.black.opacity(0.12)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    model.showBotLoginRateLimitNotice = false
+                    HapticManager.shared.play(.menuClosed)
+                }
+
+            VStack(spacing: 0) {
+                HStack {
+                    Text("ЛИМИТ ВХОДА").microLabel(color: .white.opacity(0.48))
+                    Spacer()
+                    Text("ПОПЫТКИ").microLabel(color: .white.opacity(0.48))
+                }
+                .padding(16)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Слишком много попыток")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("Подождите около \(minutes) мин. и запросите вход снова.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.46))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
+
+                Hairline(color: .white.opacity(0.1))
+
+                Button {
+                    model.showBotLoginRateLimitNotice = false
+                    HapticManager.shared.play(.selection)
+                } label: {
+                    HStack(spacing: 13) {
+                        Text("01").microLabel(color: .white.opacity(0.35))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Понятно").font(.system(size: 14, weight: .medium))
+                            Text("Закрыть и подождать").font(.system(size: 10)).foregroundStyle(.white.opacity(0.46))
+                        }
+                        Spacer()
+                        Image(systemName: "checkmark")
+                            .foregroundStyle(DS.acid)
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 68)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(HapticButtonStyle())
+            }
+            .foregroundStyle(.white)
+            .frame(width: min(UIScreen.main.bounds.width - 32, 350))
+            .background(DS.ink)
+            .shadow(color: .black.opacity(0.24), radius: 24, y: 12)
+            .padding(.top, 12)
+            .padding(.horizontal, 16)
+        }
+    }
+
+    /// Square segments — system `.segmented` Picker is rounded and often swallows taps under AuthPageShell's buttonStyle.
+    private var botModeSwitcher: some View {
+        HStack(spacing: 0) {
+            ForEach(CheckoutAuthBotMode.allCases, id: \.self) { mode in
+                let selected = model.checkoutAuthBotMode == mode
+                Button {
+                    guard model.checkoutAuthBotMode != mode else { return }
+                    model.checkoutAuthBotMode = mode
+                    model.checkoutAuthError = nil
+                    HapticManager.shared.play(.selection)
+                } label: {
+                    Text(mode.rawValue)
+                        .font(.system(size: 10, weight: selected ? .bold : .regular))
+                        .foregroundStyle(selected ? DS.paper : DS.ink)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 36)
+                        .background(selected ? DS.ink : Color.clear)
+                        .overlay(Rectangle().stroke(selected ? DS.ink : DS.line, lineWidth: 1))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }
 
@@ -916,9 +1034,19 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
     }
 
     private var continuation: CheckedContinuation<Result, Error>?
+    private var isSigningIn = false
 
     func signIn() async throws -> Result {
-        try await withCheckedThrowingContinuation { cont in
+        if isSigningIn {
+            throw NSError(
+                domain: "DirectAuth",
+                code: 1002,
+                userInfo: [NSLocalizedDescriptionKey: "Вход через Apple уже выполняется"]
+            )
+        }
+        isSigningIn = true
+        defer { isSigningIn = false }
+        return try await withCheckedThrowingContinuation { cont in
             self.continuation = cont
             let request = ASAuthorizationAppleIDProvider().createRequest()
             request.requestedScopes = [.fullName, .email]
@@ -994,8 +1122,18 @@ final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationCo
     }
 
     private var session: ASWebAuthenticationSession?
+    private var isSigningIn = false
 
     func signIn() async throws -> Result {
+        if isSigningIn {
+            throw NSError(
+                domain: "DirectAuth",
+                code: 1002,
+                userInfo: [NSLocalizedDescriptionKey: "Вход через Google уже выполняется"]
+            )
+        }
+        isSigningIn = true
+        defer { isSigningIn = false }
         let clientId = DirectBackendRuntime.googleClientID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clientId.isEmpty else {
             throw NSError(
