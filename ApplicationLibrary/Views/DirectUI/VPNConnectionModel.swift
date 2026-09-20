@@ -965,8 +965,8 @@ public final class VPNConnectionModel: ObservableObject {
 
     public var statusTitle: String {
         switch phase {
-        case .connecting: "Подключение"
-        case .disconnecting: "Отключение"
+        case .connecting: "Защищаем Сеть"
+        case .disconnecting: "Отключаем Защиту"
         case .switching: "Переподключение"
         case .idle: isProtected ? "Подключено" : "Отключено"
         }
@@ -3053,13 +3053,18 @@ public final class VPNConnectionModel: ObservableObject {
             connectPollTask = nil
             isStarting = false
             connectSawConnecting = false
+            let becameConnected = !wasConnected
             isConnected = true
             let shouldApplyMode = phase == .connecting
             phase = .idle
             alert = nil
             environments?.commandClient.connect()
             Task {
-                resetSessionTrafficBaseline()
+                // Only baseline on a real connect. Re-baselining on every foreground
+                // sync zeroes the live TRAFFIC counter while the tunnel stays up.
+                if becameConnected {
+                    resetSessionTrafficBaseline()
+                }
                 await refreshAssignedFromGroups()
                 if shouldApplyMode {
                     try? await applyConnectionModeBehavior(force: true)
@@ -4071,10 +4076,13 @@ public final class VPNConnectionModel: ObservableObject {
         let next: String
         if isProtected, let status = environments?.commandClient.status {
             let sessionTotal = status.uplinkTotal &+ status.downlinkTotal
-            lastSessionTrafficTotal = sessionTotal
-            if sessionTrafficBaseline == 0 {
+            // Extension counters can restart after suspend — don't invent a huge negative delta.
+            if sessionTrafficBaseline > 0, sessionTotal < sessionTrafficBaseline {
+                sessionTrafficBaseline = sessionTotal
+            } else if sessionTrafficBaseline == 0 {
                 sessionTrafficBaseline = sessionTotal
             }
+            lastSessionTrafficTotal = sessionTotal
             let delta = max(0, sessionTotal - sessionTrafficBaseline)
             next = Self.formatBytes(persisted &+ delta)
         } else if persisted > 0 {
@@ -4087,7 +4095,23 @@ public final class VPNConnectionModel: ObservableObject {
         }
     }
 
+    /// Flush live session bytes into today's store and advance the baseline so a
+    /// later reset / counter rewind cannot wipe the counter on foreground.
+    public func checkpointSessionTraffic() {
+        persistSessionTrafficDelta()
+        if let status = environments?.commandClient.status {
+            let total = status.uplinkTotal &+ status.downlinkTotal
+            sessionTrafficBaseline = total
+            lastSessionTrafficTotal = total
+        } else if lastSessionTrafficTotal > sessionTrafficBaseline {
+            sessionTrafficBaseline = lastSessionTrafficTotal
+        }
+        updateTraffic()
+    }
+
     private func resetSessionTrafficBaseline() {
+        // Keep any uncommitted session bytes before re-baselining.
+        persistSessionTrafficDelta()
         if let status = environments?.commandClient.status {
             sessionTrafficBaseline = status.uplinkTotal &+ status.downlinkTotal
             lastSessionTrafficTotal = sessionTrafficBaseline

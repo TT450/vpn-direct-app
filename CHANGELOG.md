@@ -1,3 +1,12 @@
+## [1.0.11.155] — 2026-09-20
+
+### Home / Management polish (build 155)
+
+- Management page compact mock layout; remain/bar use forest green
+- App bar restored on tab roots; burger menu removed
+- Splash + launch mark «A» flipped; lighter paper; traffic counter survives background
+- TestFlight **1.0.11 (155)**
+
 ## [1.0.11.153] — 2026-09-20
 
 ### Auth hardening + logout wipe (build 153)

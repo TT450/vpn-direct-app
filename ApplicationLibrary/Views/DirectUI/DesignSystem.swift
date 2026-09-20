@@ -4,7 +4,8 @@ import UIKit
 #if os(iOS)
 
 enum DS {
-    static let paper = Color(red: 0.93, green: 0.94, blue: 0.91)
+    /// Soft light gray canvas — near-white, slightly cooler than pure white.
+    static let paper = Color(red: 0.965, green: 0.965, blue: 0.968)
     static let ink = Color(red: 0.08, green: 0.09, blue: 0.08)
     static let panel = Color(red: 0.19, green: 0.21, blue: 0.18)
     static let muted = Color(red: 0.48, green: 0.50, blue: 0.46)
@@ -78,11 +79,12 @@ struct Hairline: View {
 }
 
 /// In-card usage gauge for limited locations (not a row divider).
-/// Fill grows with used/cap; solid color green→red as remaining shrinks.
+/// Fill grows with used/cap; solid color green→orange→red as remaining shrinks.
+/// Sharp corners — matches Direct location cards (no capsule).
 struct DirectLocationQuotaBar: View {
     /// Used fraction in `0…1`.
     let usedFraction: Double
-    var height: CGFloat = 4
+    var height: CGFloat = 3
 
     private var clamped: Double {
         min(1, max(0, usedFraction.isFinite ? usedFraction : 0))
@@ -98,15 +100,14 @@ struct DirectLocationQuotaBar: View {
         GeometryReader { geo in
             let fillW = geo.size.width * fillFraction
             ZStack(alignment: .leading) {
-                Capsule(style: .continuous)
+                Rectangle()
                     .fill(DS.ink.opacity(0.10))
-                Capsule(style: .continuous)
+                Rectangle()
                     .fill(Self.color(usedFraction: clamped))
                     .frame(width: fillW)
             }
         }
         .frame(height: height)
-        .clipShape(Capsule(style: .continuous))
         .accessibilityLabel("Использовано трафика")
         .accessibilityValue("\(Int((clamped * 100).rounded())) процентов")
     }
@@ -116,8 +117,8 @@ struct DirectLocationQuotaBar: View {
         let t = CGFloat(min(1, max(0, used)))
         // Ease toward red sooner so mid-usage already reads warm.
         let eased = pow(t, 0.85)
-        let green = UIColor(red: 0.18, green: 0.55, blue: 0.31, alpha: 1)
-        let amber = UIColor(red: 0.90, green: 0.58, blue: 0.12, alpha: 1)
+        let green = UIColor(red: 0.18, green: 0.55, blue: 0.31, alpha: 1) // forest — not lime
+        let amber = UIColor(red: 0.90, green: 0.55, blue: 0.14, alpha: 1)
         let red = UIColor(red: 0.82, green: 0.24, blue: 0.20, alpha: 1)
         let blended: UIColor
         if eased <= 0.45 {

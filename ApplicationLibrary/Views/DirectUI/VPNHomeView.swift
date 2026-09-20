@@ -27,16 +27,14 @@ public struct VPNHomeView: View {
         GeometryReader { proxy in
             let chromeWidth = proxy.size.width
 
-            let showAppBar = model.detailPage != nil
+            // App bar on root tabs + detail stack (burger removed; back only on details).
+            let showAppBar = true
 
             ZStack(alignment: .top) {
                 DS.paper.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // App bar only on pushed detail pages — root tabs (Home/Plans/Management/Profile) are chrome-free.
-                    if showAppBar {
-                        Color.clear.frame(height: DirectChrome.appBarHeight)
-                    }
+                    Color.clear.frame(height: DirectChrome.appBarHeight)
 
                     Group {
                         if let detailPage = model.detailPage {
@@ -202,12 +200,10 @@ public struct VPNHomeView: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                // Overlay app bar only for detail stack (back + brand). Root tabs rely on bottom nav.
-                if showAppBar {
-                    appHeader
-                        .frame(width: chromeWidth)
-                        .zIndex(50)
-                }
+                // Overlay app bar for root tabs and detail stack.
+                appHeader
+                    .frame(width: chromeWidth)
+                    .zIndex(50)
 
                 if let force = model.forceUpdateRequirement {
                     VPNDirectForceUpdateView(
@@ -267,6 +263,9 @@ public struct VPNHomeView: View {
                 consumeAccountDeepLinkIfNeeded()
                 model.resumeOpenPaymentsIfNeeded()
                 Task { await DirectBalanceFlow.shared.refresh() }
+            } else if phase == .inactive || phase == .background {
+                // Persist live TRAFFIC before suspend so foreground sync cannot zero it.
+                model.checkpointSessionTraffic()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .vpnDirectWidgetToggle)) { _ in
@@ -398,35 +397,10 @@ public struct VPNHomeView: View {
             Spacer(minLength: 0)
         }
         .padding(.leading, 20)
-        // Keep trailing controls out of the HStack flow — absolute pin to the bar edge.
         .overlay(alignment: .trailing) {
-            HStack(spacing: 8) {
-                Text("VPN / \(String(format: "%02d", model.headerPageIndex))")
-                    .microLabel()
-                Button {
-                    model.isMenuOpen.toggle()
-                    HapticManager.shared.play(model.isMenuOpen ? .menuOpened : .menuClosed)
-                } label: {
-                    ZStack {
-                        if model.isMenuOpen {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 12, weight: .medium))
-                        } else {
-                            VStack(spacing: 4) {
-                                Capsule().fill(DS.ink).frame(width: 14, height: 1.5)
-                                Capsule().fill(DS.ink).frame(width: 14, height: 1.5)
-                            }
-                        }
-                    }
-                    .frame(width: 36, height: 36)
-                    .contentShape(Rectangle())
-                    .background(model.isMenuOpen ? DS.ink : Color.clear)
-                    .foregroundStyle(model.isMenuOpen ? DS.acid : DS.ink)
-                    .overlay(Rectangle().stroke(DS.ink, lineWidth: 1))
-                }
-                .buttonStyle(HapticButtonStyle())
-            }
-            .padding(.trailing, 12)
+            Text("VPN / \(String(format: "%02d", model.headerPageIndex))")
+                .microLabel()
+                .padding(.trailing, 20)
         }
         .frame(maxWidth: .infinity)
         .frame(height: DirectChrome.appBarHeight)

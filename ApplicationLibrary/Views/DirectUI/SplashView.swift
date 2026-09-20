@@ -46,6 +46,7 @@ public struct SplashView: View {
                     Text("A")
                         .font(.system(size: 74, weight: .medium, design: .monospaced))
                         .foregroundStyle(DS.acid)
+                        .rotationEffect(.degrees(180))
                         .offset(y: appeared ? 0 : 8)
                         .opacity(appeared ? 1 : 0)
                 }

@@ -21,6 +21,11 @@ struct DirectLucideIcon: View {
         case slidersHorizontal = "sliders-horizontal"
         case x
         case arrowUpRight = "arrow-up-right"
+        case plus
+        case ban
+        case arrowLeftRight = "arrow-left-right"
+        case helpCircle = "help-circle"
+        case zap
 
         var systemFallback: String {
             switch self {
@@ -38,6 +43,11 @@ struct DirectLucideIcon: View {
             case .slidersHorizontal: return "slider.horizontal.3"
             case .x: return "xmark"
             case .arrowUpRight: return "arrow.up.right"
+            case .plus: return "plus"
+            case .ban: return "circle.slash"
+            case .arrowLeftRight: return "arrow.left.arrow.right"
+            case .helpCircle: return "questionmark"
+            case .zap: return "bolt.fill"
             }
         }
     }

@@ -17,19 +17,18 @@
                             <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="mark-box">
                                 <rect key="frame" x="120" y="324" width="153" height="153"/>
                                 <subviews>
-                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="A" textAlignment="center" translatesAutoresizingMaskIntoConstraints="NO" id="mark-label">
-                                        <rect key="frame" x="0.0" y="27" width="153" height="99"/>
-                                        <fontDescription key="fontDescription" type="system" weight="medium" pointSize="74"/>
-                                        <color key="textColor" red="0.6588235294" green="0.937254902" blue="0.4078431373" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                    </label>
+                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchMarkA" translatesAutoresizingMaskIntoConstraints="NO" id="mark-image">
+                                        <rect key="frame" x="0.0" y="0.0" width="153" height="153"/>
+                                    </imageView>
                                 </subviews>
                                 <color key="backgroundColor" white="1" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <constraints>
                                     <constraint firstAttribute="width" constant="153" id="box-width"/>
                                     <constraint firstAttribute="height" constant="153" id="box-height"/>
-                                    <constraint firstItem="mark-label" firstAttribute="leading" secondItem="mark-box" secondAttribute="leading" id="mark-leading"/>
-                                    <constraint firstAttribute="trailing" secondItem="mark-label" secondAttribute="trailing" id="mark-trailing"/>
-                                    <constraint firstItem="mark-label" firstAttribute="centerY" secondItem="mark-box" secondAttribute="centerY" id="mark-y"/>
+                                    <constraint firstItem="mark-image" firstAttribute="leading" secondItem="mark-box" secondAttribute="leading" id="mark-leading"/>
+                                    <constraint firstAttribute="trailing" secondItem="mark-image" secondAttribute="trailing" id="mark-trailing"/>
+                                    <constraint firstItem="mark-image" firstAttribute="top" secondItem="mark-box" secondAttribute="top" id="mark-top"/>
+                                    <constraint firstAttribute="bottom" secondItem="mark-image" secondAttribute="bottom" id="mark-bottom"/>
                                 </constraints>
                             </view>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="VPN DIRECT" textAlignment="center" translatesAutoresizingMaskIntoConstraints="NO" id="brand-label">
@@ -59,4 +58,7 @@
             </objects>
         </scene>
     </scenes>
+    <resources>
+        <image name="LaunchMarkA" width="153" height="153"/>
+    </resources>
 </document>

@@ -18,11 +18,11 @@ How to install beta builds and invite people. **No signing secrets belong in thi
 | Field | Value |
 | --- | --- |
 | Marketing version | **1.0.11** |
-| Build | **153** (auth hardening + logout wipe) |
+| Build | **155** (management UI + app bar + splash mark) |
 | Bundle ID | `com.vpndirect.vpndirectapp` |
 | GitHub tag | [`v1.0.11.153`](https://github.com/TT450/vpn-direct-app/releases/tag/v1.0.11.153) |
 
-Prefer **153+**. Older builds may still appear in history.
+Prefer **155+**. Older builds may still appear in history.
 
 ## How to add testers (you / App Store Connect)
 

@@ -1,0 +1,8 @@
+{
+  "images" : [
+    { "filename" : "LaunchMarkA.png", "idiom" : "universal", "scale" : "1x" },
+    { "filename" : "peter.m@example.com", "idiom" : "universal", "scale" : "2x" },
+    { "filename" : "james.b@example.com", "idiom" : "universal", "scale" : "3x" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}
